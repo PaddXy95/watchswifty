@@ -81,3 +81,12 @@ Platzierung der Kommentar-Felder im Detail.
   wird einmalig `token.key` neben der Datenbank erzeugt (Hinweis im Log). Ungültiger Schlüssel → Start bricht ab.
 - Bestehende Klartext-Tokens werden beim Start verschlüsselt. Nicht entschlüsselbarer Token (Schlüssel gewechselt)
   gilt als fehlend; Konto zeigt „Token nicht lesbar – bitte neu eintragen“.
+
+## Nachtrag: Hinweis auf neue Versionen [entschieden: in der App, abschaltbar, „Jetzt prüfen“]
+- Neue Admin-Seite „System“ (`/admin/system`): installierte Version, Abschnitt „Updates“ mit Hinweis, dass dafür
+  die GitHub-API (api.github.com) abgefragt wird (GitHub sieht die Server-IP, keine WatchSwifty-Daten), Schalter
+  „Automatisch alle 12 Stunden prüfen“ und Button „Jetzt prüfen“. [entschieden]
+- Standard: aus (keine Anfrage an GitHub ohne Zustimmung des Admins). Einschalten prüft sofort einmal. [Vorschlag]
+- Ergebnis wird gespeichert (letzte Prüfung, neueste Version, Link zu den Release-Notes, Fehler). Ist eine neuere
+  Version da, zeigt die Seite die Update-Befehle und der Footer zeigt Admins „Update auf vX.Y.Z verfügbar“. [Vorschlag]
+- Aktualisieren bleibt Handarbeit (`docker compose pull && docker compose up -d`); die App tauscht sich nicht selbst aus.
