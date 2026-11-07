@@ -15,21 +15,38 @@ actor MatchingWorker {
     private let provider: TMDBProvider
     private let logger: Logger
     private let enabled: Bool
+    /// Shared with MappingService so user decisions and worker writes never interleave.
+    private let lock: AsyncMutex
 
     private(set) var isRunning = false
+    private var processing = false
     /// Last problem per user (missing/rejected token, TMDB down); cleared after a clean run for that user.
     private var errors: [UUID: String] = [:]
     private var failedThisRun: Set<UUID> = []
     private var rerunRequested = false
 
-    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool) {
+    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool, lock: AsyncMutex = AsyncMutex()) {
         self.db = db
         self.provider = provider
         self.logger = logger
         self.enabled = enabled
+        self.lock = lock
     }
 
     func lastError(for userID: UUID) -> String? { errors[userID] }
+
+    /// Runs `body` (actor-isolated) while holding the shared import lock.
+    private func locked<T>(_ body: () async throws -> T) async throws -> T {
+        await lock.lock()
+        do {
+            let result = try await body()
+            await lock.unlock()
+            return result
+        } catch {
+            await lock.unlock()
+            throw error
+        }
+    }
 
     /// Starts a run in the background (no-op when disabled); a kick during a run schedules another pass.
     func kick() {
@@ -57,7 +74,11 @@ actor MatchingWorker {
 
     private var watches: WatchService { WatchService(db: db) }
 
+    /// One pass over all pending work. A call while another pass is in progress returns at once.
     func processAll() async throws -> MatchingRunResult {
+        guard !processing else { return MatchingRunResult() }
+        processing = true
+        defer { processing = false }
         var result = MatchingRunResult()
         failedThisRun = []
         var touchedUsers: Set<UUID> = []
@@ -83,6 +104,10 @@ actor MatchingWorker {
 
     /// Gives every pending row without a mapping its (name, kind) mapping.
     private func assignMappings() async throws -> Bool {
+        try await locked { try await assignMappingsLocked() }
+    }
+
+    private func assignMappingsLocked() async throws -> Bool {
         let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id == nil).all()
         guard !rows.isEmpty else { return false }
         for (userID, userRows) in Dictionary(grouping: rows, by: { $0.$user.id }) {
@@ -153,26 +178,32 @@ actor MatchingWorker {
         errors[userID] = message
     }
 
+    /// TMDB lookups happen outside the lock; the result is only written if the user has not
+    /// decided on this mapping in the meantime (still `pending`).
     private func resolve(_ mapping: NetflixMapping, tmdb: any TMDBClient, catalog: CatalogService) async throws {
         let results = try await tmdb.search(mapping.netflixName, kind: mapping.titleKind)
-        var resolved = false
+        var titleID: UUID?
         if let hit = autoMatch(candidate: mapping.netflixName, in: results) {
             do {
-                let title = try await catalog.title(kind: mapping.titleKind, tmdbID: hit.id)
-                mapping.$title.id = try title.requireID()
-                mapping.status = MappingStatus.auto.rawValue
-                resolved = true
+                titleID = try await catalog.title(kind: mapping.titleKind, tmdbID: hit.id).requireID()
             } catch TMDBError.notFound {
-                resolved = false
+                titleID = nil
             }
         }
-        if !resolved {
-            mapping.status = MappingStatus.review.rawValue
-            mapping.candidateResults = Array(results.prefix(5))
-        }
-        try await mapping.save(on: db)
-        if !resolved && mapping.titleKind == .movie {
-            try await redirectFallbackRows(from: mapping)
+        let mappingID = try mapping.requireID()
+        try await locked {
+            guard let fresh = try await NetflixMapping.find(mappingID, on: db), fresh.mappingStatus == .pending else { return }
+            if let titleID {
+                fresh.$title.id = titleID
+                fresh.status = MappingStatus.auto.rawValue
+            } else {
+                fresh.status = MappingStatus.review.rawValue
+                fresh.candidateResults = Array(results.prefix(5))
+            }
+            try await fresh.save(on: db)
+            if titleID == nil && fresh.titleKind == .movie {
+                try await redirectFallbackRows(from: fresh)
+            }
         }
     }
 
@@ -193,6 +224,10 @@ actor MatchingWorker {
     // MARK: Step 3 – ignored names
 
     private func ignoreRowsOfIgnoredMappings() async throws {
+        try await locked { try await ignoreRowsLocked() }
+    }
+
+    private func ignoreRowsLocked() async throws {
         let ignored = try await NetflixMapping.query(on: db).filter(\.$status == MappingStatus.ignored.rawValue).all().compactMap(\.id)
         guard !ignored.isEmpty else { return }
         try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id ~~ ignored)
@@ -202,41 +237,52 @@ actor MatchingWorker {
     // MARK: Step 4 – episodes / movies
 
     private func matchRows() async throws -> (Int, Int) {
-        let resolved = try await NetflixMapping.query(on: db)
-            .filter(\.$status ~~ [MappingStatus.auto.rawValue, MappingStatus.confirmed.rawValue]).filter(\.$title.$id != nil).all()
-        guard !resolved.isEmpty else { return (0, 0) }
-        let byID = Dictionary(resolved.compactMap { m in m.id.map { ($0, m) } }, uniquingKeysWith: { a, _ in a })
-        let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
-            .filter(\.$mapping.$id ~~ Array(byID.keys)).all()
+        let resolvedIDs = try await NetflixMapping.query(on: db)
+            .filter(\.$status ~~ [MappingStatus.auto.rawValue, MappingStatus.confirmed.rawValue]).filter(\.$title.$id != nil)
+            .all().compactMap(\.id)
+        guard !resolvedIDs.isEmpty else { return (0, 0) }
+        let groups = Set(try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
+            .filter(\.$mapping.$id ~~ resolvedIDs).all().compactMap(\.$mapping.id))
         var matched = 0, unmatched = 0
-        for (mappingID, mappingRows) in Dictionary(grouping: rows, by: { $0.$mapping.id! }) {
-            guard let mapping = byID[mappingID], let titleID = mapping.$title.id else { continue }
-            let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
-            let candidates: [EpisodeCandidate] = mapping.titleKind == .movie ? [] : try await catalog.episodes(of: titleID).map {
-                EpisodeCandidate(id: try $0.requireID(), season: $0.season, number: $0.number, name: $0.name)
-            }
-            for row in mappingRows {
-                let episodeIDs: [UUID?]
-                if mapping.titleKind == .movie {
-                    episodeIDs = [nil]
-                } else {
-                    episodeIDs = matchEpisodes(title: row.episodeTitle ?? row.rawTitle, season: row.seasonNumber, in: candidates)
+        for mappingID in groups {
+            let (m, u) = try await locked { try await matchGroup(mappingID) }
+            matched += m
+            unmatched += u
+        }
+        return (matched, unmatched)
+    }
+
+    /// Matches one mapping's pending rows, re-reading mapping and rows under the lock so a
+    /// decision the user made in the meantime is honoured.
+    private func matchGroup(_ mappingID: UUID) async throws -> (Int, Int) {
+        guard let mapping = try await NetflixMapping.find(mappingID, on: db),
+              [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id else { return (0, 0) }
+        let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
+            .filter(\.$mapping.$id == mappingID).all()
+        guard !rows.isEmpty else { return (0, 0) }
+        let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
+        let candidates: [EpisodeCandidate] = mapping.titleKind == .movie ? [] : try await catalog.episodes(of: titleID).map {
+            EpisodeCandidate(id: try $0.requireID(), season: $0.season, number: $0.number, name: $0.name)
+        }
+        var matched = 0, unmatched = 0
+        for row in rows {
+            let episodeIDs: [UUID?] = mapping.titleKind == .movie
+                ? [nil]
+                : matchEpisodes(title: row.episodeTitle ?? row.rawTitle, season: row.seasonNumber, in: candidates)
+            if episodeIDs.isEmpty {
+                row.status = RowStatus.unmatched.rawValue
+                unmatched += 1
+            } else {
+                var first: UUID?
+                for episodeID in episodeIDs {
+                    let watch = try await watches.recordImportedWatch(userID: row.$user.id, titleID: titleID, episodeID: episodeID, day: row.watchedOn)
+                    if first == nil { first = watch.id }
                 }
-                if episodeIDs.isEmpty {
-                    row.status = RowStatus.unmatched.rawValue
-                    unmatched += 1
-                } else {
-                    var first: UUID?
-                    for episodeID in episodeIDs {
-                        let watch = try await watches.recordImportedWatch(userID: row.$user.id, titleID: titleID, episodeID: episodeID, day: row.watchedOn)
-                        if first == nil { first = watch.id }
-                    }
-                    row.$watch.id = first
-                    row.status = RowStatus.matched.rawValue
-                    matched += 1
-                }
-                try await row.save(on: db)
+                row.$watch.id = first
+                row.status = RowStatus.matched.rawValue
+                matched += 1
             }
+            try await row.save(on: db)
         }
         return (matched, unmatched)
     }

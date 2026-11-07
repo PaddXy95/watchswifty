@@ -33,6 +33,19 @@ extension Request {
 }
 
 extension Application {
+    private struct ImportLockKey: StorageKey { typealias Value = AsyncMutex }
+
+    /// Serializes import decisions (MappingService) with the matching worker's writes.
+    var importLock: AsyncMutex {
+        get {
+            guard let lock = storage[ImportLockKey.self] else { fatalError("import lock not configured") }
+            return lock
+        }
+        set { storage[ImportLockKey.self] = newValue }
+    }
+}
+
+extension Application {
     private struct MatchingWorkerKey: StorageKey { typealias Value = MatchingWorker }
 
     var matchingWorker: MatchingWorker {

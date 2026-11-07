@@ -40,7 +40,9 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     try await app.autoMigrate()
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
 
-    app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, enabled: config.backgroundJobsEnabled)
+    app.importLock = AsyncMutex()
+    app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger,
+                                        enabled: config.backgroundJobsEnabled, lock: app.importLock)
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
