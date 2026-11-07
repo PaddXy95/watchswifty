@@ -68,6 +68,8 @@ protocol TMDBClient: Sendable {
     func series(id: Int) async throws -> TMDBSeries
     func season(seriesID: Int, number: Int) async throws -> [TMDBEpisode]
     func movie(id: Int) async throws -> TMDBMovie
+    /// IMDb id of a series (`GET /tv/{id}/external_ids`); nil when TMDB has none.
+    func seriesIMDbID(id: Int) async throws -> String?
 }
 
 /// Builds a TMDB client for one user's token.
@@ -87,4 +89,5 @@ struct MissingTokenTMDBClient: TMDBClient {
     func series(id: Int) async throws -> TMDBSeries { throw TMDBError.missingToken }
     func season(seriesID: Int, number: Int) async throws -> [TMDBEpisode] { throw TMDBError.missingToken }
     func movie(id: Int) async throws -> TMDBMovie { throw TMDBError.missingToken }
+    func seriesIMDbID(id: Int) async throws -> String? { throw TMDBError.missingToken }
 }

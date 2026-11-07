@@ -113,3 +113,25 @@ struct CatalogOverviewTests {
         }
     }
 }
+
+@Suite("CatalogIMDb")
+struct CatalogIMDbTests {
+    @Test func refreshStoresIMDbID() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 1399, name: "Game of Thrones", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1]), episodes: [1: ["A"]])
+        tmdb.setIMDbID(seriesID: 1399, "tt0944947")
+        tmdb.addSeries(TMDBSeries(id: 2, name: "Ohne", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1]), episodes: [1: ["A"]])
+        tmdb.addMovie(TMDBMovie(id: 603, name: "Matrix", originalName: nil, year: nil, posterPath: nil, imdbID: "tt0133093"))
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let got = try await catalog.title(kind: .tv, tmdbID: 1399)
+            let none = try await catalog.title(kind: .tv, tmdbID: 2)
+            let movie = try await catalog.title(kind: .movie, tmdbID: 603)
+            #expect(got.imdbID == "tt0944947")
+            #expect(none.imdbID == "")
+            #expect(movie.imdbID == "tt0133093")
+        }
+    }
+}

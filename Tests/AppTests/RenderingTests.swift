@@ -109,3 +109,43 @@ struct LoadingBarTests {
         #expect(link?.contains(#"hx-boost="false""#) == true)
     }
 }
+
+@Suite("ExternalLinks")
+struct ExternalLinksTests {
+    func title(_ kind: TitleKind, tmdbID: Int, name: String, imdb: String?) -> Title {
+        let t = Title(tmdbID: tmdbID, kind: kind, name: name)
+        t.imdbID = imdb
+        return t
+    }
+
+    @Test func externalLinksSeries() {
+        let html = ExternalLinks(title: title(.tv, tmdbID: 1399, name: "Game of Thrones", imdb: "tt0944947")).render()
+        #expect(html.contains(#"href="https://www.themoviedb.org/tv/1399""#))
+        #expect(html.contains(#"href="https://www.imdb.com/title/tt0944947/""#))
+        #expect(html.contains(#"href="https://www.rottentomatoes.com/search?search=Game%20of%20Thrones""#))
+        #expect(html.contains(#"href="https://seriesgraph.com/show/1399""#))
+        #expect(html.contains(#"target="_blank""#))
+    }
+
+    @Test func externalLinksMovieHasNoSeriesGraph() {
+        let html = ExternalLinks(title: title(.movie, tmdbID: 603, name: "Matrix", imdb: "tt0133093")).render()
+        #expect(html.contains(#"href="https://www.themoviedb.org/movie/603""#))
+        #expect(!html.contains("seriesgraph"))
+    }
+
+    @Test func imdbFallbackSearch() {
+        let html = ExternalLinks(title: title(.tv, tmdbID: 5, name: "Dark", imdb: "")).render()
+        #expect(html.contains(#"href="https://www.imdb.com/find/?q=Dark""#))
+    }
+
+    @Test func detailPageShowsLinks() async throws {
+        try await withTestApp(tmdb: TitlePagesTests.fake()) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                #expect(res.body.string.contains("seriesgraph.com/show/1399"))
+                #expect(res.body.string.contains("Rotten Tomatoes"))
+            }
+        }
+    }
+}

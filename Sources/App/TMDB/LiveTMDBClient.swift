@@ -46,6 +46,11 @@ struct LiveTMDBClient: TMDBClient {
         do { return try body() } catch is DecodingError { throw TMDBError.invalidResponse }
     }
 
+    func seriesIMDbID(id: Int) async throws -> String? {
+        let data = try await get("tv/\(id)/external_ids", [:])
+        return try Self.decoding { try Self.decodeExternalIDs(data) }
+    }
+
     // MARK: HTTP
 
     private func get(_ path: String, _ query: [String: String]) async throws -> Data {
@@ -156,6 +161,11 @@ struct LiveTMDBClient: TMDBClient {
         return try (JSONDecoder().decode(Season.self, from: data).episodes ?? []).map {
             TMDBEpisode(id: $0.id, season: $0.season_number, number: $0.episode_number, name: $0.name ?? "", airDate: blankToNil($0.air_date))
         }
+    }
+
+    static func decodeExternalIDs(_ data: Data) throws -> String? {
+        struct IDs: Decodable { let imdb_id: String? }
+        return blankToNil(try JSONDecoder().decode(IDs.self, from: data).imdb_id)
     }
 
     static func decodeMovie(_ data: Data) throws -> TMDBMovie {

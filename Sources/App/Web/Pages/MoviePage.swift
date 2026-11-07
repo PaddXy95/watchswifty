@@ -21,6 +21,7 @@ struct MoviePage: HTML {
                     if let overview = title.overview, !overview.isEmpty {
                         p(.class("overview")) { overview }
                     }
+                    ExternalLinks(title: title)
                     RatingControl(kind: .movie, tmdbID: title.tmdbID, rating: rating)
                     CommentBox(id: "movie-comment", action: "/movie/\(title.tmdbID)/comment", caption: "Kommentar zum Film", comment: comment)
                 }

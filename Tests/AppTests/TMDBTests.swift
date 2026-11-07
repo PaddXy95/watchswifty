@@ -131,3 +131,12 @@ struct TMDBOverviewTests {
         #expect(movie.overview == "Neo erwacht.")
     }
 }
+
+@Suite("TMDBIMDb")
+struct TMDBIMDbTests {
+    @Test func decodesIMDbIDs() throws {
+        #expect(try LiveTMDBClient.decodeMovie(Data(#"{"id":603,"title":"Matrix","imdb_id":"tt0133093"}"#.utf8)).imdbID == "tt0133093")
+        #expect(try LiveTMDBClient.decodeExternalIDs(Data(#"{"id":1399,"imdb_id":"tt0944947","tvdb_id":121361}"#.utf8)) == "tt0944947")
+        #expect(try LiveTMDBClient.decodeExternalIDs(Data(#"{"id":1,"imdb_id":""}"#.utf8)) == nil)
+    }
+}

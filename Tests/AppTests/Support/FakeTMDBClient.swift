@@ -9,6 +9,7 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         var seriesByID: [Int: TMDBSeries] = [:]
         var seasons: [String: [TMDBEpisode]] = [:]              // "seriesID/season"
         var moviesByID: [Int: TMDBMovie] = [:]
+        var imdbIDs: [Int: String] = [:]
         var failure: TMDBError?
         var genericFailure = false
         var calls: [String] = []
@@ -48,6 +49,15 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
 
     func setSeason(seriesID: Int, number: Int, _ episodes: [TMDBEpisode]) {
         state.withLockedValue { $0.seasons["\(seriesID)/\(number)"] = episodes }
+    }
+
+    func setIMDbID(seriesID: Int, _ imdbID: String) {
+        state.withLockedValue { $0.imdbIDs[seriesID] = imdbID }
+    }
+
+    func seriesIMDbID(id: Int) async throws -> String? {
+        try record("external_ids:\(id)")
+        return state.withLockedValue { $0.imdbIDs[id] }
     }
 
     func addMovie(_ movie: TMDBMovie) {

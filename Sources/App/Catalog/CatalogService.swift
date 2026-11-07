@@ -34,6 +34,8 @@ struct CatalogService {
             try await title.save(on: db)
         case .tv:
             let series = try await tmdb.series(id: title.tmdbID)
+            let imdbID: String?
+            do { imdbID = try await tmdb.seriesIMDbID(id: series.id) } catch TMDBError.notFound { imdbID = nil }
             var seasons: [[TMDBEpisode]] = []
             for number in series.seasonNumbers {
                 seasons.append(try await tmdb.season(seriesID: series.id, number: number))
@@ -44,6 +46,7 @@ struct CatalogService {
             title.posterPath = series.posterPath
             title.tmdbStatus = series.status
             title.overview = series.overview ?? ""
+            title.imdbID = imdbID ?? ""
             title.refreshedAt = now
             let episodes = seasons.flatMap { $0 }
             try await db.transaction { db in

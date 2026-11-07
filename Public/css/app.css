@@ -182,3 +182,4 @@ summary { cursor: pointer; font-weight: 600; }
 .candidate-action { color: var(--accent); font-weight: 600; }
 .more-link { margin-top: var(--space-4); text-align: center; }
 .overview { color: var(--ink-2); max-width: 46rem; margin: 0 0 var(--space-3); }
+.external-links { font-size: var(--text-sm); color: var(--ink-3); margin: 0 0 var(--space-3); }
