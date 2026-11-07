@@ -33,6 +33,7 @@ let package = Package(
             dependencies: [
                 .target(name: "App"),
                 .product(name: "VaporTesting", package: "vapor"),
+                .product(name: "Elementary", package: "elementary"),
             ],
             swiftSettings: swiftSettings
         ),

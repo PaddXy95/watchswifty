@@ -4,6 +4,7 @@ import Vapor
 
 func configure(_ app: Application, config: AppConfig) async throws {
     app.appConfig = config
+    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     app.http.server.configuration.hostname = config.host
     app.http.server.configuration.port = config.port
 
