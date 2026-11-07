@@ -398,3 +398,29 @@ Fehlt eine Pflichtvariable, startet die App nicht und sagt klar, was fehlt.
   unbekannt), sobald echte Dateien vorliegen
 - Watchlist, kommende Premieren
 - Umstieg auf Vapor 5, wenn stabil und die Fluent-Integration nachgezogen hat
+
+---
+
+## Änderung 2026-11-07: TMDB-Token pro Benutzer **[entschieden]**
+
+Jeder Benutzer hinterlegt seinen eigenen TMDB-Token; es gibt keinen serverweiten `TMDB_TOKEN` mehr.
+Ersetzt die betreffenden Aussagen in §3, §5, §6, §7, §9 und §10.
+
+- **Konto-Seite:** Abschnitt „TMDB-Token“ mit Status (hinterlegt, nur die letzten 4 Zeichen sichtbar /
+  nicht hinterlegt), Eingabefeld, „Speichern“, „Entfernen“. Beim Speichern wird der Token bei TMDB
+  geprüft (`GET /3/authentication`); abgelehnt → nicht gespeichert, Meldung „TMDB hat den Token
+  abgelehnt.“ **[Vorschlag]**
+- **Speicherung:** Klartext in `users.tmdb_token` (wird für die Aufrufe gebraucht). Nur der Besitzer
+  kann ihn setzen/entfernen; er erscheint nirgends im Klartext, auch nicht für Admins, und wird nie
+  geloggt. Die SQLite-Datei ist entsprechend zu schützen (README). **[Vorschlag]**
+- **Ohne Token:** Suche zeigt einen Hinweis mit Link zur Konto-Seite; bereits zwischengespeicherte
+  Titel, Weiterschauen, Verlauf und Bibliothek funktionieren weiter. **[Vorschlag]**
+- **Import:** Der Zuordnungslauf nutzt pro Benutzer dessen Token. Fehlt er oder lehnt TMDB ihn ab,
+  bleiben nur die Zeilen dieses Benutzers ausstehend, und seine Import-Seite zeigt die Meldung;
+  andere Benutzer werden weiter verarbeitet. **[Vorschlag]**
+- **Täglicher Abgleich:** Für jede fällige Serie wird der Token eines Benutzers verwendet, der die
+  Serie sichtbar in seiner Bibliothek hat; ohne solchen Token wird die Serie übersprungen. **[Vorschlag]**
+- **Gemeinsamer Cache bleibt:** `titles`/`episodes` werden weiterhin geteilt, egal mit wessen Token
+  sie geladen wurden.
+- **Konfiguration:** `TMDB_TOKEN` entfällt; `TMDB_LANGUAGE` bleibt global. Ein Rate-Limiter (≤ 20/s)
+  gilt für alle Benutzer gemeinsam.

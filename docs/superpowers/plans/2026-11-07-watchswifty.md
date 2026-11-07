@@ -725,3 +725,21 @@ Needs a real TMDB read access token from the user (never committed, passed via e
 - [ ] **Step 4:** Upload the same file again → „0 neu, 4268 bereits bekannt, 127 übersprungen (leerer Titel)“; row and watch counts unchanged.
 - [ ] **Step 5:** Open `/` → „The Mentalist“ card shows a next episode in Staffel 4 and „zuletzt auf Netflix“, dated 07.11.2026.
 - [ ] **Step 6:** Report the numbers from Step 3 to the user; spot-check five auto-matched series for wrong matches (anti-goal). Do not commit the database or the CSV.
+
+---
+
+### Task 21 (inserted before Task 19 verification): Per-user TMDB token
+
+Spec: „Änderung 2026-11-07: TMDB-Token pro Benutzer“.
+
+**Files:** Modify `Config/AppConfig.swift` (drop `tmdbToken`), `Auth/User.swift` (+`tmdb_token`), new migration `Auth/AddUserTMDBToken.swift`, `TMDB/TMDBClient.swift` (+`validate()`, `TMDBError.missingToken`, `struct TMDBProvider`, `MissingTokenTMDBClient`), `TMDB/LiveTMDBClient.swift`, `Config/Application+Services.swift` (`app.tmdbProvider`, `req.tmdb` from the user's token), `Account/AccountController.swift` + `AccountPage`, `Tracking/SearchController.swift` + `SearchPage` (hint without token), `Tracking/TrackingErrors.swift` (missingToken → 422 flash), `Import/MatchingWorker.swift` (per-user client and per-user `lastError(for:)`), `Import/ImportController.swift`, `Catalog/DailyRefresh.swift` (`refreshToken(for:on:)`), `configure.swift`, `entrypoint.swift`, README/compose; tests updated accordingly.
+
+**Interfaces:**
+- `struct TMDBProvider: Sendable { let make: @Sendable (String) -> any TMDBClient }`, `app.tmdbProvider`
+- `protocol TMDBClient { …; func validate() async throws }`; `TMDBError.missingToken`
+- `extension Request { var tmdb: any TMDBClient }` – client for the logged-in user's token, or `MissingTokenTMDBClient` (throws `.missingToken` on every call)
+- `MatchingWorker(db:provider:logger:enabled:)`, `func lastError(for userID: UUID) -> String?`
+- `func refreshToken(for titleID: UUID, on db: any Database) async throws -> String?`
+- Routes: `POST /account/tmdb-token` (`token`), `POST /account/tmdb-token/remove`
+
+**Tests:** config without TMDB_TOKEN starts; save token (validated, masked „…abcd“), rejected token 422 „TMDB hat den Token abgelehnt.“, remove token; search without token shows „TMDB-Token“ hint; worker: user without token stays pending with „Kein TMDB-Token hinterlegt“, other user processed; one user's rejected token doesn't block another; refresh token chooses a visible owner with a token.
