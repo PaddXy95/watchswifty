@@ -10,6 +10,7 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         var seasons: [String: [TMDBEpisode]] = [:]              // "seriesID/season"
         var moviesByID: [Int: TMDBMovie] = [:]
         var failure: TMDBError?
+        var genericFailure = false
         var calls: [String] = []
     }
 
@@ -19,6 +20,14 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     var failure: TMDBError? {
         get { state.withLockedValue { $0.failure } }
         set { state.withLockedValue { $0.failure = newValue } }
+    }
+
+    struct Boom: Error {}
+
+    /// Makes every call throw a non-TMDB error (e.g. a database or decoding problem).
+    var genericFailure: Bool {
+        get { state.withLockedValue { $0.genericFailure } }
+        set { state.withLockedValue { $0.genericFailure = newValue } }
     }
 
     func setSearch(_ kind: String, _ query: String, _ results: [TMDBSearchResult]) {
@@ -46,10 +55,11 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     }
 
     private func record(_ call: String) throws {
-        let failure = state.withLockedValue { s -> TMDBError? in
+        let (failure, generic) = state.withLockedValue { s -> (TMDBError?, Bool) in
             s.calls.append(call)
-            return s.failure
+            return (s.failure, s.genericFailure)
         }
+        if generic { throw Boom() }
         if let failure { throw failure }
     }
 

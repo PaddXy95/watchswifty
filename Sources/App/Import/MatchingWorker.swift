@@ -17,6 +17,8 @@ actor MatchingWorker {
     private let enabled: Bool
     /// Shared with MappingService so user decisions and worker writes never interleave.
     private let lock: AsyncMutex
+    private let retryDelay: Duration
+    private var retryScheduled = false
 
     private(set) var isRunning = false
     private var processing = false
@@ -25,12 +27,14 @@ actor MatchingWorker {
     private var failedThisRun: Set<UUID> = []
     private var rerunRequested = false
 
-    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool, lock: AsyncMutex = AsyncMutex()) {
+    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool, lock: AsyncMutex = AsyncMutex(),
+         retryDelay: Duration = .seconds(300)) {
         self.db = db
         self.provider = provider
         self.logger = logger
         self.enabled = enabled
         self.lock = lock
+        self.retryDelay = retryDelay
     }
 
     func lastError(for userID: UUID) -> String? { errors[userID] }
@@ -67,9 +71,35 @@ actor MatchingWorker {
                 logger.info("Zuordnung: \(result.matched) zugeordnet, \(result.unmatched) nicht zugeordnet, \(result.awaitingReview) zu prüfen")
             } catch {
                 logger.error("Matching failed: \(error)")
+                await recordForPendingUsers("Zuordnung fehlgeschlagen: \(error)")
             }
         } while rerunRequested
         isRunning = false
+        if !failedThisRun.isEmpty { scheduleRetry() }
+    }
+
+    /// After a run with per-user failures (TMDB down, token rejected …) try again later by itself.
+    private func scheduleRetry() {
+        guard enabled, !retryScheduled else { return }
+        retryScheduled = true
+        let delay = retryDelay
+        Task {
+            try? await Task.sleep(for: delay)
+            await self.retryNow()
+        }
+    }
+
+    private func retryNow() {
+        retryScheduled = false
+        kick()
+    }
+
+    private func recordForPendingUsers(_ message: String) async {
+        guard let users = try? await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).all().map(\.$user.id) else { return }
+        for user in Set(users) {
+            failedThisRun.insert(user)
+            errors[user] = message
+        }
     }
 
     private var watches: WatchService { WatchService(db: db) }
@@ -168,6 +198,9 @@ actor MatchingWorker {
             } catch let error as TMDBError {
                 fail(userID, "TMDB nicht erreichbar: \(error)")
                 logger.warning("Matching for one user stopped, TMDB error: \(error)")
+            } catch {
+                fail(userID, "Zuordnung fehlgeschlagen: \(error)")
+                logger.error("Matching for one user failed: \(error)")
             }
         }
         return (changed, Set(byUser.keys))

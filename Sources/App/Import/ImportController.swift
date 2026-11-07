@@ -13,6 +13,7 @@ struct ImportController {
         protected.get("import", use: page)
         protected.on(.POST, "import", body: .collect(maxSize: "10mb"), use: upload)
         protected.get("import", "progress", use: progress)
+        protected.post("import", "retry", use: retry)
         protected.get("import", "mappings", ":mappingID", "search", use: searchCandidates)
         protected.post("import", "mappings", ":mappingID", "accept", use: accept)
         protected.post("import", "mappings", ":mappingID", "ignore", use: ignore)
@@ -57,6 +58,12 @@ struct ImportController {
             return HTMLResponse(headers: ["HX-Refresh": "true"], fragment)
         }
         return HTMLResponse(fragment)
+    }
+
+    /// Starts a matching run now (e.g. after TMDB was down) and returns the progress fragment.
+    func retry(req: Request) async throws -> HTMLResponse {
+        await req.application.matchingWorker.kick()
+        return HTMLResponse(try await progressFragment(req))
     }
 
     // MARK: Decisions

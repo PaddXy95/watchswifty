@@ -18,23 +18,32 @@ struct LiveTMDBClient: TMDBClient {
 
     func search(_ query: String, kind: TitleKind) async throws -> [TMDBSearchResult] {
         let data = try await get("search/\(kind.rawValue)", ["query": query, "include_adult": "false"])
-        return try Self.decodeSearch(data, kind: kind)
+        return try Self.decoding { try Self.decodeSearch(data, kind: kind) }
     }
 
     func searchMulti(_ query: String) async throws -> [TMDBSearchResult] {
-        try Self.decodeMulti(try await get("search/multi", ["query": query, "include_adult": "false"]))
+        let data = try await get("search/multi", ["query": query, "include_adult": "false"])
+        return try Self.decoding { try Self.decodeMulti(data) }
     }
 
     func series(id: Int) async throws -> TMDBSeries {
-        try Self.decodeSeries(try await get("tv/\(id)", [:]))
+        let data = try await get("tv/\(id)", [:])
+        return try Self.decoding { try Self.decodeSeries(data) }
     }
 
     func season(seriesID: Int, number: Int) async throws -> [TMDBEpisode] {
-        try Self.decodeSeason(try await get("tv/\(seriesID)/season/\(number)", [:]))
+        let data = try await get("tv/\(seriesID)/season/\(number)", [:])
+        return try Self.decoding { try Self.decodeSeason(data) }
     }
 
     func movie(id: Int) async throws -> TMDBMovie {
-        try Self.decodeMovie(try await get("movie/\(id)", [:]))
+        let data = try await get("movie/\(id)", [:])
+        return try Self.decoding { try Self.decodeMovie(data) }
+    }
+
+    /// Maps malformed bodies (proxies, captive portals, API changes) to `.invalidResponse`.
+    static func decoding<T>(_ body: () throws -> T) throws -> T {
+        do { return try body() } catch is DecodingError { throw TMDBError.invalidResponse }
     }
 
     // MARK: HTTP

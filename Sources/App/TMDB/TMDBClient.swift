@@ -40,7 +40,7 @@ struct TMDBMovie: Sendable, Equatable {
 }
 
 enum TMDBError: Error, Equatable, CustomStringConvertible {
-    case missingToken, unauthorized, notFound, rateLimited
+    case missingToken, unauthorized, notFound, rateLimited, invalidResponse
     case http(UInt)
     case network(String)
 
@@ -50,6 +50,7 @@ enum TMDBError: Error, Equatable, CustomStringConvertible {
         case .unauthorized: "Token ungültig (HTTP 401)"
         case .notFound: "nicht gefunden (HTTP 404)"
         case .rateLimited: "Anfragelimit erreicht (HTTP 429)"
+        case .invalidResponse: "unerwartete Antwort von TMDB"
         case .http(let code): "HTTP \(code)"
         case .network(let message): message
         }

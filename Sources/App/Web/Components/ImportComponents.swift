@@ -22,6 +22,9 @@ struct ImportProgress: HTML {
             if let lastError {
                 p(.class("error")) { lastError }
             }
+            if !isRunning && (lastError != nil || pendingRows > 0) {
+                button(.hx.post("/import/retry"), .hx.target("#import-progress"), .hx.swap(.outerHTML)) { "Erneut versuchen" }
+            }
         }
     }
 }
