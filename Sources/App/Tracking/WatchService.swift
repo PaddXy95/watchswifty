@@ -1,0 +1,163 @@
+import Fluent
+import Foundation
+import Vapor
+
+enum TrackingError: Error, Equatable {
+    case notFound, invalidRating, invalidDate, futureDate, notAired
+}
+
+/// All per-user tracking writes. Every method takes the acting user's ID and never
+/// touches another user's rows (foreign IDs → `.notFound`).
+struct WatchService {
+    let db: any Database
+    var today: @Sendable () -> String = { CalendarDay.today() }
+
+    // MARK: Episodes
+
+    func markEpisode(userID: UUID, episodeID: UUID, day: String?, service: StreamingService?, rewatch: Bool = false) async throws -> Watch {
+        guard let episode = try await Episode.find(episodeID, on: db) else { throw TrackingError.notFound }
+        let watchedOn = try resolveDay(day)
+        guard isAired(episode) else { throw TrackingError.notAired }
+        try await unhide(userID: userID, titleID: episode.$title.id)
+        if !rewatch, let existing = try await watchesQuery(userID: userID).filter(\.$episode.$id == episodeID)
+            .sort(\.$createdAt, .descending).first() {
+            return existing
+        }
+        let watch = Watch(userID: userID, titleID: episode.$title.id, episodeID: episodeID, watchedOn: watchedOn, service: service, origin: .manual)
+        try await watch.save(on: db)
+        return watch
+    }
+
+    func unmarkEpisode(userID: UUID, episodeID: UUID) async throws {
+        try await watchesQuery(userID: userID).filter(\.$episode.$id == episodeID).delete()
+    }
+
+    func markSeason(userID: UUID, titleID: UUID, season: Int, service: StreamingService?) async throws -> Int {
+        guard try await Title.find(titleID, on: db) != nil else { throw TrackingError.notFound }
+        let episodes = try await Episode.query(on: db).filter(\.$title.$id == titleID).filter(\.$season == season).all()
+        return try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
+    }
+
+    func markUpTo(userID: UUID, episodeID: UUID, service: StreamingService?) async throws -> Int {
+        guard let target = try await Episode.find(episodeID, on: db) else { throw TrackingError.notFound }
+        let all = try await Episode.query(on: db).filter(\.$title.$id == target.$title.id).all()
+        let selected = all.filter { e in
+            if target.season == 0 { return e.season == 0 && e.number <= target.number }
+            return e.season >= 1 && (e.season < target.season || (e.season == target.season && e.number <= target.number))
+        }
+        return try await markUndated(userID: userID, titleID: target.$title.id, episodes: selected, service: service)
+    }
+
+    // MARK: Movies
+
+    func markMovie(userID: UUID, titleID: UUID, day: String?, service: StreamingService?, rewatch: Bool = false) async throws -> Watch {
+        guard let title = try await Title.find(titleID, on: db), title.titleKind == .movie else { throw TrackingError.notFound }
+        let watchedOn = try resolveDay(day)
+        _ = try await userTitle(userID: userID, titleID: titleID)
+        if !rewatch, let existing = try await watchesQuery(userID: userID).filter(\.$title.$id == titleID)
+            .filter(\.$episode.$id == nil).sort(\.$createdAt, .descending).first() {
+            return existing
+        }
+        let watch = Watch(userID: userID, titleID: titleID, episodeID: nil, watchedOn: watchedOn, service: service, origin: .manual)
+        try await watch.save(on: db)
+        return watch
+    }
+
+    func unmarkMovie(userID: UUID, titleID: UUID) async throws {
+        try await watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil).delete()
+    }
+
+    // MARK: Single watches
+
+    func editWatch(userID: UUID, watchID: UUID, day: String?, service: StreamingService?) async throws {
+        let watch = try await ownWatch(userID: userID, watchID: watchID)
+        watch.watchedOn = try day.map { try resolveDay($0) }
+        watch.service = service?.rawValue
+        try await watch.save(on: db)
+    }
+
+    func deleteWatch(userID: UUID, watchID: UUID) async throws {
+        let watch = try await ownWatch(userID: userID, watchID: watchID)
+        try await watch.delete(on: db)
+    }
+
+    // MARK: Library entry
+
+    func setRating(userID: UUID, titleID: UUID, rating: Int?) async throws {
+        if let rating, !(1...10).contains(rating) { throw TrackingError.invalidRating }
+        guard try await Title.find(titleID, on: db) != nil else { throw TrackingError.notFound }
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        entry.rating = rating
+        try await entry.save(on: db)
+    }
+
+    func setHidden(userID: UUID, titleID: UUID, hidden: Bool) async throws {
+        guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        entry.hidden = hidden
+        try await entry.save(on: db)
+    }
+
+    /// Service of the most recent watch that has one (dated watches first).
+    func lastService(userID: UUID, titleID: UUID) async throws -> StreamingService? {
+        try await watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$service != nil)
+            .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending).first()?.streamingService
+    }
+
+    /// Get-or-create the user's library entry for a title.
+    func userTitle(userID: UUID, titleID: UUID) async throws -> UserTitle {
+        if let entry = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() {
+            return entry
+        }
+        let entry = UserTitle(userID: userID, titleID: titleID)
+        try await entry.save(on: db)
+        return entry
+    }
+
+    // MARK: Helpers
+
+    func watchesQuery(userID: UUID) -> QueryBuilder<Watch> {
+        Watch.query(on: db).filter(\.$user.$id == userID)
+    }
+
+    private func ownWatch(userID: UUID, watchID: UUID) async throws -> Watch {
+        guard let watch = try await watchesQuery(userID: userID).filter(\.$id == watchID).first() else { throw TrackingError.notFound }
+        return watch
+    }
+
+    private func resolveDay(_ day: String?) throws -> String {
+        let today = today()
+        guard let day, !day.isEmpty else { return today }
+        guard CalendarDay.isValid(day) else { throw TrackingError.invalidDate }
+        guard day <= today else { throw TrackingError.futureDate }
+        return day
+    }
+
+    func isAired(_ episode: Episode) -> Bool {
+        guard let airDate = episode.airDate else { return false }
+        return airDate <= today()
+    }
+
+    private func unhide(userID: UUID, titleID: UUID) async throws {
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        if entry.hidden {
+            entry.hidden = false
+            try await entry.save(on: db)
+        }
+    }
+
+    private func markUndated(userID: UUID, titleID: UUID, episodes: [Episode], service: StreamingService?) async throws -> Int {
+        let watched = Set(try await watchesQuery(userID: userID).filter(\.$title.$id == titleID).all().compactMap(\.$episode.id))
+        let toMark = episodes.filter { isAired($0) && !watched.contains($0.id!) }
+        try await unhide(userID: userID, titleID: titleID)
+        for episode in toMark {
+            try await Watch(userID: userID, titleID: titleID, episodeID: episode.requireID(), watchedOn: nil,
+                            service: service, origin: .manual).save(on: db)
+        }
+        return toMark.count
+    }
+}
+
+extension Request {
+    var watches: WatchService { WatchService(db: db) }
+}
