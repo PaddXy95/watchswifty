@@ -29,7 +29,7 @@ struct WatchService {
     }
 
     func unmarkEpisode(userID: UUID, episodeID: UUID) async throws {
-        try await watchesQuery(userID: userID).filter(\.$episode.$id == episodeID).delete()
+        try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$episode.$id == episodeID))
     }
 
     func markSeason(userID: UUID, titleID: UUID, season: Int, service: StreamingService?) async throws -> Int {
@@ -64,7 +64,7 @@ struct WatchService {
     }
 
     func unmarkMovie(userID: UUID, titleID: UUID) async throws {
-        try await watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil).delete()
+        try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil))
     }
 
     // MARK: Single watches
@@ -77,8 +77,8 @@ struct WatchService {
     }
 
     func deleteWatch(userID: UUID, watchID: UUID) async throws {
-        let watch = try await ownWatch(userID: userID, watchID: watchID)
-        try await watch.delete(on: db)
+        try await ownWatch(userID: userID, watchID: watchID)
+        try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$id == watchID))
     }
 
     // MARK: Library entry
@@ -120,6 +120,19 @@ struct WatchService {
         Watch.query(on: db).filter(\.$user.$id == userID)
     }
 
+    /// Deletes the selected watches; Netflix rows linked to them become `discarded` so a
+    /// re-import does not bring them back.
+    private func deleteDiscardingRows(_ query: QueryBuilder<Watch>) async throws {
+        let ids = try await query.all().compactMap(\.id)
+        guard !ids.isEmpty else { return }
+        try await db.transaction { db in
+            try await NetflixRow.query(on: db).filter(\.$watch.$id ~~ ids)
+                .set(\.$status, to: RowStatus.discarded.rawValue).update()
+            try await Watch.query(on: db).filter(\.$id ~~ ids).delete()
+        }
+    }
+
+    @discardableResult
     private func ownWatch(userID: UUID, watchID: UUID) async throws -> Watch {
         guard let watch = try await watchesQuery(userID: userID).filter(\.$id == watchID).first() else { throw TrackingError.notFound }
         return watch

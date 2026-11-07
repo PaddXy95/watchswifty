@@ -9,6 +9,7 @@ func routes(_ app: Application) throws {
     HomeController().register(on: protected)
     HistoryController().register(on: protected)
     LibraryController().register(on: protected)
+    ImportController().register(on: protected)
     AdminUsersController().register(on: protected)
     AccountController().register(on: protected)
     SearchController().register(on: protected)

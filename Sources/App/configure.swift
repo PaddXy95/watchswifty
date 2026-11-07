@@ -29,6 +29,9 @@ func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) asyn
     app.migrations.add(CreateEpisode())
     app.migrations.add(CreateUserTitle())
     app.migrations.add(CreateWatch())
+    app.migrations.add(CreateNetflixImport())
+    app.migrations.add(CreateNetflixMapping())
+    app.migrations.add(CreateNetflixRow())
 
     try routes(app)
     try await app.autoMigrate()
