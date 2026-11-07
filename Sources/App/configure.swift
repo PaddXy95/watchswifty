@@ -40,5 +40,6 @@ func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) asyn
     app.matchingWorker = MatchingWorker(db: app.db, tmdb: tmdb, logger: app.logger, enabled: config.backgroundJobsEnabled)
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())
+        app.lifecycle.use(DailyRefreshLifecycle())
     }
 }
