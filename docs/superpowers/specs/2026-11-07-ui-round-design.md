@@ -55,3 +55,19 @@ Platzierung der Kommentar-Felder im Detail.
   „vX.Y.Z“ (Link zum GitHub-Release), Branch-Builds „main (abc1234)“, lokale Builds „dev“. `GET /version` liefert
   `{"version": …, "commit": …}` ohne Login.
 - `CHANGELOG.md` (deutsch) pro Version; README: Version festpinnen, Release erstellen.
+
+## Nachtrag: Statistik [entschieden]
+- Neuer Menüpunkt „Statistik“ (`/stats`, nach „Bibliothek“), nur eigene Daten.
+- **Insgesamt:** gesehene Filme, gesehene Serien (mind. eine Folge), gesehene Folgen, verbrachte Zeit.
+- **Pro Jahr** (nach Sichtungsdatum): Filme, Serien, Folgen, Zeit mit schlichtem Balken; ein Jahr lässt sich
+  aufklappen und zeigt die Monate. Eine Serie zählt in jedem Jahr/Monat, in dem mindestens eine Folge
+  gesehen wurde. Sichtungen ohne Datum zählen insgesamt mit und stehen als eigene Zeile „ohne Datum“. [entschieden]
+- **Nach Bewertung:** je Note 10 … 1 und „ohne Bewertung“ Filme, Serien und Zeit, wahlweise auf ein Jahr
+  eingegrenzt. [entschieden]
+- **Zeit** [entschieden: anzeigen]: aus den TMDB-Laufzeiten (Film: `runtime`; Folge: `runtime` der Folge,
+  sonst typische Folgenlänge der Serie `episode_run_time`). [Vorschlag] Laufzeiten werden im Katalog
+  gespeichert (`nil` = noch nicht geladen, `0` = TMDB kennt keine); bereits gespeicherte Titel holen sie
+  einmalig im Hintergrund nach (und beim Öffnen der Detailseite). Sichtungen ohne bekannte Laufzeit
+  werden nicht mitgezählt und als Hinweis ausgewiesen.
+- Zählweise [Vorschlag]: Filme und Serien je Zeitraum eindeutig; Folgen = Sichtungen inkl. erneut
+  gesehen; Zeit = alle Sichtungen (erneut gesehen zählt doppelt). Ausgeblendete Titel zählen mit.
