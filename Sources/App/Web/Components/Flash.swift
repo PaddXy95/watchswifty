@@ -10,5 +10,7 @@ struct FlashMessage: HTML {
 }
 
 func flashError(_ message: String, status: HTTPStatus = .unprocessableEntity) -> HTMLResponse {
-    HTMLResponse(status: status, headers: ["HX-Retarget": "#flash", "HX-Reswap": "innerHTML"], FlashMessage(message: message))
+    // HX-Push-Url: a failed boosted navigation must not change the address bar.
+    HTMLResponse(status: status, headers: ["HX-Retarget": "#flash", "HX-Reswap": "innerHTML", "HX-Push-Url": "false"],
+                 FlashMessage(message: message))
 }

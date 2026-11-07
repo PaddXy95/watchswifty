@@ -21,6 +21,14 @@ struct ContinueCard: Sendable {
 struct ContinueWatchingService {
     let db: any Database
 
+    /// Later of the newest dated watch and the day the newest undated (bulk-marked) watch was made,
+    /// so catching up after an old import keeps the series on the shelf.
+    static func lastActivity(_ watches: [Watch]) -> String? {
+        let dated = watches.compactMap(\.watchedOn).max()
+        let undatedDay = watches.filter { $0.watchedOn == nil }.compactMap(\.createdAt).max().map { CalendarDay.today(now: $0) }
+        return [dated, undatedDay].compactMap { $0 }.max()
+    }
+
     func cards(userID: UUID, today: String) async throws -> [ContinueCard] {
         try await build(userID: userID, onlyTitle: nil, today: today)
     }
@@ -69,7 +77,7 @@ struct ContinueWatchingService {
                 lastWatchedOn: lastDated,
                 lastService: byRecency.lazy.compactMap(\.streamingService).first,
                 hasNetflixData: titleWatches.contains { $0.watchOrigin == .import || $0.streamingService == .netflix },
-                lastActivityOn: lastDated ?? CalendarDay.today(now: latestCreated)
+                lastActivityOn: Self.lastActivity(titleWatches) ?? lastDated ?? CalendarDay.today(now: latestCreated)
             )
             // Dated series first (newest day first), then undated-only series by creation time.
             result.append((card, (lastDated == nil ? 1 : 0, lastDated ?? "", latestCreated)))

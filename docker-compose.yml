@@ -17,3 +17,5 @@ services:
 
 volumes:
   watchswifty-data:
+    # Fixed name, so `docker run -v watchswifty-data:/data …` (README backup) uses the same volume.
+    name: watchswifty-data

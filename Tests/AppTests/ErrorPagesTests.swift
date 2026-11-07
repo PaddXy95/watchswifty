@@ -89,3 +89,23 @@ struct ErrorPagesTests {
         #expect(html.contains("[45]..&quot;,&quot;swap&quot;:true"))
     }
 }
+
+@Suite("ErrorPushURL")
+struct ErrorPushURLTests {
+    @Test func failedBoostedNavigationDoesNotPushURL() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/abc", headers: headers.adding(["HX-Boosted": "true"])) { res async in
+                #expect(res.status == .notFound)
+                #expect(res.headers.first(name: "HX-Push-Url") == "false")
+            }
+        }
+    }
+
+    @Test func originMessageUsesBrand() {
+        let (_, message) = HTMLErrorMiddleware.describe(Abort(.forbidden, reason: "Anfrage abgelehnt: Herkunft passt nicht zur Adresse."), path: "/x")
+        #expect(message.contains("WatchSwifty"))
+        #expect(!message.contains("watchswifty"))
+    }
+}

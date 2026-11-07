@@ -184,3 +184,26 @@ struct TileLoadingTests {
         #expect(css.contains("@keyframes tile-spin"))
     }
 }
+
+@Suite("ReviewFixesUI")
+struct ReviewFixesUITests {
+    @Test func errorPageStacksVertically() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        #expect(css.contains(".auth .page { display: flex; flex-direction: column; align-items: center; justify-content: center; }"))
+    }
+
+    @Test func loginHeadingUsesBrand() {
+        #expect(LoginPage(error: nil, username: "").render().contains("<h1>WatchSwifty</h1>"))
+    }
+
+    @Test func composeVolumeHasFixedName() throws {
+        let compose = try String(contentsOfFile: "docker-compose.yml", encoding: .utf8)
+        #expect(compose.contains("name: watchswifty-data"))
+    }
+
+    @Test func commentTextSurvivesSectionSwaps() {
+        let html = CommentBox(id: "season-comment-2", action: "/x", caption: "Kommentar zur Staffel", comment: nil).render()
+        #expect(html.contains(#"id="season-comment-2-text""#))
+        #expect(html.contains(#"hx-preserve="true""#))
+    }
+}

@@ -13,7 +13,9 @@ struct CommentBox: HTML {
         form(.id(id), .class("comment-box"), .hx.post(action), .hx.target("this"), .hx.swap(.outerHTML)) {
             label {
                 caption
-                textarea(.name("comment"), .custom(name: "maxlength", value: "2000"), .custom(name: "rows", value: "3"),
+                // hx-preserve keeps unsaved text when the surrounding season section is re-rendered.
+                textarea(.id("\(id)-text"), .custom(name: "hx-preserve", value: "true"),
+                         .name("comment"), .custom(name: "maxlength", value: "2000"), .custom(name: "rows", value: "3"),
                          .custom(name: "placeholder", value: "Nur für dich sichtbar")) { comment ?? "" }
             }
             div(.class("comment-actions")) {

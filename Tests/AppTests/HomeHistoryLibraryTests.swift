@@ -320,3 +320,22 @@ struct ContinueCutoffTests {
         }
     }
 }
+
+@Suite("CutoffAfterBulkMark")
+struct CutoffAfterBulkMarkTests {
+    @Test func bulkMarkAfterOldImportStaysVisible() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 9, name: "Nach Import aufgeholt", seasons: [1: 2, 2: 3])
+            let ws = WatchService(db: app.db, today: { "2026-11-07" })
+            // Imported months ago …
+            _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 2).requireID(), day: "2026-05-01", service: .netflix)
+            // … caught up today with an undated bulk mark.
+            _ = try await ws.markUpTo(userID: user.requireID(), episodeID: episode(app, show, 2, 1).requireID(), service: nil)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/", headers: headers) { res async in
+                #expect(res.body.string.contains("Nach Import aufgeholt"))
+            }
+        }
+    }
+}

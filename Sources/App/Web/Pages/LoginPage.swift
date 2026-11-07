@@ -7,7 +7,7 @@ struct LoginPage: HTML {
     var body: some HTML {
         PageLayout(title: "Anmelden", nav: nil) {
             section(.class("login")) {
-                h1 { "watchswifty" }
+                h1 { "WatchSwifty" }
                 if let error {
                     p(.class("error"), .custom(name: "role", value: "alert")) { error }
                 }

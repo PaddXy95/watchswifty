@@ -120,7 +120,7 @@ summary { cursor: pointer; font-weight: 600; }
 .site-footer .github { justify-self: end; }
 
 /* ---- Login (centered) ---- */
-.auth .page { display: flex; align-items: center; justify-content: center; }
+.auth .page { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .login { width: 100%; max-width: 22rem; background: var(--paper-2); border: 1px solid var(--line);
   border-radius: var(--radius); padding: var(--space-6); box-shadow: 0 10px 30px rgb(0 0 0 / 0.35); }
 .login h1 { text-align: center; }
