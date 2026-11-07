@@ -7,19 +7,22 @@ struct EpisodeInfo: Sendable, Equatable {
     let name: String
     let airDate: String?
     var overview: String?
+    /// Minutes; nil or 0 = unknown.
+    var runtime: Int?
 
-    init(id: UUID, season: Int, number: Int, name: String, airDate: String?, overview: String? = nil) {
+    init(id: UUID, season: Int, number: Int, name: String, airDate: String?, overview: String? = nil, runtime: Int? = nil) {
         self.id = id
         self.season = season
         self.number = number
         self.name = name
         self.airDate = airDate
         self.overview = overview
+        self.runtime = runtime
     }
 
     init(_ episode: Episode) {
         self.init(id: episode.id!, season: episode.season, number: episode.number, name: episode.name, airDate: episode.airDate,
-                  overview: episode.overview)
+                  overview: episode.overview, runtime: episode.runtime)
     }
 
     var code: String { String(format: "S%02dE%02d", season, number) }

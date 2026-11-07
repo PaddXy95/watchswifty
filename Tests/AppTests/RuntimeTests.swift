@@ -101,3 +101,42 @@ struct RuntimeTests {
         }
     }
 }
+
+@Suite("RuntimeDisplay")
+struct RuntimeDisplayTests {
+    @Test func moviePageShowsRuntime() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addMovie(TMDBMovie(id: 603, name: "Matrix", originalName: nil, year: 1999, posterPath: nil, overview: "Neo.", runtime: 136))
+        tmdb.addMovie(TMDBMovie(id: 604, name: "Ohne", originalName: nil, year: 1999, posterPath: nil, overview: "?"))
+        try await withTestApp(tmdb: tmdb) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/movie/603", headers: headers) { res async in
+                #expect(res.body.string.contains(#"<p class="muted title-meta">2 Std. 16 Min.</p>"#))
+            }
+            try await app.testing().test(.GET, "/movie/604", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(!res.body.string.contains("title-meta"))   // TMDB knows no runtime
+            }
+        }
+    }
+
+    @Test func episodeRowsShowRuntime() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 7, name: "Serie", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1], overview: "Serie.", episodeRunTime: 45), episodes: [:])
+        tmdb.setSeason(seriesID: 7, number: 1, [
+            TMDBEpisode(id: 71, season: 1, number: 1, name: "Pilot", airDate: "2020-01-01", overview: "A", runtime: 51),
+            TMDBEpisode(id: 72, season: 1, number: 2, name: "Zwei", airDate: "2020-01-08", overview: "B"),
+        ])
+        try await withTestApp(tmdb: tmdb) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/7", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains(#"<span class="runtime">51 Min.</span>"#))
+                #expect(body.components(separatedBy: #"class="runtime""#).count == 2)   // unknown runtime: nothing shown
+            }
+        }
+    }
+}

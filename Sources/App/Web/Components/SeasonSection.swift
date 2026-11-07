@@ -76,6 +76,9 @@ struct EpisodeRow: HTML {
             }
             span(.class("code")) { model.info.code }
             span(.class("name")) { model.info.name }
+            if let runtime = model.info.runtime, runtime > 0 {
+                span(.class("runtime")) { formatDuration(minutes: runtime) }
+            }
             span(.class("meta")) {
                 if model.watched {
                     watchSummary(model.watches)
