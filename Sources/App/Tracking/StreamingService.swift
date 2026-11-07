@@ -3,7 +3,11 @@ enum StreamingService: String, Codable, Sendable, CaseIterable {
     case primeVideo = "prime_video"
     case disneyPlus = "disney_plus"
     case appleTV = "apple_tv"
+    case hboMax = "hbo_max"
+    case paramountPlus = "paramount_plus"
+    case wow
     case cinema
+    case purchased
     case other
 
     var label: String {
@@ -12,7 +16,11 @@ enum StreamingService: String, Codable, Sendable, CaseIterable {
         case .primeVideo: "Prime Video"
         case .disneyPlus: "Disney+"
         case .appleTV: "Apple TV+"
+        case .hboMax: "HBO Max"
+        case .paramountPlus: "Paramount+"
+        case .wow: "WOW"
         case .cinema: "Kino"
+        case .purchased: "Gekauft"
         case .other: "Sonstiges"
         }
     }

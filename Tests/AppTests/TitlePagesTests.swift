@@ -278,3 +278,19 @@ struct SearchWithoutTokenTests {
         }
     }
 }
+
+@Suite("PurchasedService")
+struct PurchasedServiceTests {
+    @Test func markWithPurchasedService() async throws {
+        try await withTestApp(tmdb: TitlePagesTests.fake()) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "purchased"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("01.11.2026 · Gekauft"))
+            })
+        }
+    }
+}

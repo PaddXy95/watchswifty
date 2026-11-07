@@ -204,3 +204,16 @@ struct WatchServiceTests {
         }
     }
 }
+
+@Suite("Services")
+struct ServicesTests {
+    @Test func serviceListAndLabels() {
+        #expect(StreamingService.allCases == [.netflix, .primeVideo, .disneyPlus, .appleTV, .hboMax, .paramountPlus, .wow, .cinema, .purchased, .other])
+        #expect(StreamingService.allCases.map(\.label) == ["Netflix", "Prime Video", "Disney+", "Apple TV+", "HBO Max", "Paramount+", "WOW", "Kino", "Gekauft", "Sonstiges"])
+        #expect(StreamingService(rawValue: "purchased") == .purchased)
+        #expect(StreamingService(rawValue: "hbo_max") == .hboMax)
+        #expect(StreamingService(rawValue: "paramount_plus") == .paramountPlus)
+        #expect(StreamingService(rawValue: "wow") == .wow)
+        #expect(StreamingService(rawValue: "netflix") == .netflix)   // existing raw values unchanged
+    }
+}
