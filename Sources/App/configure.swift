@@ -6,6 +6,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.appConfig = config
     app.tmdbProvider = tmdbProvider
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
+    app.middleware = Middlewares()
+    app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
     app.sessions.use(.fluent)

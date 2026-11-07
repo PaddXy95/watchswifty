@@ -31,6 +31,8 @@ struct ImportController {
     func upload(req: Request) async throws -> HTMLResponse {
         let nav = try req.nav(.importing)
         let input = try req.content.decode(UploadInput.self)
+        // Also enforced by the route's body limit; checked here for already-collected bodies.
+        guard input.file.data.readableBytes <= 10 * 1024 * 1024 else { throw Abort(.payloadTooLarge) }
         func failure(_ message: String) async throws -> HTMLResponse {
             HTMLResponse(status: .unprocessableEntity, ImportPage(navContext: nav, summary: nil, error: message, state: try await state(req)))
         }
