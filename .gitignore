@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+*.sqlite
+*.sqlite-*
+.env
+DerivedData/
+.DS_Store
