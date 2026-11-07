@@ -18,6 +18,8 @@ Erste Version.
 - **Netflix-Import:** Wiedergabeaktivität als CSV (auch Excel-Varianten), automatische TMDB-Zuordnung, „Zu prüfen“,
   „Nicht zugeordnet“, „Zuordnungen“, „Erneut versuchen“ und automatische Wiederholung.
 - **Verlauf** und **Bibliothek** mit Filter und Sortierung.
+- **Statistik:** Filme, Serien, Folgen und verbrachte Zeit (TMDB-Laufzeiten) – insgesamt, pro Jahr und Monat
+  sowie nach Bewertung.
 - **Benutzer:** mehrere Konten mit getrennten Daten, Admin-Verwaltung, eigener TMDB-Token pro Benutzer.
 - **Oberfläche:** WatchSwifty-Branding, Smartphone-Layout mit Burger-Menü, Ladebalken und Lade-Animation auf Kacheln,
   deutsche Fehlerseiten.

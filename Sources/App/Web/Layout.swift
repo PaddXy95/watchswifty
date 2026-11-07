@@ -2,7 +2,7 @@ import Elementary
 import ElementaryHTMX2
 
 enum NavItem: Sendable, Equatable {
-    case continueWatching, history, library, search, importing, account, admin
+    case continueWatching, history, library, stats, search, importing, account, admin
 }
 
 struct NavContext: Sendable {
@@ -59,6 +59,7 @@ struct SiteNav: HTML {
             (.continueWatching, "Weiterschauen", "/"),
             (.history, "Verlauf", "/history"),
             (.library, "Bibliothek", "/library"),
+            (.stats, "Statistik", "/stats"),
             (.search, "Suche", "/search"),
             (.importing, "Import", "/import"),
             (.account, "Konto", "/account"),

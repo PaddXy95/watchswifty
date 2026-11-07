@@ -7,6 +7,7 @@ Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Ele
 - **Manuell:** Serien/Filme suchen, Folgen abhaken (mit Datum und Dienst), bewerten (1–10),
   private Kommentare zu Serie, Staffel und Film
 - **Verlauf** und **Bibliothek**, Klappentext und Links zu TMDB, IMDb, Rotten Tomatoes, SeriesGraph
+- **Statistik:** gesehene Filme, Serien, Folgen und verbrachte Zeit – insgesamt, pro Jahr/Monat und nach Bewertung
 - **Mehrere Benutzer** mit getrennten Daten; der Admin legt Konten an
 
 Repository: https://github.com/PaddXy95/watchswifty
