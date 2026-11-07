@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+.superpowers/
+.git/
+*.sqlite
+*.sqlite-*
+.env
+DerivedData/

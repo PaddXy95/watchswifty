@@ -1,0 +1,19 @@
+# watchswifty – Beispiel für den Betrieb auf einem Server im Heimnetz.
+# "dein-github-name" durch den GitHub-Account ersetzen, unter dem die Action das Image baut.
+services:
+  watchswifty:
+    image: ghcr.io/dein-github-name/watchswifty:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TMDB_LANGUAGE: de-DE
+      # Nur beim allerersten Start nötig: legt den ersten Admin an.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TZ: Europe/Berlin
+    volumes:
+      - watchswifty-data:/data
+
+volumes:
+  watchswifty-data:
