@@ -47,3 +47,11 @@ Platzierung der Kommentar-Felder im Detail.
 - Hinweis verschwindet beim Sehen der neuen Folgen oder per „Erledigt“; neue Folgen danach lassen ihn
   wieder erscheinen. [Vorschlag]
 - Täglicher TMDB-Abgleich bezieht beobachtete Serien auch dann ein, wenn sie ausgeblendet sind. [Vorschlag]
+
+## Nachtrag: Versionierung [entschieden: in der App sichtbar]
+- SemVer über Git-Tags `vX.Y.Z`; Startversion 0.1.0 [Vorschlag, nicht widersprochen]. Die GitHub Action baut bei
+  Tags zusätzlich `ghcr.io/paddxy95/watchswifty:X.Y.Z` und `:X.Y`.
+- Version und Commit werden als `APP_VERSION`/`GIT_COMMIT` ins Image geschrieben; Footer links zeigt
+  „vX.Y.Z“ (Link zum GitHub-Release), Branch-Builds „main (abc1234)“, lokale Builds „dev“. `GET /version` liefert
+  `{"version": …, "commit": …}` ohne Login.
+- `CHANGELOG.md` (deutsch) pro Version; README: Version festpinnen, Release erstellen.
