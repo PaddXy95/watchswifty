@@ -30,6 +30,7 @@ struct CatalogService {
             title.posterPath = movie.posterPath
             title.overview = movie.overview ?? ""
             title.imdbID = movie.imdbID ?? ""
+            title.runtime = movie.runtime ?? 0
             title.refreshedAt = now
             try await title.save(on: db)
         case .tv:
@@ -47,6 +48,7 @@ struct CatalogService {
             title.tmdbStatus = series.status
             title.overview = series.overview ?? ""
             title.imdbID = imdbID ?? ""
+            title.runtime = series.episodeRunTime ?? 0
             title.refreshedAt = now
             let episodes = seasons.flatMap { $0 }
             try await db.transaction { db in
@@ -72,18 +74,21 @@ struct CatalogService {
         for item in fetched {
             let key = "\(item.season)/\(item.number)"
             let overview = item.overview ?? ""
+            let runtime = item.runtime ?? 0
             if let episode = byKey[key] {
                 guard episode.name != item.name || episode.airDate != item.airDate || episode.tmdbEpisodeID != item.id
-                    || episode.overview != overview else { continue }
+                    || episode.overview != overview || episode.runtime != runtime else { continue }
                 episode.name = item.name
                 episode.airDate = item.airDate
                 episode.tmdbEpisodeID = item.id
                 episode.overview = overview
+                episode.runtime = runtime
                 try await episode.save(on: db)
             } else {
                 let episode = Episode(titleID: titleID, season: item.season, number: item.number, name: item.name,
                                       airDate: item.airDate, tmdbEpisodeID: item.id)
                 episode.overview = overview
+                episode.runtime = runtime
                 try await episode.save(on: db)
                 byKey[key] = episode
             }

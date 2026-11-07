@@ -14,6 +14,8 @@ final class Episode: Model, @unchecked Sendable {
     @Field(key: "tmdb_episode_id") var tmdbEpisodeID: Int
     /// TMDB overview of the episode; "" = none, nil = not fetched yet.
     @OptionalField(key: "overview") var overview: String?
+    /// Minutes; 0 = unknown, nil = not fetched yet.
+    @OptionalField(key: "runtime") var runtime: Int?
 
     init() {}
 

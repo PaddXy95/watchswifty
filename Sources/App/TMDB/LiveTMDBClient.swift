@@ -127,6 +127,11 @@ struct LiveTMDBClient: TMDBClient {
         return Int(date.prefix(4))
     }
 
+    private static func positive(_ value: Int?) -> Int? {
+        guard let value, value > 0 else { return nil }
+        return value
+    }
+
     private static func blankToNil(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
         return value
@@ -148,21 +153,23 @@ struct LiveTMDBClient: TMDBClient {
         struct Series: Decodable {
             let id: Int; let name: String; let original_name: String?; let first_air_date: String?
             let poster_path: String?; let status: String?; let seasons: [Season]?; let overview: String?
+            let episode_run_time: [Int]?
         }
         let s = try JSONDecoder().decode(Series.self, from: data)
         return TMDBSeries(id: s.id, name: s.name, originalName: s.original_name, year: year(s.first_air_date),
                           posterPath: s.poster_path, status: s.status, seasonNumbers: (s.seasons ?? []).map(\.season_number),
-                          overview: blankToNil(s.overview))
+                          overview: blankToNil(s.overview), episodeRunTime: positive(s.episode_run_time?.first))
     }
 
     static func decodeSeason(_ data: Data) throws -> [TMDBEpisode] {
         struct Episode: Decodable {
             let id: Int; let episode_number: Int; let season_number: Int; let name: String?; let air_date: String?; let overview: String?
+            let runtime: Int?
         }
         struct Season: Decodable { let episodes: [Episode]? }
         return try (JSONDecoder().decode(Season.self, from: data).episodes ?? []).map {
             TMDBEpisode(id: $0.id, season: $0.season_number, number: $0.episode_number, name: $0.name ?? "", airDate: blankToNil($0.air_date),
-                        overview: blankToNil($0.overview))
+                        overview: blankToNil($0.overview), runtime: positive($0.runtime))
         }
     }
 
@@ -174,10 +181,10 @@ struct LiveTMDBClient: TMDBClient {
     static func decodeMovie(_ data: Data) throws -> TMDBMovie {
         struct Movie: Decodable {
             let id: Int; let title: String; let original_title: String?; let release_date: String?; let poster_path: String?
-            let overview: String?; let imdb_id: String?
+            let overview: String?; let imdb_id: String?; let runtime: Int?
         }
         let m = try JSONDecoder().decode(Movie.self, from: data)
         return TMDBMovie(id: m.id, name: m.title, originalName: m.original_title, year: year(m.release_date), posterPath: m.poster_path,
-                         overview: blankToNil(m.overview), imdbID: blankToNil(m.imdb_id))
+                         overview: blankToNil(m.overview), imdbID: blankToNil(m.imdb_id), runtime: positive(m.runtime))
     }
 }

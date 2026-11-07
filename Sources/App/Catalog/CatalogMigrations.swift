@@ -53,6 +53,19 @@ struct AddTitleDetails: AsyncMigration {
     }
 }
 
+/// Runtimes for the statistics (UI round, task 21).
+struct AddRuntimes: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(Title.schema).field("runtime", .int).update()
+        try await database.schema(Episode.schema).field("runtime", .int).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(Episode.schema).deleteField("runtime").update()
+        try await database.schema(Title.schema).deleteField("runtime").update()
+    }
+}
+
 struct AddEpisodeOverview: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema(Episode.schema).field("overview", .string).update()

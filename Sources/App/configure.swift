@@ -40,6 +40,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddTitleDetails())
     app.migrations.add(AddEpisodeOverview())
     app.migrations.add(AddFollowFields())
+    app.migrations.add(AddRuntimes())
 
     try routes(app)
     try await app.autoMigrate()

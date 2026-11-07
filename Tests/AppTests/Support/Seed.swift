@@ -7,25 +7,30 @@ import VaporTesting
 @discardableResult
 func seedSeries(_ app: Application, tmdbID: Int, name: String = "Serie", seasons: [Int: Int],
                 unaired: Set<String> = [], noAirDate: Set<String> = [], airDates: [String: String] = [:],
-                status: String? = "Returning Series") async throws -> Title {
+                status: String? = "Returning Series", runtime: Int? = nil,
+                episodeRuntimes: [String: Int] = [:]) async throws -> Title {
     let title = Title(tmdbID: tmdbID, kind: .tv, name: name)
     title.tmdbStatus = status
+    title.runtime = runtime
     title.refreshedAt = .now
     try await title.save(on: app.db)
     for (season, count) in seasons.sorted(by: { $0.key < $1.key }) where count > 0 {
         for number in 1...count {
             let key = "\(season)x\(number)"
             let airDate: String? = airDates[key] ?? (noAirDate.contains(key) ? nil : (unaired.contains(key) ? "2999-01-01" : "2020-01-01"))
-            try await Episode(titleID: title.requireID(), season: season, number: number, name: "Folge \(key)",
-                              airDate: airDate, tmdbEpisodeID: tmdbID * 10_000 + season * 100 + number).save(on: app.db)
+            let episode = Episode(titleID: try title.requireID(), season: season, number: number, name: "Folge \(key)",
+                                  airDate: airDate, tmdbEpisodeID: tmdbID * 10_000 + season * 100 + number)
+            episode.runtime = episodeRuntimes[key]
+            try await episode.save(on: app.db)
         }
     }
     return title
 }
 
 @discardableResult
-func seedMovie(_ app: Application, tmdbID: Int, name: String = "Film") async throws -> Title {
+func seedMovie(_ app: Application, tmdbID: Int, name: String = "Film", runtime: Int? = nil) async throws -> Title {
     let title = Title(tmdbID: tmdbID, kind: .movie, name: name)
+    title.runtime = runtime
     title.refreshedAt = .now
     try await title.save(on: app.db)
     return title

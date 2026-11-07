@@ -214,14 +214,14 @@ struct TitleController {
 
     // MARK: Helpers
 
-    /// Stale caches are refreshed; titles cached before overviews existed fetch them once.
+    /// Stale caches are refreshed; titles cached before overviews/runtimes existed fetch them once.
     /// Failures (no token, TMDB down) only log – the cached data is shown.
     private func refreshForDetails(_ req: Request, _ title: Title) async {
         do {
             let episodesMissingOverview = title.titleKind == .tv
                 ? try await Episode.query(on: req.db).filter(\.$title.$id == title.requireID()).filter(\.$overview == nil).count() > 0
                 : false
-            if title.overview == nil || episodesMissingOverview {
+            if title.overview == nil || title.runtime == nil || episodesMissingOverview {
                 try await req.catalog.refresh(title)
             } else {
                 try await req.catalog.refreshIfStale(title)

@@ -23,6 +23,43 @@ func refreshToken(for titleID: UUID, on db: any Database) async throws -> String
         .compactMap(\.tmdbToken).first { !$0.isEmpty }
 }
 
+/// Watched titles cached before runtimes were stored (`runtime == nil`), sorted by TMDB id.
+func titlesMissingRuntime(on db: any Database) async throws -> [Title] {
+    let missing = try await Title.query(on: db).filter(\.$runtime == nil).sort(\.$tmdbID).all()
+    guard !missing.isEmpty else { return [] }
+    let watched = Set(try await Watch.query(on: db).filter(\.$title.$id ~~ missing.compactMap(\.id)).unique().all(\.$title.$id))
+    return missing.filter { $0.id.map(watched.contains) ?? false }
+}
+
+/// Token of any user who watched the title (nil if none of them stored one).
+func backfillToken(for titleID: UUID, on db: any Database) async throws -> String? {
+    let watchers = try await Watch.query(on: db).filter(\.$title.$id == titleID).unique().all(\.$user.$id)
+    guard !watchers.isEmpty else { return nil }
+    return try await User.query(on: db).filter(\.$id ~~ watchers).filter(\.$tmdbToken != nil).sort(\.$username).all()
+        .compactMap(\.tmdbToken).first { !$0.isEmpty }
+}
+
+/// Loads runtimes for watched titles that lack them (one refresh each); returns how many were refreshed.
+func backfillRuntimes(db: any Database, provider: TMDBProvider, logger: Logger) async -> Int {
+    let titles: [Title]
+    do { titles = try await titlesMissingRuntime(on: db) } catch {
+        logger.warning("Laufzeiten: Abfrage fehlgeschlagen: \(error)")
+        return 0
+    }
+    var refreshed = 0
+    for title in titles {
+        if Task.isCancelled { break }
+        do {
+            guard let token = try await backfillToken(for: title.requireID(), on: db) else { continue }
+            try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+            refreshed += 1
+        } catch {
+            logger.warning("Laufzeit für \(title.name) nicht geladen: \(error)")
+        }
+    }
+    return refreshed
+}
+
 /// Refreshes due series one after another: first 60 s after boot, then every 24 h.
 struct DailyRefreshLifecycle: LifecycleHandler {
     private struct TaskKey: StorageKey { typealias Value = Task<Void, Never> }
@@ -35,6 +72,8 @@ struct DailyRefreshLifecycle: LifecycleHandler {
         application.storage[TaskKey.self] = Task {
             try? await Task.sleep(for: .seconds(60))
             while !Task.isCancelled {
+                let filled = await backfillRuntimes(db: db, provider: provider, logger: logger)
+                if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
                 do {
                     let due = try await seriesDueForRefresh(on: db)
                     var requeued = 0

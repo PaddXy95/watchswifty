@@ -18,6 +18,8 @@ final class Title: Model, @unchecked Sendable {
     @OptionalField(key: "overview") var overview: String?
     /// IMDb id (e.g. tt0944947); "" = none, nil = not fetched yet.
     @OptionalField(key: "imdb_id") var imdbID: String?
+    /// Minutes: movie runtime, or typical episode length of a series; 0 = unknown, nil = not fetched yet.
+    @OptionalField(key: "runtime") var runtime: Int?
 
     init() {}
 
