@@ -21,6 +21,7 @@ struct TMDBSeries: Sendable, Equatable {
     let posterPath: String?
     let status: String?
     let seasonNumbers: [Int]
+    var overview: String? = nil
 }
 
 struct TMDBEpisode: Sendable, Equatable {
@@ -37,6 +38,8 @@ struct TMDBMovie: Sendable, Equatable {
     let originalName: String?
     let year: Int?
     let posterPath: String?
+    var overview: String? = nil
+    var imdbID: String? = nil
 }
 
 enum TMDBError: Error, Equatable, CustomStringConvertible {

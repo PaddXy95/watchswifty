@@ -313,3 +313,41 @@ struct WatchAllTests {
         }
     }
 }
+
+@Suite("OverviewPages")
+struct OverviewPagesTests {
+    static func fake() -> FakeTMDBClient {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 1, name: "Testserie", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1], overview: "Eine Serie über Tests."), episodes: [1: ["A"]])
+        tmdb.addMovie(TMDBMovie(id: 603, name: "Matrix", originalName: nil, year: 1999, posterPath: nil, overview: "Neo erwacht."))
+        return tmdb
+    }
+
+    @Test func detailPagesShowOverview() async throws {
+        try await withTestApp(tmdb: Self.fake()) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/1", headers: headers) { res async in
+                #expect(res.body.string.contains("Eine Serie über Tests."))
+            }
+            try await app.testing().test(.GET, "/movie/603", headers: headers) { res async in
+                #expect(res.body.string.contains("Neo erwacht."))
+            }
+        }
+    }
+
+    @Test func oldTitleFetchesOverviewOnce() async throws {
+        let tmdb = Self.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            try await createUser(app, "pat")
+            _ = try await seedSeries(app, tmdbID: 1, name: "Testserie", seasons: [1: 1])   // cached before overviews existed
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/1", headers: headers) { res async in
+                #expect(res.body.string.contains("Eine Serie über Tests."))
+            }
+            try await app.testing().test(.GET, "/tv/1", headers: headers) { _ async in }
+            #expect(tmdb.calls.filter { $0 == "series:1" }.count == 1)
+        }
+    }
+}

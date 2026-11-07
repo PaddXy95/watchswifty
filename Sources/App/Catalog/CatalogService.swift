@@ -28,6 +28,8 @@ struct CatalogService {
             title.originalName = movie.originalName
             title.year = movie.year
             title.posterPath = movie.posterPath
+            title.overview = movie.overview ?? ""
+            title.imdbID = movie.imdbID ?? ""
             title.refreshedAt = now
             try await title.save(on: db)
         case .tv:
@@ -41,6 +43,7 @@ struct CatalogService {
             title.year = series.year
             title.posterPath = series.posterPath
             title.tmdbStatus = series.status
+            title.overview = series.overview ?? ""
             title.refreshedAt = now
             let episodes = seasons.flatMap { $0 }
             try await db.transaction { db in

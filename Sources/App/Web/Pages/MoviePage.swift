@@ -18,6 +18,9 @@ struct MoviePage: HTML {
                         title.name
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
+                    if let overview = title.overview, !overview.isEmpty {
+                        p(.class("overview")) { overview }
+                    }
                     RatingControl(kind: .movie, tmdbID: title.tmdbID, rating: rating)
                     CommentBox(id: "movie-comment", action: "/movie/\(title.tmdbID)/comment", caption: "Kommentar zum Film", comment: comment)
                 }

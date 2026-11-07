@@ -20,6 +20,9 @@ struct SeriesPage: HTML {
                         title.name
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
+                    if let overview = title.overview, !overview.isEmpty {
+                        p(.class("overview")) { overview }
+                    }
                     RatingControl(kind: .tv, tmdbID: title.tmdbID, rating: rating)
                     HiddenToggle(tmdbID: title.tmdbID, hidden: hidden)
                     CommentBox(id: "series-comment", action: "/tv/\(title.tmdbID)/comment", caption: "Kommentar zur Serie", comment: comment)

@@ -30,9 +30,7 @@ struct TitleController {
     func seriesPage(req: Request) async throws -> Response {
         try await handle(req) {
             let title = try await resolve(req, .tv)
-            do { try await req.catalog.refreshIfStale(title) } catch {
-                req.logger.warning("TMDB refresh failed for \(title.tmdbID): \(error)")
-            }
+            await refreshForDetails(req, title)
             let userID = try req.userID
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
@@ -120,6 +118,7 @@ struct TitleController {
     func moviePage(req: Request) async throws -> Response {
         try await handle(req) {
             let title = try await resolve(req, .movie)
+            await refreshForDetails(req, title)
             let userID = try req.userID
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             return HTMLResponse(MoviePage(nav: try req.nav(.search), title: title,
@@ -191,6 +190,20 @@ struct TitleController {
     }
 
     // MARK: Helpers
+
+    /// Stale caches are refreshed; titles cached before overviews existed fetch them once.
+    /// Failures (no token, TMDB down) only log – the cached data is shown.
+    private func refreshForDetails(_ req: Request, _ title: Title) async {
+        do {
+            if title.overview == nil {
+                try await req.catalog.refresh(title)
+            } else {
+                try await req.catalog.refreshIfStale(title)
+            }
+        } catch {
+            req.logger.warning("TMDB refresh failed for \(title.tmdbID): \(error)")
+        }
+    }
 
     private func handle(_ req: Request, _ body: () async throws -> HTMLResponse) async throws -> Response {
         try await respondMappingTrackingErrors(req, body)

@@ -119,3 +119,15 @@ struct TMDBValidateTests {
         await #expect(throws: TMDBError.missingToken) { _ = try await MissingTokenTMDBClient().searchMulti("x") }
     }
 }
+
+@Suite("TMDBOverview")
+struct TMDBOverviewTests {
+    @Test func decodesOverview() throws {
+        let series = try LiveTMDBClient.decodeSeries(Data(#"{"id":1420,"name":"The Mentalist","overview":"Ein Mentalist hilft dem CBI.","seasons":[]}"#.utf8))
+        #expect(series.overview == "Ein Mentalist hilft dem CBI.")
+        let bare = try LiveTMDBClient.decodeSeries(Data(#"{"id":1,"name":"X","seasons":[]}"#.utf8))
+        #expect(bare.overview == nil)
+        let movie = try LiveTMDBClient.decodeMovie(Data(#"{"id":603,"title":"Matrix","overview":"Neo erwacht."}"#.utf8))
+        #expect(movie.overview == "Neo erwacht.")
+    }
+}

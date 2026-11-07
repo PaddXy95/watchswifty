@@ -95,3 +95,21 @@ struct CatalogServiceTests {
         }
     }
 }
+
+@Suite("CatalogOverview")
+struct CatalogOverviewTests {
+    @Test func refreshStoresOverviewOrEmpty() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 1, name: "Mit Text", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1], overview: "Worum es geht."), episodes: [1: ["A"]])
+        tmdb.addSeries(TMDBSeries(id: 2, name: "Ohne Text", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1]), episodes: [1: ["A"]])
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let withText = try await catalog.title(kind: .tv, tmdbID: 1)
+            let withoutText = try await catalog.title(kind: .tv, tmdbID: 2)
+            #expect(withText.overview == "Worum es geht.")
+            #expect(withoutText.overview == "")
+        }
+    }
+}

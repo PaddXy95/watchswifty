@@ -14,6 +14,10 @@ final class Title: Model, @unchecked Sendable {
     @OptionalField(key: "poster_path") var posterPath: String?
     @OptionalField(key: "tmdb_status") var tmdbStatus: String?
     @OptionalField(key: "refreshed_at") var refreshedAt: Date?
+    /// TMDB overview („Klappentext“); "" = TMDB has none, nil = not fetched yet.
+    @OptionalField(key: "overview") var overview: String?
+    /// IMDb id (e.g. tt0944947); "" = none, nil = not fetched yet.
+    @OptionalField(key: "imdb_id") var imdbID: String?
 
     init() {}
 

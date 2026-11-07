@@ -39,3 +39,16 @@ struct CreateEpisode: AsyncMigration {
         try await database.schema(Episode.schema).delete()
     }
 }
+
+/// Overview and IMDb id for detail pages (UI round 1, tasks 10–11).
+struct AddTitleDetails: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(Title.schema).field("overview", .string).update()
+        try await database.schema(Title.schema).field("imdb_id", .string).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(Title.schema).deleteField("imdb_id").update()
+        try await database.schema(Title.schema).deleteField("overview").update()
+    }
+}
