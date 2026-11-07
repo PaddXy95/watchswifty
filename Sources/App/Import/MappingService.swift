@@ -111,7 +111,7 @@ struct MappingService {
         return mapping
     }
 
-    private func ownRow(userID: UUID, rowID: UUID) async throws -> NetflixRow {
+    func ownRow(userID: UUID, rowID: UUID) async throws -> NetflixRow {
         guard let row = try await NetflixRow.query(on: db).filter(\.$id == rowID).filter(\.$user.$id == userID).first() else {
             throw TrackingError.notFound
         }

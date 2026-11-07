@@ -19,6 +19,7 @@ struct ImportController {
         protected.post("import", "mappings", ":mappingID", "ignore", use: ignore)
         protected.post("import", "mappings", ":mappingID", "reset", use: reset)
         protected.post("import", "mappings", ":mappingID", "change", use: change)
+        protected.get("import", "rows", ":rowID", "options", use: rowOptions)
         protected.post("import", "rows", ":rowID", "assign", use: assignRow)
         protected.post("import", "rows", ":rowID", "ignore", use: ignoreRow)
     }
@@ -53,10 +54,8 @@ struct ImportController {
 
     /// Progress fragment; when a polling request finds the run finished, the page reloads once.
     func progress(req: Request) async throws -> HTMLResponse {
-        let fragment = try await progressFragment(req)
-        if !fragment.isRunning, (try? req.query.get(String.self, at: "polling")) == "1" {
-            return HTMLResponse(headers: ["HX-Refresh": "true"], fragment)
-        }
+        var fragment = try await progressFragment(req)
+        fragment.finished = (try? req.query.get(String.self, at: "polling")) == "1"
         return HTMLResponse(fragment)
     }
 
@@ -106,6 +105,16 @@ struct ImportController {
             let input = try req.content.decode(DecisionInput.self)
             try await req.mappings.change(userID: userID, mappingID: id, kind: try kind(input.kind), tmdbID: input.tmdbID)
             return try await listItem(req, userID: userID, mappingID: id)
+        }
+    }
+
+    /// Episode picker for one unmatched row (episodes of the series its name is mapped to).
+    func rowOptions(req: Request) async throws -> Response {
+        try await respondMappingTrackingErrors(req) {
+            let row = try await req.mappings.ownRow(userID: try req.userID, rowID: try uuid(req, "rowID"))
+            guard let mappingID = row.$mapping.id, let mapping = try await NetflixMapping.find(mappingID, on: req.db),
+                  mapping.titleKind == .tv, let titleID = mapping.$title.id else { throw TrackingError.notFound }
+            return HTMLResponse(AssignForm(rowID: try row.requireID(), episodes: try await req.catalog.episodes(of: titleID)))
         }
     }
 
@@ -179,15 +188,9 @@ struct ImportController {
             .filter { $0.rowCount > 0 }
         let unmatchedRows = rows.filter { $0.rowStatus == .unmatched }.sorted { $0.watchedOn > $1.watchedOn }
         let mappingByID = Dictionary(mappings.compactMap { m in m.id.map { ($0, m) } }, uniquingKeysWith: { a, _ in a })
-        var episodesByTitle: [UUID: [Episode]] = [:]
-        var unmatched: [UnmatchedItem] = []
-        for row in unmatchedRows.prefix(Self.unmatchedLimit) {
-            var episodes: [Episode] = []
-            if let mappingID = row.$mapping.id, let mapping = mappingByID[mappingID], mapping.titleKind == .tv, let titleID = mapping.$title.id {
-                if episodesByTitle[titleID] == nil { episodesByTitle[titleID] = try await req.catalog.episodes(of: titleID) }
-                episodes = episodesByTitle[titleID] ?? []
-            }
-            unmatched.append(UnmatchedItem(row: row, episodes: episodes))
+        let unmatched = unmatchedRows.prefix(Self.unmatchedLimit).map { row in
+            let mapping = row.$mapping.id.flatMap { mappingByID[$0] }
+            return UnmatchedItem(row: row, canAssign: mapping?.titleKind == .tv && mapping?.$title.id != nil)
         }
         let listed = mappings.filter { mapping in
             switch filter {
@@ -195,7 +198,7 @@ struct ImportController {
             default: mapping.mappingStatus != .review
             }
         }
-        return ImportState(progress: try await progressFragment(req), review: review, unmatched: unmatched,
+        return ImportState(progress: try await progressFragment(req), review: review, unmatched: Array(unmatched),
                            unmatchedTotal: unmatchedRows.count, mappings: listed.map { ($0, $0.title?.name) }, mappingFilter: filter)
     }
 }

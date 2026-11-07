@@ -198,3 +198,54 @@ struct ImportPageTests {
         #expect(idle.contains("2 Zeilen warten auf Prüfung"))
     }
 }
+
+@Suite("ImportPageLight")
+struct ImportPageLightTests {
+    static func withUnmatched(_ body: (Application, NetflixRow, HTTPHeaders) async throws -> Void) async throws {
+        let tmdb = ImportPageTests.fake()
+        tmdb.addSeries(TMDBSeries(id: 1001, name: "The Mentalist", originalName: "The Mentalist", year: 2008, posterPath: nil,
+                                  status: "Ended", seasonNumbers: [1, 4]),
+                       episodes: [1: ["Pilot"], 4: ["Scharlachrote Briefe", "Die Aura des Todes"]], airDate: "2011-01-01")
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            _ = try await ImportService(db: app.db).ingest(text: try fixtureText(), filename: "a.csv", userID: user.requireID())
+            _ = try await app.matchingWorker.processAll()
+            let row = try #require(try await NetflixRow.query(on: app.db).all().first { $0.rawTitle.contains("Shakespeare") })
+            try await body(app, row, try await login(app, "pat").adding(.htmx))
+        }
+    }
+
+    @Test func pageDoesNotEmbedEpisodeLists() async throws {
+        try await Self.withUnmatched { app, row, headers in
+            try await app.testing().test(.GET, "/import", headers: headers) { res async in
+                #expect(res.body.string.contains("Keine Lust auf Shakespeare"))
+                #expect(res.body.string.contains("/import/rows/\(row.id!.uuidString)/options"))
+                #expect(!res.body.string.contains("Scharlachrote Briefe"))
+            }
+        }
+    }
+
+    @Test func optionsAreLoadedOnDemand() async throws {
+        try await Self.withUnmatched { app, row, headers in
+            try await app.testing().test(.GET, "/import/rows/\(row.id!.uuidString)/options", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("S04E01 · Scharlachrote Briefe"))
+                #expect(res.body.string.contains("/import/rows/\(row.id!.uuidString)/assign"))
+            }
+            try await createUser(app, "other")
+            let other = try await login(app, "other").adding(.htmx)
+            try await app.testing().test(.GET, "/import/rows/\(row.id!.uuidString)/options", headers: other) { res async in
+                #expect(res.status == .notFound)
+            }
+        }
+    }
+
+    @Test func finishedRunOffersReloadInsteadOfForcingIt() async throws {
+        try await Self.withUnmatched { app, _, headers in
+            try await app.testing().test(.GET, "/import/progress?polling=1", headers: headers) { res async in
+                #expect(res.headers.first(name: "HX-Refresh") == nil)
+                #expect(res.body.string.contains("Seite aktualisieren"))
+            }
+        }
+    }
+}

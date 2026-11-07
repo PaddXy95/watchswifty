@@ -7,6 +7,8 @@ struct ImportProgress: HTML {
     let pendingRows: Int
     let waitingForReview: Int
     let lastError: String?
+    /// The page was polling and the run is over: offer a reload instead of forcing one.
+    var finished = false
 
     var body: some HTML {
         div(.id("import-progress"), .class("import-progress"),
@@ -15,6 +17,12 @@ struct ImportProgress: HTML {
             .hx.swap(.outerHTML)) {
             if isRunning {
                 p(.class("notice")) { "Zuordnung läuft … (\(pendingRows) Zeilen ausstehend)" }
+            }
+            if finished && !isRunning {
+                p(.class("notice")) {
+                    "Zuordnung abgeschlossen. "
+                    a(.href("/import")) { "Seite aktualisieren" }
+                }
             }
             if waitingForReview > 0 {
                 p { "\(waitingForReview) Zeilen warten auf Prüfung" }
@@ -112,7 +120,8 @@ struct MappingReviewItem: HTML {
 
 struct UnmatchedItem {
     let row: NetflixRow
-    let episodes: [Episode]
+    /// The row's name is mapped to a series, so it can be assigned to one of its episodes.
+    let canAssign: Bool
 }
 
 struct UnmatchedRowItem: HTML {
@@ -124,18 +133,10 @@ struct UnmatchedRowItem: HTML {
             div(.class("card-body")) {
                 strong { item.row.rawTitle }
                 span(.class("muted")) { " · \(CalendarDay.display(item.row.watchedOn))" }
-                if !item.episodes.isEmpty {
-                    form(.class("inline-form"), .hx.post("/import/rows/\(id)/assign"), .hx.target("closest .unmatched-row"), .hx.swap(.outerHTML)) {
-                        select(.name("episodeID"), .custom(name: "aria-label", value: "Folge auswählen")) {
-                            for (season, episodes) in Dictionary(grouping: item.episodes, by: \.season).sorted(by: { $0.key < $1.key }) {
-                                optgroup(.custom(name: "label", value: season == 0 ? "Specials" : "Staffel \(season)")) {
-                                    for episode in episodes {
-                                        option(.value(episode.id!.uuidString)) { "\(episode.code) · \(episode.name)" }
-                                    }
-                                }
-                            }
-                        }
-                        button(.type(.submit)) { "Zuordnen" }
+                if item.canAssign {
+                    // Episode lists of long series are large: loaded only when needed.
+                    span(.class("assign-slot")) {
+                        button(.hx.get("/import/rows/\(id)/options"), .hx.target("closest .assign-slot"), .hx.swap(.innerHTML)) { "Folge wählen" }
                     }
                 }
                 button(.hx.post("/import/rows/\(id)/ignore"), .hx.target("closest .unmatched-row"), .hx.swap(.outerHTML)) { "Ignorieren" }
@@ -163,6 +164,28 @@ struct MappingListItem: HTML {
             button(.hx.post("/import/mappings/\(id.uuidString)/reset"),
                    .hx.confirm("Zuordnung zurücksetzen? Die daraus importierten Sichtungen werden gelöscht."),
                    .hx.target("closest .mapping-item"), .hx.swap(.outerHTML)) { "Zurücksetzen" }
+        }
+    }
+}
+
+/// Episode picker for one unmatched row, fetched on demand.
+struct AssignForm: HTML {
+    let rowID: UUID
+    let episodes: [Episode]
+
+    var body: some HTML {
+        form(.class("inline-form"), .hx.post("/import/rows/\(rowID.uuidString)/assign"), .hx.target("closest .unmatched-row"),
+             .hx.swap(.outerHTML)) {
+            select(.name("episodeID"), .custom(name: "aria-label", value: "Folge auswählen")) {
+                for (season, seasonEpisodes) in Dictionary(grouping: episodes, by: \.season).sorted(by: { $0.key < $1.key }) {
+                    optgroup(.custom(name: "label", value: season == 0 ? "Specials" : "Staffel \(season)")) {
+                        for episode in seasonEpisodes {
+                            option(.value(episode.id!.uuidString)) { "\(episode.code) · \(episode.name)" }
+                        }
+                    }
+                }
+            }
+            button(.type(.submit)) { "Zuordnen" }
         }
     }
 }
