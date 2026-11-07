@@ -25,6 +25,8 @@ func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) asyn
 
     app.migrations.add(CreateUser())
     app.migrations.add(SessionRecord.migration)
+    app.migrations.add(CreateTitle())
+    app.migrations.add(CreateEpisode())
 
     try routes(app)
     try await app.autoMigrate()
