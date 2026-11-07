@@ -6,6 +6,7 @@ struct MoviePage: HTML {
     let title: Title
     let watches: [Watch]
     let rating: Int?
+    let comment: String?
     let today: String
 
     var body: some HTML {
@@ -18,6 +19,7 @@ struct MoviePage: HTML {
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
                     RatingControl(kind: .movie, tmdbID: title.tmdbID, rating: rating)
+                    CommentBox(id: "movie-comment", action: "/movie/\(title.tmdbID)/comment", caption: "Kommentar zum Film", comment: comment)
                 }
             }
             MovieWatchesSection(tmdbID: title.tmdbID, watches: watches, today: today)

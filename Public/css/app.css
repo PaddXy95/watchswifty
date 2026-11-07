@@ -174,3 +174,8 @@ summary { cursor: pointer; font-weight: 600; }
   .page-loader.htmx-request { animation: none !important; background: var(--accent); }
 }
 .series-action { margin-bottom: var(--space-3); }
+.comment-box { margin: var(--space-3) 0; max-width: 40rem; }
+.comment-box label { margin-bottom: var(--space-1); }
+.comment-box textarea { display: block; width: 100%; margin-top: var(--space-1); font: inherit; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2); resize: vertical; }
+.comment-actions { display: flex; align-items: center; gap: var(--space-3); }

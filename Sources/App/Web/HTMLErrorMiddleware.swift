@@ -30,6 +30,7 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
             case .invalidDate: return (.unprocessableEntity, "Ungültiges Datum.")
             case .notAired: return (.unprocessableEntity, "Folge ist noch nicht erschienen.")
             case .invalidRating: return (.unprocessableEntity, "Bewertung muss zwischen 1 und 10 liegen.")
+            case .commentTooLong: return (.unprocessableEntity, "Kommentar darf höchstens 2.000 Zeichen haben.")
             }
         case let error as TMDBError:
             switch error {

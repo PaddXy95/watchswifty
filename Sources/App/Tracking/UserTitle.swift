@@ -10,6 +10,8 @@ final class UserTitle: Model, @unchecked Sendable {
     @Parent(key: "title_id") var title: Title
     @OptionalField(key: "rating") var rating: Int?
     @Field(key: "hidden") var hidden: Bool
+    /// Private comment on the series or movie.
+    @OptionalField(key: "comment") var comment: String?
 
     init() {}
 

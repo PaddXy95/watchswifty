@@ -5,6 +5,7 @@ struct TitleController {
     struct WatchInput: Content { var day: String?; var service: String?; var rewatch: String? }
     struct RatingInput: Content { var rating: String? }
     struct HiddenInput: Content { var hidden: Bool; var context: String? }
+    struct CommentInput: Content { var comment: String? }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("tv", ":tmdbID", use: seriesPage)
@@ -15,10 +16,13 @@ struct TitleController {
         protected.post("tv", ":tmdbID", "watch-all", use: markSeries)
         protected.post("tv", ":tmdbID", "hidden", use: setHidden)
         protected.post("tv", ":tmdbID", "rating") { try await setRating(req: $0, kind: .tv) }
+        protected.post("tv", ":tmdbID", "comment") { try await setComment(req: $0, kind: .tv) }
+        protected.post("tv", ":tmdbID", "seasons", ":season", "comment", use: setSeasonComment)
         protected.get("movie", ":tmdbID", use: moviePage)
         protected.post("movie", ":tmdbID", "watch", use: markMovie)
         protected.delete("movie", ":tmdbID", "watch", use: unmarkMovie)
         protected.post("movie", ":tmdbID", "rating") { try await setRating(req: $0, kind: .movie) }
+        protected.post("movie", ":tmdbID", "comment") { try await setComment(req: $0, kind: .movie) }
     }
 
     // MARK: Series
@@ -33,7 +37,7 @@ struct TitleController {
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
             return HTMLResponse(SeriesPage(nav: try req.nav(.search), title: title, seasons: seasons, rating: entry?.rating,
-                                           hidden: entry?.hidden ?? false, today: req.watches.today(),
+                                           comment: entry?.comment, hidden: entry?.hidden ?? false, today: req.watches.today(),
                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
         }
     }
@@ -120,7 +124,7 @@ struct TitleController {
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             return HTMLResponse(MoviePage(nav: try req.nav(.search), title: title,
                                           watches: try await movieWatches(req, userID: userID, titleID: title.requireID()),
-                                          rating: entry?.rating, today: req.watches.today()))
+                                          rating: entry?.rating, comment: entry?.comment, today: req.watches.today()))
         }
     }
 
@@ -156,6 +160,33 @@ struct TitleController {
             if raw.isEmpty { rating = nil } else if let value = Int(raw) { rating = value } else { throw TrackingError.invalidRating }
             try await req.watches.setRating(userID: try req.userID, titleID: title.requireID(), rating: rating)
             return HTMLResponse(RatingControl(kind: kind, tmdbID: title.tmdbID, rating: rating))
+        }
+    }
+
+    // MARK: Comments
+
+    func setComment(req: Request, kind: TitleKind) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, kind)
+            let comment = (try? req.content.decode(CommentInput.self))?.comment
+            let userID = try req.userID
+            try await req.watches.setComment(userID: userID, titleID: title.requireID(), comment: comment)
+            let saved = try await findEntry(req, userID: userID, titleID: title.requireID())?.comment
+            let (id, label) = kind == .tv ? ("series-comment", "Kommentar zur Serie") : ("movie-comment", "Kommentar zum Film")
+            return HTMLResponse(CommentBox(id: id, action: "/\(kind.rawValue)/\(title.tmdbID)/comment", caption: label, comment: saved, saved: true))
+        }
+    }
+
+    func setSeasonComment(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            guard let season = req.parameters.get("season", as: Int.self) else { throw Abort(.notFound) }
+            let comment = (try? req.content.decode(CommentInput.self))?.comment
+            let userID = try req.userID
+            try await req.watches.setSeasonComment(userID: userID, titleID: title.requireID(), season: season, comment: comment)
+            let saved = try await req.watches.seasonComments(userID: userID, titleID: title.requireID())[season]
+            return HTMLResponse(CommentBox(id: "season-comment-\(season)", action: "/tv/\(title.tmdbID)/seasons/\(season)/comment",
+                                           caption: "Kommentar zur Staffel", comment: saved, saved: true))
         }
     }
 
@@ -216,10 +247,11 @@ struct TitleController {
         let openSeason = open ?? nextEpisode(in: infos, watched: Set(byEpisode.keys), today: today)?.season
             ?? (watches.isEmpty ? infos.first(where: { $0.season >= 1 })?.season : nil)
         let grouped = Dictionary(grouping: episodes, by: \.season)
+        let comments = try await req.watches.seasonComments(userID: userID, titleID: title.requireID())
         return grouped.keys.sorted { a, b in (a == 0 ? Int.max : a) < (b == 0 ? Int.max : b) }.map { number in
             SeasonModel(number: number, episodes: grouped[number]!.map { e in
                 EpisodeRowModel(info: EpisodeInfo(e), aired: req.watches.isAired(e), watches: byEpisode[e.id!] ?? [])
-            }, isOpen: number == openSeason)
+            }, isOpen: number == openSeason, comment: comments[number])
         }
     }
 }

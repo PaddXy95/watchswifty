@@ -3,7 +3,7 @@ import Foundation
 import Vapor
 
 enum TrackingError: Error, Equatable {
-    case notFound, invalidRating, invalidDate, futureDate, notAired
+    case notFound, invalidRating, invalidDate, futureDate, notAired, commentTooLong
 }
 
 /// All per-user tracking writes. Every method takes the acting user's ID and never
@@ -129,6 +129,48 @@ struct WatchService {
         let entry = try await userTitle(userID: userID, titleID: titleID)
         entry.hidden = hidden
         try await entry.save(on: db)
+    }
+
+    // MARK: Comments
+
+    static let maxCommentLength = 2000
+
+    /// Trimmed comment, nil when empty; throws when longer than 2000 characters.
+    private func cleanComment(_ comment: String?) throws -> String? {
+        let text = (comment ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count <= Self.maxCommentLength else { throw TrackingError.commentTooLong }
+        return text.isEmpty ? nil : text
+    }
+
+    func setComment(userID: UUID, titleID: UUID, comment: String?) async throws {
+        let text = try cleanComment(comment)
+        guard try await Title.find(titleID, on: db) != nil else { throw TrackingError.notFound }
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        entry.comment = text
+        try await entry.save(on: db)
+    }
+
+    func setSeasonComment(userID: UUID, titleID: UUID, season: Int, comment: String?) async throws {
+        let text = try cleanComment(comment)
+        guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
+        let existing = try await SeasonNote.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID)
+            .filter(\.$season == season).first()
+        switch (existing, text) {
+        case let (note?, text?):
+            note.comment = text
+            try await note.save(on: db)
+        case let (note?, nil):
+            try await note.delete(on: db)
+        case let (nil, text?):
+            try await SeasonNote(userID: userID, titleID: titleID, season: season, comment: text).save(on: db)
+        case (nil, nil):
+            break
+        }
+    }
+
+    func seasonComments(userID: UUID, titleID: UUID) async throws -> [Int: String] {
+        let notes = try await SeasonNote.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).all()
+        return Dictionary(notes.map { ($0.season, $0.comment) }, uniquingKeysWith: { a, _ in a })
     }
 
     /// Service of the most recent watch that has one (dated watches first).

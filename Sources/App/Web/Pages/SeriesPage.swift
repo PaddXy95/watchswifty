@@ -6,6 +6,7 @@ struct SeriesPage: HTML {
     let title: Title
     let seasons: [SeasonModel]
     let rating: Int?
+    let comment: String?
     let hidden: Bool
     let today: String
     let defaultService: StreamingService?
@@ -21,6 +22,7 @@ struct SeriesPage: HTML {
                     }
                     RatingControl(kind: .tv, tmdbID: title.tmdbID, rating: rating)
                     HiddenToggle(tmdbID: title.tmdbID, hidden: hidden)
+                    CommentBox(id: "series-comment", action: "/tv/\(title.tmdbID)/comment", caption: "Kommentar zur Serie", comment: comment)
                 }
             }
             if seasons.isEmpty {

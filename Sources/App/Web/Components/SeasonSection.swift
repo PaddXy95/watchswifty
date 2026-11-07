@@ -14,6 +14,7 @@ struct SeasonModel {
     let number: Int
     let episodes: [EpisodeRowModel]
     var isOpen: Bool
+    var comment: String? = nil
 
     var watchedCount: Int { episodes.filter(\.watched).count }
     var title: String { number == 0 ? "Specials" : "Staffel \(number)" }
@@ -44,6 +45,8 @@ struct SeasonSection: HTML {
             for episode in season.episodes {
                 EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService)
             }
+            CommentBox(id: "season-comment-\(season.number)", action: "/tv/\(tmdbID)/seasons/\(season.number)/comment",
+                       caption: "Kommentar zur Staffel", comment: season.comment)
         }
         .attributes(.custom(name: "open", value: ""), when: season.isOpen)
     }
