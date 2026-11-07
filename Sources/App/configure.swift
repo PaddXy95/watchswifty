@@ -2,8 +2,9 @@ import Fluent
 import FluentSQLiteDriver
 import Vapor
 
-func configure(_ app: Application, config: AppConfig) async throws {
+func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) async throws {
     app.appConfig = config
+    app.tmdb = tmdb
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     app.middleware.use(OriginCheckMiddleware())

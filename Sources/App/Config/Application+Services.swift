@@ -11,3 +11,19 @@ extension Application {
         set { storage[AppConfigKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct TMDBKey: StorageKey { typealias Value = any TMDBClient }
+
+    var tmdb: any TMDBClient {
+        get {
+            guard let client = storage[TMDBKey.self] else { fatalError("TMDB client not configured") }
+            return client
+        }
+        set { storage[TMDBKey.self] = newValue }
+    }
+}
+
+extension Request {
+    var tmdb: any TMDBClient { application.tmdb }
+}

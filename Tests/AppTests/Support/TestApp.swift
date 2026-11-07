@@ -3,10 +3,11 @@ import Fluent
 import Testing
 import VaporTesting
 
-func withTestApp(config: AppConfig = .testing, _ test: (Application) async throws -> Void) async throws {
+func withTestApp(config: AppConfig = .testing, tmdb: FakeTMDBClient = FakeTMDBClient(),
+                 _ test: (Application) async throws -> Void) async throws {
     let app = try await Application.make(.testing)
     do {
-        try await configure(app, config: config)
+        try await configure(app, config: config, tmdb: tmdb)
         try await test(app)
     } catch {
         try await app.asyncShutdown()

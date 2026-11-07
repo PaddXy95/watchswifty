@@ -20,7 +20,8 @@ enum Entrypoint {
 
         let app = try await Application.make(env)
         do {
-            try await configure(app, config: config)
+            let tmdb = LiveTMDBClient(client: app.client, token: config.tmdbToken, language: config.tmdbLanguage, limiter: RateLimiter())
+            try await configure(app, config: config, tmdb: tmdb)
             try await app.execute()
         } catch {
             app.logger.report(error: error)
