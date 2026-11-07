@@ -93,3 +93,12 @@ summary { cursor: pointer; font-weight: 600; }
 .search-form input { width: 100%; max-width: 32rem; font-size: var(--text-lg); }
 .search-result { text-decoration: none; }
 #flash:empty { display: none; }
+.continue-card .card-title { font-size: var(--text-lg); margin: 0; }
+.continue-card .card-title a { text-decoration: none; }
+.continue-card p { margin: var(--space-1) 0; }
+.card-body { flex: 1; min-width: 0; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); align-items: center; }
+.filter-bar a { text-decoration: none; color: var(--ink-2); padding: var(--space-1) var(--space-2); border-radius: var(--radius); }
+.filter-bar a.active { color: var(--ink); background: var(--paper-3); }
+.library-item a { text-decoration: none; }
+.history-edit { display: inline-block; margin: 0 var(--space-2) 0 0; padding: 0 var(--space-2); }

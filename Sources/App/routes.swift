@@ -6,10 +6,9 @@ func routes(_ app: Application) throws {
     AuthController().register(on: app)
 
     let protected = app.grouped(User.sessionAuthenticator(), AuthRedirectMiddleware())
-    protected.get { req async throws -> HTMLResponse in
-        let user = try req.currentUser
-        return HTMLResponse(ContinuePlaceholderPage(nav: .init(username: user.username, isAdmin: user.isAdmin, active: .continueWatching)))
-    }
+    HomeController().register(on: protected)
+    HistoryController().register(on: protected)
+    LibraryController().register(on: protected)
     AdminUsersController().register(on: protected)
     AccountController().register(on: protected)
     SearchController().register(on: protected)

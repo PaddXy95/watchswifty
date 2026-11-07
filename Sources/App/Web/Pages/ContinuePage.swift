@@ -1,13 +1,18 @@
 import Elementary
 
-/// Placeholder home page; replaced by the continue-watching shelf in Task 10.
-struct ContinuePlaceholderPage: HTML {
+struct ContinuePage: HTML {
     let nav: NavContext
+    let cards: [ContinueCard]
 
     var body: some HTML {
         PageLayout(title: "Weiterschauen", nav: nav) {
             h1 { "Weiterschauen" }
-            p(.class("muted")) { "Noch nichts zum Weiterschauen." }
+            if cards.isEmpty {
+                p(.class("muted")) { "Noch nichts zum Weiterschauen." }
+            }
+            div(.class("card-list")) {
+                for card in cards { ContinueCardView(card: card) }
+            }
         }
     }
 }
