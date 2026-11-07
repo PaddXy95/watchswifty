@@ -60,30 +60,34 @@ docker run -d --name watchswifty --restart unless-stopped \
 Statt eines benannten Volumes geht auch ein Verzeichnis, z. B. `-v /srv/watchswifty:/data`
 (es muss für den Container-Benutzer beschreibbar sein).
 
-## Versionen
+## Versionen und Releases
 
 WatchSwifty folgt [SemVer](https://semver.org/lang/de/); Änderungen stehen im [CHANGELOG](CHANGELOG.md).
 Die laufende Version steht links im Footer und unter `http://<server>:8080/version`.
 
+**Ablauf (GitHub Actions):**
+
+- Pull Request → nur Tests.
+- Push auf `main` → Tests; nur wenn sie grün sind: Docker-Image bauen, nach GHCR hochladen und ein
+  GitHub-Release `vX.Y.Z` erstellen.
+
+**Versionsnummer:** In `VERSION` steht die angestrebte Version (Start: `0.1.0`). Gibt es dafür noch kein
+Release, wird genau diese Version veröffentlicht; jeder weitere Push auf `main` zählt die letzte Stelle hoch
+(`0.1.1`, `0.1.2`, …). Für eine neue Minor-/Major-Version `VERSION` ändern, z. B. auf `0.2.0`. Steht im
+CHANGELOG ein Abschnitt `## [X.Y.Z]`, wird er als Release-Text verwendet, sonst erzeugt GitHub die
+Änderungsliste automatisch.
+
 | Image-Tag | Inhalt |
 |---|---|
-| `latest` | neuester Stand von `main` |
-| `0.1.0` | genau diese Version |
+| `latest` | neuestes Release |
+| `0.1.3` | genau diese Version |
 | `0.1` | neueste 0.1.x-Version |
 
-Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.0`.
+Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.3`.
 
-Neue Version veröffentlichen (Eintrag im CHANGELOG ergänzen, dann taggen):
-
-```bash
-git tag v0.1.0
-```
-
-```bash
-git push origin v0.1.0
-```
-
-Die GitHub Action testet, baut das Image und schreibt die Version hinein.
+Beim allerersten Release legt GitHub das Paket `watchswifty` als privat an; damit der Server es ohne Login
+laden kann, unter GitHub → Packages → watchswifty → Package settings die Sichtbarkeit auf „Public“ stellen
+(oder auf dem Server `docker login ghcr.io` mit einem Token ausführen).
 
 ## Update
 

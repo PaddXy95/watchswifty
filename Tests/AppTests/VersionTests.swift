@@ -43,7 +43,11 @@ struct VersionTests {
         #expect(dockerfile.contains("ARG APP_VERSION=dev"))
         #expect(dockerfile.contains("ENV APP_VERSION=$APP_VERSION"))
         let workflow = try String(contentsOfFile: ".github/workflows/docker.yml", encoding: .utf8)
-        #expect(workflow.contains("APP_VERSION=${{ steps.meta.outputs.version }}"))
+        #expect(workflow.contains("APP_VERSION=${{ steps.version.outputs.version }}"))
+        #expect(workflow.contains("needs: test"))
+        #expect(workflow.contains("github.ref == 'refs/heads/main'"))
+        #expect(workflow.contains("gh release create"))
+        #expect(!workflow.contains("tags: [\"v*\"]"))
         #expect(workflow.contains("GIT_COMMIT=${{ github.sha }}"))
     }
 }
