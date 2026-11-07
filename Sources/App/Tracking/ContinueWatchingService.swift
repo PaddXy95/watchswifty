@@ -13,6 +13,8 @@ struct ContinueCard: Sendable {
     let lastWatchedOn: String?
     let lastService: StreamingService?
     let hasNetflixData: Bool
+    /// Newest dated watch, else the day the newest (undated) watch was recorded.
+    var lastActivityOn: String = ""
 }
 
 /// Builds the "Weiterschauen" shelf for one user (§5.2).
@@ -66,7 +68,8 @@ struct ContinueWatchingService {
                 remaining: remainingAiredCount(in: titleEpisodes, from: next, watched: watched, today: today),
                 lastWatchedOn: lastDated,
                 lastService: byRecency.lazy.compactMap(\.streamingService).first,
-                hasNetflixData: titleWatches.contains { $0.watchOrigin == .import || $0.streamingService == .netflix }
+                hasNetflixData: titleWatches.contains { $0.watchOrigin == .import || $0.streamingService == .netflix },
+                lastActivityOn: lastDated ?? CalendarDay.today(now: latestCreated)
             )
             // Dated series first (newest day first), then undated-only series by creation time.
             result.append((card, (lastDated == nil ? 1 : 0, lastDated ?? "", latestCreated)))

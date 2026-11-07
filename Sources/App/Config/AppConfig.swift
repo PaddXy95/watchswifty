@@ -20,6 +20,8 @@ struct AppConfig: Sendable {
     var loginFailureDelay: Duration
     var backgroundJobsEnabled: Bool
     var bcryptCost: Int = 12
+    /// „Today“ for the app (process time zone); pinned in tests so dates never expire.
+    var today: @Sendable () -> String = { CalendarDay.today() }
     /// Extra origins accepted by the CSRF check (behind reverse proxies), e.g. `https://nas.lan:8443`.
     var publicOrigins: [String] = []
 
@@ -43,7 +45,7 @@ struct AppConfig: Sendable {
     }
 
     static var testing: AppConfig {
-        AppConfig(
+        var config = AppConfig(
             tmdbLanguage: "de-DE",
             databasePath: ":memory:",
             host: "127.0.0.1",
@@ -54,5 +56,7 @@ struct AppConfig: Sendable {
             backgroundJobsEnabled: false,
             bcryptCost: 4
         )
+        config.today = { "2026-11-07" }
+        return config
     }
 }

@@ -39,6 +39,20 @@ enum CalendarDay {
         return calendar(utc).dateComponents([.day], from: da, to: db).day ?? 0
     }
 
+    /// Adds calendar months (clamped to the month's last day) to an ISO day.
+    static func adding(months: Int, to iso: String) -> String {
+        shifted(iso, DateComponents(month: months))
+    }
+
+    static func adding(days: Int, to iso: String) -> String {
+        shifted(iso, DateComponents(day: days))
+    }
+
+    private static func shifted(_ iso: String, _ components: DateComponents) -> String {
+        guard let date = date(iso), let result = calendar(utc).date(byAdding: components, to: date) else { return iso }
+        return today(now: result, timeZone: utc)
+    }
+
     static func display(_ iso: String) -> String {
         let parts = iso.split(separator: "-")
         guard parts.count == 3 else { return iso }

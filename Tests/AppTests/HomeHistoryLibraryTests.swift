@@ -267,3 +267,56 @@ struct DoubleClickTests {
         #expect(css.contains("pointer-events: none"))
     }
 }
+
+
+@Suite("ContinueCutoff")
+struct ContinueCutoffTests {
+    func setup(_ app: Application, _ user: User) async throws {
+        let ws = WatchService(db: app.db, today: { "2026-11-07" })
+        let old = try await seedSeries(app, tmdbID: 1, name: "Alte Serie", seasons: [1: 3])
+        let edge = try await seedSeries(app, tmdbID: 2, name: "Grenzfall", seasons: [1: 3])
+        _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, old, 1, 1).requireID(), day: "2026-08-06", service: nil)
+        _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, edge, 1, 1).requireID(), day: "2026-08-07", service: nil)
+    }
+
+    @Test func oldSeriesHiddenByDefault() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await setup(app, user)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/", headers: headers) { res async in
+                let body = res.body.string
+                #expect(!body.contains("Alte Serie"))
+                #expect(body.contains("Grenzfall"))
+                #expect(body.contains("1 ältere Serie anzeigen"))
+                #expect(body.contains(#"href="/?all=1""#))
+            }
+        }
+    }
+
+    @Test func allParameterShowsOldSeries() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await setup(app, user)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/?all=1", headers: headers) { res async in
+                #expect(res.body.string.contains("Alte Serie"))
+                #expect(res.body.string.contains("Grenzfall"))
+                #expect(res.body.string.contains("Nur letzte 3 Monate"))
+            }
+        }
+    }
+
+    @Test func bulkMarkedCountsAsRecent() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 3, name: "Frisch markiert", seasons: [1: 3])
+            _ = try await WatchService(db: app.db).markUpTo(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), service: nil)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/", headers: headers) { res async in
+                #expect(res.body.string.contains("Frisch markiert"))
+                #expect(!res.body.string.contains("ältere"))
+            }
+        }
+    }
+}

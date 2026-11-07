@@ -247,5 +247,5 @@ struct WatchService {
 }
 
 extension Request {
-    var watches: WatchService { WatchService(db: db) }
+    var watches: WatchService { WatchService(db: db, today: application.appConfig.today) }
 }

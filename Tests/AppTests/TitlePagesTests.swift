@@ -36,7 +36,7 @@ struct TitlePagesTests {
         try await Watch.query(on: app.db).filter(\.$user.$id == user.requireID()).all()
     }
 
-    var todayDisplay: String { CalendarDay.display(CalendarDay.today()) }
+    var todayDisplay: String { "07.11.2026" }   // AppConfig.testing pins today
 
     @Test func searchListsBothKinds() async throws {
         try await withUser { app, _, headers in

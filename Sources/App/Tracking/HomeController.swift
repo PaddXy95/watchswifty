@@ -7,9 +7,17 @@ struct HomeController {
         protected.post("tv", ":tmdbID", "next", use: markNext)
     }
 
+    /// Series inactive for longer than this are hidden unless `?all=1`.
+    static let cutoffMonths = 3
+
     func home(req: Request) async throws -> HTMLResponse {
-        let cards = try await ContinueWatchingService(db: req.db).cards(userID: try req.userID, today: req.watches.today())
-        return HTMLResponse(ContinuePage(nav: try req.nav(.continueWatching), cards: cards))
+        let today = req.watches.today()
+        let cards = try await ContinueWatchingService(db: req.db).cards(userID: try req.userID, today: today)
+        let showAll = (try? req.query.get(String.self, at: "all")) == "1"
+        let cutoff = CalendarDay.adding(months: -Self.cutoffMonths, to: today)
+        let visible = showAll ? cards : cards.filter { $0.lastActivityOn >= cutoff }
+        return HTMLResponse(ContinuePage(nav: try req.nav(.continueWatching), cards: visible,
+                                         hiddenCount: cards.count - visible.count, showingAll: showAll))
     }
 
     struct NextInput: Content { var episodeID: UUID? }

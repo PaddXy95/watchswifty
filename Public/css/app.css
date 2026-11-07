@@ -180,3 +180,4 @@ summary { cursor: pointer; font-weight: 600; }
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2); resize: vertical; }
 .comment-actions { display: flex; align-items: center; gap: var(--space-3); }
 .candidate-action { color: var(--accent); font-weight: 600; }
+.more-link { margin-top: var(--space-4); text-align: center; }

@@ -25,4 +25,14 @@ struct CalendarDayTests {
         #expect(CalendarDay.today(now: instant, timeZone: TimeZone(identifier: "Europe/Berlin")!) == "2026-11-05")
         #expect(CalendarDay.today(now: instant, timeZone: TimeZone(identifier: "UTC")!) == "2026-11-04")
     }
+
+    @Test func addingMonthsAndDays() {
+        #expect(CalendarDay.adding(months: -3, to: "2026-11-07") == "2026-08-07")
+        #expect(CalendarDay.adding(months: -3, to: "2026-05-31") == "2026-02-28")
+        #expect(CalendarDay.adding(days: -1, to: "2026-08-07") == "2026-08-06")
+    }
+
+    @Test func testingConfigPinsToday() {
+        #expect(AppConfig.testing.today() == "2026-11-07")
+    }
 }
