@@ -37,3 +37,13 @@ der Feinschliff für Smartphone, Branding und Rückmeldung beim Laden.
 ## Dem Builder überlassen
 Genaue Breakpoints/Abstände, Animation des Ladebalkens (mit `prefers-reduced-motion` statisch),
 Platzierung der Kommentar-Felder im Detail.
+
+## Nachtrag: Neue-Folgen-Erinnerung für beobachtete Serien [entschieden: bewusst markieren]
+- Schalter „🔔 Beobachten“ / „Nicht mehr beobachten“ auf der Serienseite (pro Benutzer).
+- Startseite: Kasten „Neue Folgen“ rechts (mobil oberhalb der Karten), nur für beobachtete Serien,
+  auch wenn sie ausgeblendet oder länger als 3 Monate pausiert sind. [entschieden]
+- „Neu“ = erschienene, ungesehene reguläre Folge, deren Ausstrahlung nach dem spätesten von
+  Beobachten-Start, letzter datierter Sichtung und letztem „Erledigt“ liegt (Rückstand zählt nicht). [Vorschlag]
+- Hinweis verschwindet beim Sehen der neuen Folgen oder per „Erledigt“; neue Folgen danach lassen ihn
+  wieder erscheinen. [Vorschlag]
+- Täglicher TMDB-Abgleich bezieht beobachtete Serien auch dann ein, wenn sie ausgeblendet sind. [Vorschlag]
