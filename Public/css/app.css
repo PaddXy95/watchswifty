@@ -219,3 +219,4 @@ summary { cursor: pointer; font-weight: 600; }
 .followed-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3);
   padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
 .followed-list li .link-button { margin-left: auto; }
+.new-episodes h3 { font-size: var(--text-sm); color: var(--ink-2); margin: var(--space-3) 0 var(--space-1); text-transform: uppercase; letter-spacing: 0.04em; }

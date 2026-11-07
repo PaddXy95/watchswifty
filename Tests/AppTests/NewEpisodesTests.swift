@@ -212,3 +212,61 @@ struct FollowedListTests {
         }
     }
 }
+
+@Suite("Upcoming")
+struct UpcomingTests {
+    func seed(_ app: Application, tmdbID: Int = 1, name: String = "Bald neu") async throws -> Title {
+        try await seedSeries(app, tmdbID: tmdbID, name: name, seasons: [1: 5],
+                             airDates: ["1x3": "2026-11-12", "1x4": "2026-11-21", "1x5": "2026-11-22"])
+    }
+
+    func follow(_ app: Application, _ user: User, _ title: Title) async throws {
+        try await WatchService(db: app.db, today: { "2026-11-07" }).setFollowed(userID: user.requireID(), titleID: title.requireID(), followed: true)
+    }
+
+    @Test func upcomingWithin14Days() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seed(app)
+            try await follow(app, user, title)
+            let notes = try await NewEpisodesService(db: app.db).upcoming(userID: user.requireID(), today: "2026-11-07")
+            #expect(notes.count == 1)
+            #expect(notes.first?.next.code == "S01E03")
+            #expect(notes.first?.count == 2)   // 11-12 and 11-21 (day 14); 11-22 is outside
+        }
+    }
+
+    @Test func upcomingOnlyForFollowed() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            _ = try await seed(app)
+            #expect(try await NewEpisodesService(db: app.db).upcoming(userID: user.requireID(), today: "2026-11-07").isEmpty)
+        }
+    }
+
+    @Test func upcomingIgnoresDismiss() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seed(app)
+            try await follow(app, user, title)
+            try await WatchService(db: app.db, today: { "2026-11-07" }).dismissNewEpisodes(userID: user.requireID(), titleID: title.requireID())
+            #expect(try await NewEpisodesService(db: app.db).upcoming(userID: user.requireID(), today: "2026-11-07").count == 1)
+        }
+    }
+
+    @Test func homeShowsUpcomingSection() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seed(app)
+            try await follow(app, user, title)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains("Demnächst"))
+                #expect(body.contains("Bald neu"))
+                #expect(body.contains("S01E03 am 12.11.2026"))
+                #expect(body.contains("+ 1 weitere"))
+            }
+        }
+    }
+}

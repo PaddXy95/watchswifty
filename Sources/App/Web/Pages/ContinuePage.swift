@@ -6,12 +6,15 @@ struct ContinuePage: HTML {
     var hiddenCount = 0
     var showingAll = false
     var newEpisodes: [NewEpisodesNote] = []
+    var upcoming: [UpcomingNote] = []
+
+    private var hasAside: Bool { !newEpisodes.isEmpty || !upcoming.isEmpty }
 
     var body: some HTML {
         PageLayout(title: "Weiterschauen", nav: nav) {
             h1 { "Weiterschauen" }
-            div(.class(newEpisodes.isEmpty ? "home" : "home with-aside")) {
-                if !newEpisodes.isEmpty { NewEpisodesBox(notes: newEpisodes) }
+            div(.class(hasAside ? "home with-aside" : "home")) {
+                if hasAside { NewEpisodesBox(notes: newEpisodes, upcoming: upcoming) }
                 div(.class("home-main")) {
                     if cards.isEmpty {
                         p(.class("muted")) { "Noch nichts zum Weiterschauen." }

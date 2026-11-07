@@ -14,6 +14,15 @@ struct NewEpisodesNote: Sendable {
     let newestAirDate: String
 }
 
+struct UpcomingNote: Sendable {
+    let tmdbID: Int
+    let name: String
+    /// Next episode airing within the window.
+    let next: EpisodeInfo
+    /// Episodes of this series airing within the window.
+    let count: Int
+}
+
 struct FollowedSeries: Sendable {
     let tmdbID: Int
     let name: String
@@ -53,6 +62,24 @@ struct NewEpisodesService {
                                          newestAirDate: new.compactMap(\.airDate).max() ?? ""))
         }
         return notes.sorted { $0.newestAirDate > $1.newestAirDate }
+    }
+
+    /// „Demnächst“: followed series with regular episodes airing after today and at most `days` days ahead.
+    func upcoming(userID: UUID, today: String, days: Int = 14) async throws -> [UpcomingNote] {
+        let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$followed == true).all()
+        guard !entries.isEmpty else { return [] }
+        let titleIDs = entries.map(\.$title.id)
+        let until = CalendarDay.adding(days: days, to: today)
+        let titles = try await Title.query(on: db).filter(\.$id ~~ titleIDs).all()
+        let episodes = try await Episode.query(on: db).filter(\.$title.$id ~~ titleIDs).filter(\.$season >= 1)
+            .filter(\.$airDate > today).filter(\.$airDate <= until).all()
+        let byTitle = Dictionary(grouping: episodes, by: { $0.$title.id })
+        let notes: [UpcomingNote] = titles.compactMap { title in
+            guard let id = title.id, let list = byTitle[id],
+                  let next = list.min(by: { ($0.airDate ?? "", $0.season, $0.number) < ($1.airDate ?? "", $1.season, $1.number) }) else { return nil }
+            return UpcomingNote(tmdbID: title.tmdbID, name: title.name, next: EpisodeInfo(next), count: list.count)
+        }
+        return notes.sorted { ($0.next.airDate ?? "") < ($1.next.airDate ?? "") }
     }
 
     /// All series the user follows (for the account page), by name.
