@@ -36,7 +36,8 @@ struct LibraryPage: HTML {
             div(.class("poster-grid"), .hx.boost(true)) {
                 for item in items {
                     div(.class("library-item")) {
-                        a(.href("/\(item.title.kind)/\(item.title.tmdbID)")) {
+                        a(.href("/\(item.title.kind)/\(item.title.tmdbID)"),
+                          .custom(name: "hx-indicator", value: "closest .library-item, #page-loader")) {
                             Poster(path: item.title.posterPath, alt: item.title.name)
                             div { item.title.name }
                         }

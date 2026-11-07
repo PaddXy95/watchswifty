@@ -183,3 +183,17 @@ summary { cursor: pointer; font-weight: 600; }
 .more-link { margin-top: var(--space-4); text-align: center; }
 .overview { color: var(--ink-2); max-width: 46rem; margin: 0 0 var(--space-3); }
 .external-links { font-size: var(--text-sm); color: var(--ink-3); margin: 0 0 var(--space-3); }
+
+/* ---- Loading state on the clicked tile ---- */
+.library-item { position: relative; }
+.search-result.htmx-request, .library-item.htmx-request, .continue-card.htmx-request { position: relative; opacity: 1; }
+.search-result.htmx-request::before, .library-item.htmx-request::before, .continue-card.htmx-request::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; border-radius: var(--radius); background: rgb(0 0 0 / 0.55); }
+.search-result.htmx-request::after, .library-item.htmx-request::after, .continue-card.htmx-request::after {
+  content: ""; position: absolute; z-index: 2; top: 50%; left: 50%; width: 2rem; height: 2rem; margin: -1rem 0 0 -1rem;
+  border: 3px solid rgb(255 255 255 / 0.25); border-top-color: var(--accent); border-radius: 50%;
+  animation: tile-spin 0.8s linear infinite; }
+@keyframes tile-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .search-result.htmx-request::after, .library-item.htmx-request::after, .continue-card.htmx-request::after { animation: none; border-color: var(--accent); }
+}

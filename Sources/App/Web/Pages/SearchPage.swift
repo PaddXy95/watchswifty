@@ -46,7 +46,8 @@ struct SearchResults: HTML {
         div(.id("results"), .class("card-list"), .hx.boost(true)) {
             if !hasToken { TokenHint() }
             for item in results {
-                a(.class("card search-result"), .href("/\(item.result.kind.rawValue)/\(item.result.id)")) {
+                a(.class("card search-result"), .href("/\(item.result.kind.rawValue)/\(item.result.id)"),
+                  .custom(name: "hx-indicator", value: "closest .search-result, #page-loader")) {
                     Poster(path: item.result.posterPath, alt: item.result.name)
                     div {
                         strong { item.result.name }

@@ -15,10 +15,11 @@ struct ContinueCardView: HTML {
 
     var body: some HTML {
         article(.class("card continue-card"), .id("card-\(card.tmdbID)"), .hx.boost(true)) {
-            a(.href("/tv/\(card.tmdbID)"), .custom(name: "tabindex", value: "-1")) { Poster(path: card.posterPath, alt: card.name) }
+            a(.href("/tv/\(card.tmdbID)"), .custom(name: "tabindex", value: "-1"),
+              .custom(name: "hx-indicator", value: "closest .card, #page-loader")) { Poster(path: card.posterPath, alt: card.name) }
             div(.class("card-body")) {
                 h2(.class("card-title")) {
-                    a(.href("/tv/\(card.tmdbID)")) { card.name }
+                    a(.href("/tv/\(card.tmdbID)"), .custom(name: "hx-indicator", value: "closest .card, #page-loader")) { card.name }
                 }
                 if let last = card.lastWatchedOn {
                     p(.class("muted")) { "zuletzt \(CalendarDay.display(last))" }

@@ -160,3 +160,27 @@ struct MobileMenuLayoutTests {
         #expect(block.contains(".site-nav, .logout { display: none; flex: 0 0 100%;"))
     }
 }
+
+@Suite("TileLoading")
+struct TileLoadingTests {
+    @Test func tilesIndicateLoading() {
+        let search = SearchResults(results: [SearchResultModel(
+            result: TMDBSearchResult(id: 1, kind: .tv, name: "Dark", originalName: nil, year: 2017, posterPath: nil), status: nil, rating: nil)],
+            hasToken: true).render()
+        #expect(search.contains(##"hx-indicator="closest .search-result, #page-loader""##))
+        let title = Title(tmdbID: 1, kind: .tv, name: "Dark")
+        let library = LibraryPage(navContext: .init(username: "pat", isAdmin: false, active: .library),
+                                  items: [LibraryItem(title: title, rating: nil, hidden: false)], filter: "all", sort: "recent").render()
+        #expect(library.contains(##"hx-indicator="closest .library-item, #page-loader""##))
+        let card = ContinueCard(titleID: UUID(), tmdbID: 1, name: "Dark", posterPath: nil, rating: nil,
+                                next: EpisodeInfo(id: UUID(), season: 1, number: 2, name: "Lügen", airDate: "2017-12-01"),
+                                remaining: 1, lastWatchedOn: nil, lastService: nil, hasNetflixData: false)
+        #expect(ContinueCardView(card: card).render().contains(##"hx-indicator="closest .card, #page-loader""##))
+    }
+
+    @Test func tileSpinnerCSS() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        #expect(css.contains(".search-result.htmx-request::after"))
+        #expect(css.contains("@keyframes tile-spin"))
+    }
+}
