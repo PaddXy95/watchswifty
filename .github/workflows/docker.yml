@@ -1,7 +1,8 @@
 name: CI/CD
 
-# Pull requests: tests only.
-# Push to main: tests → (only if green) Docker image to GHCR → GitHub release.
+# Pull requests: tests and a test build of the image (nothing is pushed).
+# Push to main: tests and image build in parallel → (only if the tests are green) push to GHCR → GitHub release.
+# The release job rebuilds from the image job's cache, so it only pushes.
 on:
   push:
     branches: [main]
@@ -27,8 +28,22 @@ jobs:
       - name: Test
         run: swift test
 
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image (cache only)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   release:
-    needs: test
+    needs: [test, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -73,8 +88,7 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.version.outputs.version }}
             GIT_COMMIT=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha   # filled by the image job; this build only pushes
 
       - name: Create GitHub release
         env:

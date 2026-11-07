@@ -18,23 +18,19 @@ Repository: https://github.com/PaddXy95/watchswifty
 
 Die GitHub Action baut bei jedem Push auf `main` das Image `ghcr.io/paddxy95/watchswifty:latest`.
 
-1. `docker-compose.yml` aus diesem Repository auf den Server kopieren (oder das Repo klonen).
-2. Schlüssel für die TMDB-Tokens erzeugen und sicher aufbewahren (z. B. im Passwortmanager), dann den ersten
-   Admin festlegen und starten:
+1. Auf dem Server einen Ordner anlegen (z. B. `~/watchswifty`) und `docker-compose.yml` sowie `.env.example`
+   aus diesem Repository hineinkopieren; `.env.example` in `.env` umbenennen.
+2. In der `.env` mindestens `TOKEN_KEY` (Ausgabe von `openssl rand -base64 32`) und `ADMIN_PASSWORD` eintragen
+   und den Schlüssel zusätzlich sicher aufbewahren (siehe [TMDB-Tokens verschlüsselt](#tmdb-tokens-verschlüsselt)).
+   Die Datei nur für dich lesbar machen: `chmod 600 .env`.
+3. Starten:
 
    ```bash
-   openssl rand -base64 32
+   docker compose up -d
    ```
 
-   ```bash
-   TOKEN_KEY='<ausgabe von oben>' ADMIN_USERNAME=admin ADMIN_PASSWORD='ein-langes-passwort' docker compose up -d
-   ```
-
-   Den `TOKEN_KEY` bei jedem `docker compose up` mitgeben, am einfachsten in einer `.env`-Datei neben der
-   `docker-compose.yml` (`TOKEN_KEY=…`). Siehe [TMDB-Tokens verschlüsselt](#tmdb-tokens-verschlüsselt).
-
-3. Im Browser `http://<server>:8080` öffnen und mit dem Admin anmelden.
-4. Unter **Konto** den eigenen TMDB-Token hinterlegen (siehe unten).
+4. Im Browser `http://<server>:8080` öffnen und mit dem Admin anmelden.
+5. Unter **Konto** den eigenen TMDB-Token hinterlegen (siehe unten).
 
 `ADMIN_USERNAME`/`ADMIN_PASSWORD` werden nur beim allerersten Start gebraucht, solange es noch keinen
 Benutzer gibt; danach werden sie ignoriert. Weitere Konten legt der Admin unter **Benutzer** an.
@@ -77,9 +73,13 @@ Die laufende Version steht links im Footer und unter `http://<server>:8080/versi
 
 **Ablauf (GitHub Actions):**
 
-- Pull Request → nur Tests.
-- Push auf `main` → Tests; nur wenn sie grün sind: Docker-Image bauen, nach GHCR hochladen und ein
-  GitHub-Release `vX.Y.Z` erstellen.
+- Pull Request → Tests und ein Probe-Build des Images (nichts wird hochgeladen).
+- Push auf `main` → Tests und Image-Build laufen parallel; nur wenn die Tests grün sind: Image nach GHCR
+  hochladen und ein GitHub-Release `vX.Y.Z` erstellen.
+
+Die Abhängigkeiten werden im Docker-Build in einer eigenen Schicht übersetzt und im GitHub-Actions-Cache
+gehalten; solange sich `Package.swift`/`Package.resolved` nicht ändern, wird bei einem Push nur die App selbst
+neu gebaut.
 
 **Versionsnummer:** In `VERSION` steht die angestrebte Version (Start: `0.1.0`). Gibt es dafür noch kein
 Release, wird genau diese Version veröffentlicht; jeder weitere Push auf `main` zählt die letzte Stelle hoch

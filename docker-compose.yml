@@ -1,23 +1,26 @@
-# watchswifty – Beispiel für den Betrieb auf einem Server im Heimnetz.
-# Image wird von der GitHub Action aus github.com/PaddXy95/watchswifty gebaut.
+# WatchSwifty auf einem Server im Heimnetz.
+# Neben diese Datei gehört eine `.env` (Vorlage: `.env.example`). Start: `docker compose up -d`.
 services:
   watchswifty:
-    image: ghcr.io/paddxy95/watchswifty:latest
+    image: ghcr.io/paddxy95/watchswifty:${WATCHSWIFTY_VERSION:-latest}
+    container_name: watchswifty
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${WATCHSWIFTY_PORT:-8080}:8080"
     environment:
-      TMDB_LANGUAGE: de-DE
+      # Schlüssel für die gespeicherten TMDB-Tokens – getrennt von den Daten aufbewahren.
+      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY fehlt in .env (openssl rand -base64 32)}
       # Nur beim allerersten Start nötig: legt den ersten Admin an.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      TZ: Europe/Berlin
-      # Schlüssel für die gespeicherten TMDB-Tokens (openssl rand -base64 32). Leer = token.key im Volume.
-      TOKEN_KEY: ${TOKEN_KEY:-}
+      TZ: ${TZ:-Europe/Berlin}
+      TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
+      # Nur hinter einem Reverse-Proxy nötig, z. B. https://watch.example.lan
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     volumes:
       - watchswifty-data:/data
 
 volumes:
   watchswifty-data:
-    # Fixed name, so `docker run -v watchswifty-data:/data …` (README backup) uses the same volume.
+    # Fester Name, damit `docker run -v watchswifty-data:/data …` (Backup im README) dasselbe Volume trifft.
     name: watchswifty-data

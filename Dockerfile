@@ -4,9 +4,15 @@
 FROM swift:6.4-noble AS build
 WORKDIR /build
 
-# Resolve dependencies first so this layer is cached between source changes.
+# Resolve and compile the dependencies first, with stub sources standing in for the app: these layers stay
+# cached (GitHub Actions cache) until Package.swift/Package.resolved change, so a normal push only compiles the app.
 COPY ./Package.* ./
 RUN swift package resolve
+RUN mkdir -p Sources/App Tests/AppTests/Fixtures \
+    && echo 'print("stub")' > Sources/App/main.swift \
+    && echo '' > Tests/AppTests/Stub.swift \
+    && swift build -c release --static-swift-stdlib --product App \
+    && rm -rf Sources Tests
 
 COPY . .
 RUN swift build -c release --static-swift-stdlib --product App

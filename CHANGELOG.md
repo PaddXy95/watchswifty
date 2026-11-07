@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.1.1] – 2026-11-07
+
+### Neu
+- **Filmliste importieren:** eigene CSV (z. B. aus Numbers) mit Datum, Dienst, Bewertung 0–100 → 1–10 und
+  Kommentar aus „Mit …“, Übeltäter und Bemerkung; unklare Filme werden zur Auswahl vorgeschlagen.
+- **Update-Hinweis:** Admin-Seite „System“ mit optionaler Prüfung auf neue Releases bei GitHub
+  (alle 12 Stunden, standardmäßig aus) und „Jetzt prüfen“.
+- **Betrieb:** `docker-compose.yml` liest alle Einstellungen aus einer `.env` (Vorlage `.env.example`);
+  ohne `TOKEN_KEY` startet Compose nicht.
+
+### Geändert
+- CI: GitHub Actions auf Node-24-Versionen; Image-Build läuft parallel zu den Tests, Abhängigkeiten werden im
+  Docker-Build zwischengespeichert – ein Push baut nur noch die App neu.
+
 ## [0.1.0] – 2026-11-07
 
 Erste Version.
@@ -18,10 +32,6 @@ Erste Version.
 - **Netflix-Import:** Wiedergabeaktivität als CSV (auch Excel-Varianten), automatische TMDB-Zuordnung, „Zu prüfen“,
   „Nicht zugeordnet“, „Zuordnungen“, „Erneut versuchen“ und automatische Wiederholung.
 - **Verlauf** und **Bibliothek** mit Filter und Sortierung.
-- **Filmliste importieren:** eigene CSV (z. B. aus Numbers) mit Datum, Dienst, Bewertung 0–100 → 1–10 und
-  Kommentar aus „Mit …“, Übeltäter und Bemerkung; unklare Filme werden zur Auswahl vorgeschlagen.
-- **Update-Hinweis:** Admin-Seite „System“ mit optionaler Prüfung auf neue Releases bei GitHub
-  (alle 12 Stunden, standardmäßig aus) und „Jetzt prüfen“.
 - **Statistik:** Filme, Serien, Folgen und verbrachte Zeit (TMDB-Laufzeiten) – insgesamt, pro Jahr und Monat
   sowie nach Bewertung.
 - **Benutzer:** mehrere Konten mit getrennten Daten, Admin-Verwaltung, eigener TMDB-Token pro Benutzer

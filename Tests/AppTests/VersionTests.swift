@@ -48,13 +48,42 @@ struct VersionTests {
         #expect(!workflow.contains("@v3"))
     }
 
+    /// Speed: dependencies compile in their own cached layer; the image builds while the tests run.
+    @Test func ciCachesDependenciesAndBuildsInParallel() throws {
+        let dockerfile = try String(contentsOfFile: "Dockerfile", encoding: .utf8)
+        let stub = try #require(dockerfile.range(of: "Sources/App/main.swift"))
+        let copyAll = try #require(dockerfile.range(of: "COPY . ."))
+        #expect(stub.lowerBound < copyAll.lowerBound)
+        let workflow = try String(contentsOfFile: ".github/workflows/docker.yml", encoding: .utf8)
+        #expect(workflow.contains("  image:\n"))
+        #expect(workflow.contains("push: false"))
+        #expect(workflow.contains("cache-from: type=gha"))
+    }
+
+    /// Release notes come from the CHANGELOG section of the version in VERSION.
+    @Test func changelogHasSectionForVersion() throws {
+        let version = try String(contentsOfFile: "VERSION", encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        let changelog = try String(contentsOfFile: "CHANGELOG.md", encoding: .utf8)
+        #expect(changelog.contains("## [\(version)]"))
+    }
+
+    @Test func composeTakesSettingsFromEnvFile() throws {
+        let compose = try String(contentsOfFile: "docker-compose.yml", encoding: .utf8)
+        #expect(compose.contains("TOKEN_KEY: ${TOKEN_KEY:?"))
+        #expect(compose.contains("ghcr.io/paddxy95/watchswifty:${WATCHSWIFTY_VERSION:-latest}"))
+        let example = try String(contentsOfFile: ".env.example", encoding: .utf8)
+        for key in ["WATCHSWIFTY_VERSION=", "TOKEN_KEY=", "ADMIN_PASSWORD=", "TZ=", "PUBLIC_ORIGIN="] {
+            #expect(example.contains(key), "\(key) missing")
+        }
+    }
+
     @Test func buildPassesVersion() throws {
         let dockerfile = try String(contentsOfFile: "Dockerfile", encoding: .utf8)
         #expect(dockerfile.contains("ARG APP_VERSION=dev"))
         #expect(dockerfile.contains("ENV APP_VERSION=$APP_VERSION"))
         let workflow = try String(contentsOfFile: ".github/workflows/docker.yml", encoding: .utf8)
         #expect(workflow.contains("APP_VERSION=${{ steps.version.outputs.version }}"))
-        #expect(workflow.contains("needs: test"))
+        #expect(workflow.contains("needs: [test, image]"))   // release only after green tests
         #expect(workflow.contains("github.ref == 'refs/heads/main'"))
         #expect(workflow.contains("gh release create"))
         #expect(!workflow.contains("tags: [\"v*\"]"))
