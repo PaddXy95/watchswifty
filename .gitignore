@@ -9,3 +9,7 @@ DerivedData/
 
 # Server key for TMDB tokens (created next to a local dev database)
 token.key
+
+# Local tool folders (Claude Code preview config, agent working notes)
+.claude/
+.superpowers/
