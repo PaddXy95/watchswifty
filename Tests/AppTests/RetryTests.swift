@@ -65,14 +65,14 @@ struct RetryTests {
                                         retryDelay: .milliseconds(100))
             await worker.kick()
             var sawError = false
-            for _ in 0..<50 where !sawError {
+            for _ in 0..<500 where !sawError {   // up to 10 s: slow CI containers
                 try await Task.sleep(for: .milliseconds(20))
                 sawError = try await worker.lastError(for: user.requireID()) != nil
             }
             #expect(sawError)
             tmdb.failure = nil
             var matched = false
-            for _ in 0..<100 where !matched {
+            for _ in 0..<330 where !matched {   // up to 10 s
                 try await Task.sleep(for: .milliseconds(30))
                 matched = try await NetflixRow.query(on: app.db).filter(\.$user.$id == user.requireID()).all()
                     .filter { $0.rawTitle.contains("The Mentalist") }.allSatisfy { $0.rowStatus == .matched }
