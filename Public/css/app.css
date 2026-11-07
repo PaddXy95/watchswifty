@@ -163,3 +163,13 @@ summary { cursor: pointer; font-weight: 600; }
   .site-footer .github { justify-self: center; }
   button, .button { min-height: 2.5rem; }
 }
+
+/* ---- Loading bar (htmx indicator on every request) ---- */
+.page-loader { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 1000; pointer-events: none;
+  opacity: 0; background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+  background-size: 40% 100%; transition: opacity 150ms ease; }
+.page-loader.htmx-request { opacity: 1 !important; animation: page-loader-slide 1s linear infinite; }
+@keyframes page-loader-slide { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .page-loader.htmx-request { animation: none !important; background: var(--accent); }
+}

@@ -43,7 +43,7 @@ struct SearchResults: HTML {
     var hasToken = true
 
     var body: some HTML {
-        div(.id("results"), .class("card-list")) {
+        div(.id("results"), .class("card-list"), .hx.boost(true)) {
             if !hasToken { TokenHint() }
             for item in results {
                 a(.class("card search-result"), .href("/\(item.result.kind.rawValue)/\(item.result.id)")) {

@@ -24,7 +24,10 @@ struct PageLayout<Content: HTML>: HTMLDocument {
     var title: String { "\(pageTitle) · WatchSwifty" }
     var lang: String { "de" }
     /// The login page (no navigation) is laid out centered.
-    var bodyAttributes: [HTMLAttribute<HTMLTag.body>] { nav == nil ? [.class("auth")] : [] }
+    var bodyAttributes: [HTMLAttribute<HTMLTag.body>] {
+        // Every htmx request (incl. boosted links) shows the loading bar.
+        (nav == nil ? [.class("auth")] : []) + [.custom(name: "hx-indicator", value: "#page-loader")]
+    }
 
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
@@ -35,6 +38,7 @@ struct PageLayout<Content: HTML>: HTMLDocument {
     }
 
     var body: some HTML {
+        div(.id("page-loader"), .class("page-loader htmx-indicator"), .custom(name: "aria-hidden", value: "true")) {}
         if let nav {
             SiteNav(context: nav)
         }

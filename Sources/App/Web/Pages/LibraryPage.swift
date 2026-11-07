@@ -1,4 +1,5 @@
 import Elementary
+import ElementaryHTMX2
 
 struct LibraryItem {
     let title: Title
@@ -32,7 +33,7 @@ struct LibraryPage: HTML {
             if items.isEmpty {
                 p(.class("muted")) { "Keine Titel." }
             }
-            div(.class("poster-grid")) {
+            div(.class("poster-grid"), .hx.boost(true)) {
                 for item in items {
                     div(.class("library-item")) {
                         a(.href("/\(item.title.kind)/\(item.title.tmdbID)")) {

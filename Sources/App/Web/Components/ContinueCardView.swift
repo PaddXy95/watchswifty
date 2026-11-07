@@ -14,7 +14,7 @@ struct ContinueCardView: HTML {
     private var remainingText: String { card.remaining == 1 ? "noch 1 Folge" : "noch \(card.remaining) Folgen" }
 
     var body: some HTML {
-        article(.class("card continue-card"), .id("card-\(card.tmdbID)")) {
+        article(.class("card continue-card"), .id("card-\(card.tmdbID)"), .hx.boost(true)) {
             a(.href("/tv/\(card.tmdbID)"), .custom(name: "tabindex", value: "-1")) { Poster(path: card.posterPath, alt: card.name) }
             div(.class("card-body")) {
                 h2(.class("card-title")) {
@@ -36,7 +36,7 @@ struct ContinueCardView: HTML {
                     HiddenToggle(tmdbID: card.tmdbID, hidden: false, context: .card)
                     if card.hasNetflixData {
                         a(.class("button"), .href(netflixSearchURL(card.name)), .target(.blank),
-                          .custom(name: "rel", value: "noopener noreferrer")) { "Auf Netflix suchen" }
+                          .custom(name: "rel", value: "noopener noreferrer"), .hx.boost(false)) { "Auf Netflix suchen" }
                     }
                 }
             }

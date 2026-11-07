@@ -160,3 +160,14 @@ struct OriginBehindProxyTests {
         }
     }
 }
+
+@Suite("BoostedAuth")
+struct BoostedAuthTests {
+    @Test func boostedRequestWithExpiredSessionRedirects() async throws {
+        try await withTestApp { app in
+            try await app.testing().test(.GET, "/tv/1", headers: ["HX-Request": "true", "HX-Boosted": "true"]) { res async in
+                #expect(res.headers.first(name: "HX-Redirect") == "/login")
+            }
+        }
+    }
+}
