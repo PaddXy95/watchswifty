@@ -12,6 +12,13 @@ final class UserTitle: Model, @unchecked Sendable {
     @Field(key: "hidden") var hidden: Bool
     /// Private comment on the series or movie.
     @OptionalField(key: "comment") var comment: String?
+    /// „Beobachten“: remind about new episodes.
+    @OptionalField(key: "followed") var followed: Bool?
+    @OptionalField(key: "followed_on") var followedOn: String?
+    /// Day of the last „Erledigt“ on the new-episodes note.
+    @OptionalField(key: "new_seen_until") var newSeenUntil: String?
+
+    var isFollowed: Bool { followed ?? false }
 
     init() {}
 

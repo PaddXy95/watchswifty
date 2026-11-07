@@ -8,6 +8,7 @@ struct SeriesPage: HTML {
     let rating: Int?
     let comment: String?
     let hidden: Bool
+    var followed = false
     let today: String
     let defaultService: StreamingService?
 
@@ -25,7 +26,10 @@ struct SeriesPage: HTML {
                     }
                     ExternalLinks(title: title)
                     RatingControl(kind: .tv, tmdbID: title.tmdbID, rating: rating)
-                    HiddenToggle(tmdbID: title.tmdbID, hidden: hidden)
+                    div(.class("title-actions")) {
+                        FollowToggle(tmdbID: title.tmdbID, followed: followed)
+                        HiddenToggle(tmdbID: title.tmdbID, hidden: hidden)
+                    }
                     CommentBox(id: "series-comment", action: "/tv/\(title.tmdbID)/comment", caption: "Kommentar zur Serie", comment: comment)
                 }
             }

@@ -198,3 +198,20 @@ summary { cursor: pointer; font-weight: 600; }
   .search-result.htmx-request::after, .library-item.htmx-request::after, .continue-card.htmx-request::after { animation: none; border-color: var(--accent); }
 }
 .episode-overview { color: var(--ink-2); font-size: var(--text-sm); margin: var(--space-2) 0; max-width: 46rem; }
+
+/* ---- „Neue Folgen“ + Beobachten ---- */
+.title-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0; }
+.follow-toggle.active { border-color: var(--accent); }
+.home.with-aside { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--space-4); align-items: start; }
+.home.with-aside .new-episodes { grid-column: 2; grid-row: 1; position: sticky; top: var(--space-4); }
+.home.with-aside .home-main { grid-column: 1; grid-row: 1; }
+.new-episodes { background: var(--paper-2); border: 1px solid var(--accent-dim); border-radius: var(--radius); padding: var(--space-3); }
+.new-episodes h2 { font-size: var(--text-base); margin: 0 0 var(--space-2); }
+.new-episodes ul { list-style: none; margin: 0; padding: 0; }
+.new-episode-note { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+.new-episode-note .link-button { align-self: flex-start; font-size: var(--text-sm); }
+@media (max-width: 700px) {
+  .home.with-aside { grid-template-columns: 1fr; }
+  .home.with-aside .new-episodes { grid-column: 1; grid-row: 1; position: static; }
+  .home.with-aside .home-main { grid-row: 2; }
+}

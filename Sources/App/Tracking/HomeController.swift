@@ -16,8 +16,9 @@ struct HomeController {
         let showAll = (try? req.query.get(String.self, at: "all")) == "1"
         let cutoff = CalendarDay.adding(months: -Self.cutoffMonths, to: today)
         let visible = showAll ? cards : cards.filter { $0.lastActivityOn >= cutoff }
+        let newEpisodes = try await NewEpisodesService(db: req.db).notes(userID: try req.userID, today: today)
         return HTMLResponse(ContinuePage(nav: try req.nav(.continueWatching), cards: visible,
-                                         hiddenCount: cards.count - visible.count, showingAll: showAll))
+                                         hiddenCount: cards.count - visible.count, showingAll: showAll, newEpisodes: newEpisodes))
     }
 
     struct NextInput: Content { var episodeID: UUID? }

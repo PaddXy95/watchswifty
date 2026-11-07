@@ -62,3 +62,17 @@ struct CreateSeasonNote: AsyncMigration {
         try await database.schema(SeasonNote.schema).delete()
     }
 }
+
+struct AddFollowFields: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(UserTitle.schema).field("followed", .bool).update()
+        try await database.schema(UserTitle.schema).field("followed_on", .string).update()
+        try await database.schema(UserTitle.schema).field("new_seen_until", .string).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(UserTitle.schema).deleteField("new_seen_until").update()
+        try await database.schema(UserTitle.schema).deleteField("followed_on").update()
+        try await database.schema(UserTitle.schema).deleteField("followed").update()
+    }
+}

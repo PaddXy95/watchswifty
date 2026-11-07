@@ -39,6 +39,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(CreateSeasonNote())
     app.migrations.add(AddTitleDetails())
     app.migrations.add(AddEpisodeOverview())
+    app.migrations.add(AddFollowFields())
 
     try routes(app)
     try await app.autoMigrate()

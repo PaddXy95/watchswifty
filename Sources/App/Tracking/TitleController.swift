@@ -6,6 +6,7 @@ struct TitleController {
     struct RatingInput: Content { var rating: String? }
     struct HiddenInput: Content { var hidden: Bool; var context: String? }
     struct CommentInput: Content { var comment: String? }
+    struct FollowInput: Content { var followed: Bool }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("tv", ":tmdbID", use: seriesPage)
@@ -15,6 +16,8 @@ struct TitleController {
         protected.post("tv", ":tmdbID", "seasons", ":season", "watch", use: markSeason)
         protected.post("tv", ":tmdbID", "watch-all", use: markSeries)
         protected.post("tv", ":tmdbID", "hidden", use: setHidden)
+        protected.post("tv", ":tmdbID", "follow", use: setFollowed)
+        protected.post("tv", ":tmdbID", "new-episodes", "dismiss", use: dismissNewEpisodes)
         protected.post("tv", ":tmdbID", "rating") { try await setRating(req: $0, kind: .tv) }
         protected.post("tv", ":tmdbID", "comment") { try await setComment(req: $0, kind: .tv) }
         protected.post("tv", ":tmdbID", "seasons", ":season", "comment", use: setSeasonComment)
@@ -35,7 +38,7 @@ struct TitleController {
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
             return HTMLResponse(SeriesPage(nav: try req.nav(.search), title: title, seasons: seasons, rating: entry?.rating,
-                                           comment: entry?.comment, hidden: entry?.hidden ?? false, today: req.watches.today(),
+                                           comment: entry?.comment, hidden: entry?.hidden ?? false, followed: entry?.isFollowed ?? false, today: req.watches.today(),
                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
         }
     }
@@ -159,6 +162,25 @@ struct TitleController {
             if raw.isEmpty { rating = nil } else if let value = Int(raw) { rating = value } else { throw TrackingError.invalidRating }
             try await req.watches.setRating(userID: try req.userID, titleID: title.requireID(), rating: rating)
             return HTMLResponse(RatingControl(kind: kind, tmdbID: title.tmdbID, rating: rating))
+        }
+    }
+
+    // MARK: Follow
+
+    func setFollowed(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            let followed = try req.content.decode(FollowInput.self).followed
+            try await req.watches.setFollowed(userID: try req.userID, titleID: title.requireID(), followed: followed)
+            return HTMLResponse(FollowToggle(tmdbID: title.tmdbID, followed: followed))
+        }
+    }
+
+    func dismissNewEpisodes(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            try await req.watches.dismissNewEpisodes(userID: try req.userID, titleID: title.requireID())
+            return HTMLResponse(EmptyHTML())
         }
     }
 

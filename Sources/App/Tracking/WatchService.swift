@@ -131,6 +131,25 @@ struct WatchService {
         try await entry.save(on: db)
     }
 
+    // MARK: Follow („Beobachten“)
+
+    func setFollowed(userID: UUID, titleID: UUID, followed: Bool) async throws {
+        guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        entry.followed = followed
+        if followed && !(entry.isFollowed && entry.followedOn != nil) { entry.followedOn = today() }
+        if !followed { entry.followedOn = nil }
+        try await entry.save(on: db)
+    }
+
+    /// „Erledigt“ on the new-episodes note: episodes aired up to today no longer count as new.
+    func dismissNewEpisodes(userID: UUID, titleID: UUID) async throws {
+        guard try await Title.find(titleID, on: db) != nil else { throw TrackingError.notFound }
+        let entry = try await userTitle(userID: userID, titleID: titleID)
+        entry.newSeenUntil = today()
+        try await entry.save(on: db)
+    }
+
     // MARK: Comments
 
     static let maxCommentLength = 2000

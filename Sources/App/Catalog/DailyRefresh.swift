@@ -5,7 +5,10 @@ import Vapor
 /// Series that need a TMDB refresh so new episodes appear: in at least one user's library and
 /// visible there, and not finished at TMDB.
 func seriesDueForRefresh(on db: any Database) async throws -> [Title] {
-    let visible = try await UserTitle.query(on: db).filter(\.$hidden == false).all().map(\.$title.id)
+    // Visible in someone's library, or followed (also when hidden) so new episodes are noticed.
+    let visible = try await UserTitle.query(on: db).group(.or) { group in
+        group.filter(\.$hidden == false).filter(\.$followed == true)
+    }.all().map(\.$title.id)
     guard !visible.isEmpty else { return [] }
     return try await Title.query(on: db).filter(\.$id ~~ Array(Set(visible)))
         .filter(\.$kind == TitleKind.tv.rawValue).all()
