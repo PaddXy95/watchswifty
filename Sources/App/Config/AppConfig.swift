@@ -20,6 +20,8 @@ struct AppConfig: Sendable {
     var loginFailureDelay: Duration
     var backgroundJobsEnabled: Bool
     var bcryptCost: Int = 12
+    /// Extra origins accepted by the CSRF check (behind reverse proxies), e.g. `https://nas.lan:8443`.
+    var publicOrigins: [String] = []
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
@@ -34,7 +36,9 @@ struct AppConfig: Sendable {
             adminUsername: value("ADMIN_USERNAME"),
             adminPassword: value("ADMIN_PASSWORD"),
             loginFailureDelay: .seconds(1),
-            backgroundJobsEnabled: true
+            backgroundJobsEnabled: true,
+            publicOrigins: (value("PUBLIC_ORIGIN") ?? "").split(separator: ",").map { OriginCheckMiddleware.normalizeOrigin(String($0)) }
+                .filter { !$0.isEmpty }
         )
     }
 

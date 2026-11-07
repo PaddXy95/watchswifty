@@ -122,3 +122,41 @@ struct AuthTests {
         }
     }
 }
+
+@Suite("OriginBehindProxy")
+struct OriginBehindProxyTests {
+    @Test func publicOriginConfig() throws {
+        let c = try AppConfig.fromEnvironment(["PUBLIC_ORIGIN": "https://nas.lan:8443, http://tv.lan:8080/"])
+        #expect(c.publicOrigins == ["https://nas.lan:8443", "http://tv.lan:8080"])
+    }
+
+    @Test func publicOriginAllowsMismatchedHost() async throws {
+        var config = AppConfig.testing
+        config.publicOrigins = ["https://nas.lan:8443"]
+        try await withTestApp(config: config) { app in
+            // nginx with `proxy_set_header Host $host;` drops the port.
+            try await app.testing().test(.POST, "/logout", headers: ["Host": "nas.lan", "Origin": "https://nas.lan:8443"]) { res async in
+                #expect(res.status != .forbidden)
+            }
+            try await app.testing().test(.POST, "/logout", headers: ["Host": "nas.lan", "Origin": "https://evil.lan:8443"]) { res async in
+                #expect(res.status == .forbidden)
+            }
+        }
+    }
+
+    @Test func forwardedPortIsHonoured() async throws {
+        try await withTestApp { app in
+            try await app.testing().test(.POST, "/logout", headers: [
+                "Host": "app:8080", "X-Forwarded-Host": "nas.lan", "X-Forwarded-Port": "8443", "Origin": "https://nas.lan:8443",
+            ]) { res async in
+                #expect(res.status != .forbidden)
+            }
+            try await app.testing().test(.POST, "/logout", headers: [
+                "Host": "app:8080", "X-Forwarded-Host": "nas.lan", "X-Forwarded-Port": "443", "X-Forwarded-Proto": "https",
+                "Origin": "https://nas.lan",
+            ]) { res async in
+                #expect(res.status != .forbidden)
+            }
+        }
+    }
+}

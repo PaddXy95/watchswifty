@@ -7,7 +7,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.tmdbProvider = tmdbProvider
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    app.middleware.use(OriginCheckMiddleware())
+    app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
     app.sessions.use(.fluent)
     app.sessions.configuration = .init(cookieName: "watchswifty_session") { sessionID in
         .init(string: sessionID.string, expires: Date(timeIntervalSinceNow: 2_592_000), maxAge: 2_592_000,

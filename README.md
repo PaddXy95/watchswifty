@@ -37,6 +37,7 @@ TMDB geprüft und danach nur noch mit den letzten vier Zeichen angezeigt – auc
 | `HOST` / `PORT` | nein | Standard `0.0.0.0` / `8080` |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | nur erster Start | Erster Admin (Passwort mindestens 8 Zeichen) |
 | `TZ` | nein | Zeitzone für „heute“, z. B. `Europe/Berlin` |
+| `PUBLIC_ORIGIN` | nein | Öffentliche Adresse(n) hinter einem Reverse-Proxy, kommagetrennt, z. B. `https://nas.lan:8443` |
 
 ## Netflix-Verlauf importieren
 
@@ -57,8 +58,19 @@ Klartext – Backups entsprechend geschützt aufbewahren.
 ## Zugriff von außerhalb
 
 Die App spricht kein TLS. Für Zugriff außerhalb des Heimnetzes einen Reverse-Proxy (z. B. Caddy,
-Traefik, nginx) mit HTTPS davorsetzen; er muss den `Host`- bzw. `X-Forwarded-Host`-Header
-weiterreichen.
+Traefik, nginx) mit HTTPS davorsetzen. Zum Schutz vor CSRF muss die Adresse, die der Browser
+aufruft, bei der App ankommen – entweder über den `Host`-Header inklusive Port oder über
+`PUBLIC_ORIGIN`. Beispiel nginx:
+
+```nginx
+location / {
+    proxy_pass http://watchswifty:8080;
+    proxy_set_header Host $http_host;          # behält den Port, anders als $host
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Alternativ `PUBLIC_ORIGIN=https://nas.lan:8443` setzen.
 
 ## Entwicklung
 
