@@ -35,6 +35,7 @@ let package = Package(
                 .product(name: "VaporTesting", package: "vapor"),
                 .product(name: "Elementary", package: "elementary"),
             ],
+            resources: [.copy("Fixtures")],
             swiftSettings: swiftSettings
         ),
     ]
