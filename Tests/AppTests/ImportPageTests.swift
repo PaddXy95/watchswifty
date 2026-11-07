@@ -249,3 +249,16 @@ struct ImportPageLightTests {
         }
     }
 }
+
+@Suite("CandidateLabel")
+struct CandidateLabelTests {
+    @Test func candidateLabel() {
+        let html = CandidateList(mappingID: UUID(), results: [
+            TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: nil),
+        ], action: "accept", target: "x").render()
+        #expect(html.contains("Aftermath (2021) · "))
+        #expect(html.contains("Übernehmen"))
+        #expect(!html.contains("Film"))
+        #expect(!html.contains("FilmÜbernehmen"))
+    }
+}

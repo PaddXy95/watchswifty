@@ -68,8 +68,7 @@ struct CandidateList: HTML {
                         result.name
                         if let year = result.year { " (\(year))" }
                         " · "
-                        result.kind == .tv ? "Serie" : "Film"
-                        "Übernehmen"
+                        span(.class("candidate-action")) { "Übernehmen" }
                     }
                 }
             }
