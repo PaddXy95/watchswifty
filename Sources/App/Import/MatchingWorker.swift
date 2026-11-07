@@ -25,6 +25,11 @@ actor MatchingWorker {
     /// Last problem per user (missing/rejected token, TMDB down); cleared after a clean run for that user.
     private var errors: [UUID: String] = [:]
     private var failedThisRun: Set<UUID> = []
+    /// Titles whose cache was refreshed (or tried) during the current run, and those that failed.
+    private var refreshAttempted: Set<UUID> = []
+    private var refreshFailed: Set<UUID> = []
+    /// A cached title older than this is refreshed once when some of its rows do not match.
+    static let staleCacheAge: TimeInterval = 3600
     private var rerunRequested = false
 
     init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool, lock: AsyncMutex = AsyncMutex(),
@@ -111,6 +116,8 @@ actor MatchingWorker {
         defer { processing = false }
         var result = MatchingRunResult()
         failedThisRun = []
+        refreshAttempted = []
+        refreshFailed = []
         var touchedUsers: Set<UUID> = []
         var changed = true
         while changed {
@@ -289,19 +296,43 @@ actor MatchingWorker {
     /// decision the user made in the meantime is honoured.
     private func matchGroup(_ mappingID: UUID) async throws -> (Int, Int) {
         guard let mapping = try await NetflixMapping.find(mappingID, on: db),
-              [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id else { return (0, 0) }
+              [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id,
+              !refreshFailed.contains(titleID) else { return (0, 0) }
         let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
             .filter(\.$mapping.$id == mappingID).all()
         guard !rows.isEmpty else { return (0, 0) }
-        let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
-        let candidates: [EpisodeCandidate] = mapping.titleKind == .movie ? [] : try await catalog.episodes(of: titleID).map {
-            EpisodeCandidate(id: try $0.requireID(), season: $0.season, number: $0.number, name: $0.name)
+
+        func episodeMatches() async throws -> [[UUID?]] {
+            guard mapping.titleKind == .tv else { return rows.map { _ in [nil] } }
+            let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
+            let candidates = try await catalog.episodes(of: titleID).map {
+                EpisodeCandidate(id: try $0.requireID(), season: $0.season, number: $0.number, name: $0.name)
+            }
+            return rows.map { row in matchEpisodes(title: row.episodeTitle ?? row.rawTitle, season: row.seasonNumber, in: candidates) }
         }
+
+        var matches = try await episodeMatches()
+        var keepPending = false
+        // Episodes missing only because the shared cache is old: refresh the title once with the
+        // owner's token and try again. If TMDB fails, the unmatched rows stay pending for a retry.
+        if mapping.titleKind == .tv, matches.contains(where: \.isEmpty), !refreshAttempted.contains(titleID),
+           let title = try await Title.find(titleID, on: db),
+           (title.refreshedAt.map { Date().timeIntervalSince($0) > Self.staleCacheAge } ?? true),
+           let token = try await User.find(mapping.$user.id, on: db)?.tmdbToken, !token.isEmpty {
+            refreshAttempted.insert(titleID)
+            do {
+                try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+                matches = try await episodeMatches()
+            } catch {
+                refreshFailed.insert(titleID)
+                keepPending = true
+                fail(mapping.$user.id, error is TMDBError ? "TMDB nicht erreichbar: \(error)" : "Zuordnung fehlgeschlagen: \(error)")
+            }
+        }
+
         var matched = 0, unmatched = 0
-        for row in rows {
-            let episodeIDs: [UUID?] = mapping.titleKind == .movie
-                ? [nil]
-                : matchEpisodes(title: row.episodeTitle ?? row.rawTitle, season: row.seasonNumber, in: candidates)
+        for (row, episodeIDs) in zip(rows, matches) {
+            if episodeIDs.isEmpty && keepPending { continue }
             if episodeIDs.isEmpty {
                 row.status = RowStatus.unmatched.rawValue
                 unmatched += 1

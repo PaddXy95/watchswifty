@@ -27,22 +27,26 @@ struct DailyRefreshLifecycle: LifecycleHandler {
     func didBootAsync(_ application: Application) async throws {
         let db = application.db
         let provider = application.tmdbProvider
+        let worker = application.matchingWorker
         let logger = application.logger
         application.storage[TaskKey.self] = Task {
             try? await Task.sleep(for: .seconds(60))
             while !Task.isCancelled {
                 do {
                     let due = try await seriesDueForRefresh(on: db)
+                    var requeued = 0
                     for title in due {
                         if Task.isCancelled { break }
                         do {
                             guard let token = try await refreshToken(for: title.requireID(), on: db) else { continue }
                             try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+                            requeued += try await requeueUnmatchedRows(titleID: title.requireID(), on: db)
                         } catch {
                             logger.warning("TMDB-Abgleich für \(title.name) fehlgeschlagen: \(error)")
                         }
                     }
-                    logger.info("TMDB-Abgleich: \(due.count) Serien aktualisiert")
+                    logger.info("TMDB-Abgleich: \(due.count) Serien geprüft, \(requeued) Netflix-Zeilen erneut zur Zuordnung")
+                    if requeued > 0 { await worker.kick() }
                 } catch {
                     logger.error("TMDB-Abgleich fehlgeschlagen: \(error)")
                 }
