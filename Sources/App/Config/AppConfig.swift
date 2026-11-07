@@ -20,6 +20,7 @@ struct AppConfig: Sendable {
     var adminPassword: String?
     var loginFailureDelay: Duration
     var backgroundJobsEnabled: Bool
+    var bcryptCost: Int = 12
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
@@ -50,7 +51,8 @@ struct AppConfig: Sendable {
             adminUsername: "admin",
             adminPassword: "adminpass123",
             loginFailureDelay: .zero,
-            backgroundJobsEnabled: false
+            backgroundJobsEnabled: false,
+            bcryptCost: 4
         )
     }
 }
