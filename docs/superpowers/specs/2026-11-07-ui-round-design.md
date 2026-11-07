@@ -71,3 +71,13 @@ Platzierung der Kommentar-Felder im Detail.
   werden nicht mitgezählt und als Hinweis ausgewiesen.
 - Zählweise [Vorschlag]: Filme und Serien je Zeitraum eindeutig; Folgen = Sichtungen inkl. erneut
   gesehen; Zeit = alle Sichtungen (erneut gesehen zählt doppelt). Ausgeblendete Titel zählen mit.
+
+## Nachtrag: TMDB-Tokens verschlüsselt speichern [entschieden: Server-Schlüssel]
+- Tokens werden mit AES-GCM (swift-crypto) verschlüsselt in `users.tmdb_token` gespeichert (`enc:v1:` + Base64).
+  Schützt eine abhandengekommene DB-Datei bzw. ein SQLite-Backup; Hintergrund-Jobs laufen weiter. [entschieden]
+- Abgelehnt: Schlüssel aus dem Passwort-Hash (liegt selbst in der DB) bzw. aus dem Klartext-Passwort (Jobs nur bei
+  eingeloggtem Nutzer); Verschlüsselung aller Nutzerdaten (Abfragen, Jobs, Datenverlust bei Passwort-Reset).
+- Schlüssel [Vorschlag]: `TOKEN_KEY` (Base64, 32 Byte) oder `TOKEN_KEY_FILE` (z. B. Docker-Secret); ohne beides
+  wird einmalig `token.key` neben der Datenbank erzeugt (Hinweis im Log). Ungültiger Schlüssel → Start bricht ab.
+- Bestehende Klartext-Tokens werden beim Start verschlüsselt. Nicht entschlüsselbarer Token (Schlüssel gewechselt)
+  gilt als fehlend; Konto zeigt „Token nicht lesbar – bitte neu eintragen“.
