@@ -21,8 +21,10 @@ struct PageLayout<Content: HTML>: HTMLDocument {
         self.content = content()
     }
 
-    var title: String { "\(pageTitle) · watchswifty" }
+    var title: String { "\(pageTitle) · WatchSwifty" }
     var lang: String { "de" }
+    /// The login page (no navigation) is laid out centered.
+    var bodyAttributes: [HTMLAttribute<HTMLTag.body>] { nav == nil ? [.class("auth")] : [] }
 
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
@@ -40,6 +42,7 @@ struct PageLayout<Content: HTML>: HTMLDocument {
             div(.id("flash"), .custom(name: "aria-live", value: "polite")) {}
             content
         }
+        SiteFooter()
     }
 }
 
@@ -61,7 +64,10 @@ struct SiteNav: HTML {
 
     var body: some HTML {
         header(.class("site-header")) {
-            a(.class("brand"), .href("/")) { "watchswifty" }
+            a(.class("brand"), .href("/")) { "WatchSwifty" }
+            // Burger menu on phones: a CSS-only checkbox toggle (no JavaScript).
+            input(.type(.checkbox), .id("nav-toggle"), .class("nav-toggle"), .custom(name: "aria-label", value: "Menü öffnen"))
+            label(.class("nav-toggle-label"), .for("nav-toggle"), .custom(name: "aria-label", value: "Menü")) { "☰" }
             nav(.class("site-nav")) {
                 for (item, label, href) in items {
                     a(.href(href)) { label }

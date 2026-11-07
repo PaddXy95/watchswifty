@@ -10,13 +10,13 @@ struct HistoryRow: HTML {
 
     var body: some HTML {
         tr(.class("history-row"), .id("watch-\(watch.id?.uuidString ?? "")")) {
-            td { watch.watchedOn.map(CalendarDay.display) ?? "ohne Datum" }
-            td {
+            td(.data("label", value: "Datum")) { watch.watchedOn.map(CalendarDay.display) ?? "ohne Datum" }
+            td(.data("label", value: "Titel")) {
                 a(.href("/\(title.kind)/\(title.tmdbID)")) { title.name }
                 if let episode { br(); span(.class("muted")) { "\(episode.code) · \(episode.name)" } }
             }
-            td { watch.streamingService?.label ?? "unbekannt" }
-            td { watch.watchOrigin == .import ? "Import" : "manuell" }
+            td(.data("label", value: "Dienst")) { watch.streamingService?.label ?? "unbekannt" }
+            td(.data("label", value: "Herkunft")) { watch.watchOrigin == .import ? "Import" : "manuell" }
             td {
                 let path = "/watches/\(watch.id?.uuidString ?? "")"
                 details(.class("history-edit")) {

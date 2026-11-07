@@ -10,7 +10,7 @@ struct HistoryPage: HTML {
             if rows.rows.isEmpty {
                 p(.class("muted")) { "Noch keine Einträge." }
             } else {
-                table {
+                table(.class("history-table")) {
                     thead { tr { th { "Datum" }; th { "Titel" }; th { "Dienst" }; th { "Herkunft" }; th { "" } } }
                     tbody { rows }
                 }
