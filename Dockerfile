@@ -29,6 +29,12 @@ RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app
 WORKDIR /app
 COPY --from=build --chown=vapor:vapor /staging /app
 
+# Version info for the footer and /version (set by the GitHub Action).
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=
+ENV APP_VERSION=$APP_VERSION
+ENV GIT_COMMIT=$GIT_COMMIT
+
 ENV DATABASE_PATH=/data/watchswifty.sqlite
 USER vapor:vapor
 VOLUME /data

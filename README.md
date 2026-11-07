@@ -60,6 +60,31 @@ docker run -d --name watchswifty --restart unless-stopped \
 Statt eines benannten Volumes geht auch ein Verzeichnis, z. B. `-v /srv/watchswifty:/data`
 (es muss für den Container-Benutzer beschreibbar sein).
 
+## Versionen
+
+WatchSwifty folgt [SemVer](https://semver.org/lang/de/); Änderungen stehen im [CHANGELOG](CHANGELOG.md).
+Die laufende Version steht links im Footer und unter `http://<server>:8080/version`.
+
+| Image-Tag | Inhalt |
+|---|---|
+| `latest` | neuester Stand von `main` |
+| `0.1.0` | genau diese Version |
+| `0.1` | neueste 0.1.x-Version |
+
+Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.0`.
+
+Neue Version veröffentlichen (Eintrag im CHANGELOG ergänzen, dann taggen):
+
+```bash
+git tag v0.1.0
+```
+
+```bash
+git push origin v0.1.0
+```
+
+Die GitHub Action testet, baut das Image und schreibt die Version hinein.
+
 ## Update
 
 Mit Compose:
