@@ -6,7 +6,7 @@ struct TitleController {
     struct RatingInput: Content { var rating: String? }
     struct HiddenInput: Content { var hidden: Bool; var context: String? }
     struct CommentInput: Content { var comment: String? }
-    struct FollowInput: Content { var followed: Bool }
+    struct FollowInput: Content { var followed: Bool; var context: String? }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("tv", ":tmdbID", use: seriesPage)
@@ -170,9 +170,10 @@ struct TitleController {
     func setFollowed(req: Request) async throws -> Response {
         try await handle(req) {
             let title = try await resolve(req, .tv)
-            let followed = try req.content.decode(FollowInput.self).followed
-            try await req.watches.setFollowed(userID: try req.userID, titleID: title.requireID(), followed: followed)
-            return HTMLResponse(FollowToggle(tmdbID: title.tmdbID, followed: followed))
+            let input = try req.content.decode(FollowInput.self)
+            try await req.watches.setFollowed(userID: try req.userID, titleID: title.requireID(), followed: input.followed)
+            if input.context == "account" { return HTMLResponse(EmptyHTML()) }   // row in the account list disappears
+            return HTMLResponse(FollowToggle(tmdbID: title.tmdbID, followed: input.followed))
         }
     }
 

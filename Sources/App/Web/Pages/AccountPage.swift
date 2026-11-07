@@ -1,10 +1,12 @@
 import Elementary
+import ElementaryHTMX2
 
 struct AccountPage: HTML {
     let nav: NavContext
     let tokenSuffix: String?
     let error: String?
     let notice: String?
+    var followed: [FollowedSeries] = []
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -31,6 +33,25 @@ struct AccountPage: HTML {
             if tokenSuffix != nil {
                 form(.method(.post), .action("/account/tmdb-token/remove"), .class("inline-form")) {
                     button(.type(.submit)) { "Entfernen" }
+                }
+            }
+
+            h2 { "Beobachtete Serien" }
+            if followed.isEmpty {
+                p(.class("muted")) { "Du beobachtest noch keine Serien. Auf der Serienseite gibt es dafür „🔔 Beobachten“." }
+            } else {
+                ul(.class("followed-list")) {
+                    for series in followed {
+                        li {
+                            a(.href("/tv/\(series.tmdbID)")) { series.name }
+                            if let next = series.nextEpisode, let air = next.airDate {
+                                span(.class("muted")) { "Nächste Folge: \(next.code) am \(CalendarDay.display(air))" }
+                            }
+                            button(.class("link-button"), .hx.post("/tv/\(series.tmdbID)/follow"),
+                                   .hx.vals(#"{"followed":"false","context":"account"}"#),
+                                   .hx.target("closest li"), .hx.swap(.outerHTML)) { "Nicht mehr beobachten" }
+                        }
+                    }
                 }
             }
 

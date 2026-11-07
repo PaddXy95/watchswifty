@@ -14,6 +14,13 @@ struct NewEpisodesNote: Sendable {
     let newestAirDate: String
 }
 
+struct FollowedSeries: Sendable {
+    let tmdbID: Int
+    let name: String
+    /// First regular episode airing after today, if TMDB knows one.
+    let nextEpisode: EpisodeInfo?
+}
+
 /// „Neue Folgen“ for followed series: aired, unwatched regular episodes that aired after the
 /// latest of follow start, last dated watch and last „Erledigt“.
 struct NewEpisodesService {
@@ -46,5 +53,21 @@ struct NewEpisodesService {
                                          newestAirDate: new.compactMap(\.airDate).max() ?? ""))
         }
         return notes.sorted { $0.newestAirDate > $1.newestAirDate }
+    }
+
+    /// All series the user follows (for the account page), by name.
+    func followedSeries(userID: UUID, today: String) async throws -> [FollowedSeries] {
+        let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$followed == true).all()
+        guard !entries.isEmpty else { return [] }
+        let titleIDs = entries.map(\.$title.id)
+        let titles = try await Title.query(on: db).filter(\.$id ~~ titleIDs).all()
+        let upcoming = try await Episode.query(on: db).filter(\.$title.$id ~~ titleIDs).filter(\.$season >= 1)
+            .filter(\.$airDate > today).all()
+        let nextByTitle = Dictionary(grouping: upcoming, by: { $0.$title.id }).compactMapValues { episodes in
+            episodes.min { ($0.airDate ?? "", $0.season, $0.number) < ($1.airDate ?? "", $1.season, $1.number) }
+        }
+        return titles.map { title in
+            FollowedSeries(tmdbID: title.tmdbID, name: title.name, nextEpisode: title.id.flatMap { nextByTitle[$0] }.map(EpisodeInfo.init))
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }

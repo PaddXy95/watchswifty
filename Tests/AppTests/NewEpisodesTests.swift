@@ -146,3 +146,69 @@ struct NewEpisodesTests {
         }
     }
 }
+
+struct UnfollowInput: Content { var followed: Bool; var context: String }
+
+@Suite("FollowedList")
+struct FollowedListTests {
+    func seed(_ app: Application, tmdbID: Int, name: String) async throws -> Title {
+        try await seedSeries(app, tmdbID: tmdbID, name: name, seasons: [1: 4], airDates: ["1x3": "2026-11-05", "1x4": "2026-11-20"])
+    }
+
+    @Test func accountListsFollowedSeries() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seed(app, tmdbID: 1, name: "Die Kaiserin")
+            try await WatchService(db: app.db, today: { "2026-11-07" }).setFollowed(userID: user.requireID(), titleID: title.requireID(), followed: true)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/account", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains("Beobachtete Serien"))
+                #expect(body.contains("Die Kaiserin"))
+                #expect(body.contains(#"href="/tv/1""#))
+                #expect(body.contains("Nächste Folge: S01E04 am 20.11.2026"))
+                #expect(body.contains("Nicht mehr beobachten"))
+            }
+        }
+    }
+
+    @Test func unfollowFromAccount() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seed(app, tmdbID: 1, name: "Die Kaiserin")
+            try await WatchService(db: app.db).setFollowed(userID: user.requireID(), titleID: title.requireID(), followed: true)
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.POST, "/tv/1/follow", headers: headers, beforeRequest: { req in
+                try req.content.encode(UnfollowInput(followed: false, context: "account"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.isEmpty)
+            })
+            let entry = try await UserTitle.query(on: app.db).filter(\.$user.$id == user.requireID()).first()
+            #expect(entry?.isFollowed == false)
+        }
+    }
+
+    @Test func accountEmptyFollowState() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/account", headers: headers) { res async in
+                #expect(res.body.string.contains("Du beobachtest noch keine Serien."))
+            }
+        }
+    }
+
+    @Test func followListIsPrivate() async throws {
+        try await withTestApp { app in
+            let alice = try await createUser(app, "alice")
+            try await createUser(app, "bobby")
+            let title = try await seed(app, tmdbID: 1, name: "Alices Serie")
+            try await WatchService(db: app.db).setFollowed(userID: alice.requireID(), titleID: title.requireID(), followed: true)
+            let headers = try await login(app, "bobby")
+            try await app.testing().test(.GET, "/account", headers: headers) { res async in
+                #expect(!res.body.string.contains("Alices Serie"))
+            }
+        }
+    }
+}
