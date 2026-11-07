@@ -83,8 +83,14 @@ Datenbank-Änderungen neuer Versionen werden beim Start automatisch angewendet.
 
 ## TMDB-Token
 
-Jeder Benutzer hinterlegt unter **Konto** seinen eigenen kostenlosen TMDB *Read Access Token*
-(themoviedb.org → Einstellungen → API). Ohne Token funktionieren Suche und Netflix-Zuordnung nicht;
+Jeder Benutzer hinterlegt unter **Konto** seinen eigenen kostenlosen TMDB *Read Access Token*:
+
+1. Kostenloses Konto anlegen: https://www.themoviedb.org/signup (E-Mail bestätigen).
+2. Angemeldet zu **Einstellungen → API** gehen: https://www.themoviedb.org/settings/api
+3. Einen API-Schlüssel anfordern (private, nicht-kommerzielle Nutzung), Bedingungen akzeptieren, Formular ausfüllen.
+4. Den langen **„API Read Access Token“** kopieren (beginnt mit `eyJ`) – **nicht** den kurzen „API Key“.
+5. In WatchSwifty unter **Konto** einfügen und speichern.
+ Ohne Token funktionieren Suche und Netflix-Zuordnung nicht;
 bereits bekannte Titel, Weiterschauen, Verlauf und Bibliothek schon. Der Token wird beim Speichern bei
 TMDB geprüft und danach nur noch mit den letzten vier Zeichen angezeigt – auch Admins sehen ihn nicht.
 

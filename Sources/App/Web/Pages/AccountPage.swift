@@ -25,6 +25,7 @@ struct AccountPage: HTML {
             } else {
                 p { "Kein TMDB-Token hinterlegt." }
             }
+            TokenHelp(open: tokenSuffix == nil)
             form(.method(.post), .action("/account/tmdb-token"), .class("inline-form")) {
                 input(.type(.password), .name("token"), .required, .custom(name: "autocomplete", value: "off"),
                       .custom(name: "placeholder", value: "Read Access Token"), .custom(name: "aria-label", value: "TMDB-Token"))
@@ -69,5 +70,36 @@ struct AccountPage: HTML {
                 button(.type(.submit), .class("primary")) { "Passwort ändern" }
             }
         }
+    }
+}
+
+/// Step-by-step help for getting a TMDB token (open while none is stored).
+struct TokenHelp: HTML {
+    var open = false
+
+    var body: some HTML {
+        details(.class("token-help")) {
+            summary { "So bekommst du einen TMDB-Token" }
+            ol {
+                li {
+                    "Kostenloses Konto bei TMDB anlegen: "
+                    a(.href("https://www.themoviedb.org/signup"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "themoviedb.org/signup" }
+                    " (E-Mail bestätigen)."
+                }
+                li {
+                    "Angemeldet zu Einstellungen → API gehen: "
+                    a(.href("https://www.themoviedb.org/settings/api"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "themoviedb.org/settings/api" }
+                    "."
+                }
+                li { "Einen API-Schlüssel anfordern (private, nicht-kommerzielle Nutzung), Nutzungsbedingungen akzeptieren und das kurze Formular ausfüllen – als Anwendung z. B. „WatchSwifty, privater Serien-Tracker“." }
+                li {
+                    "Danach auf derselben Seite den langen "
+                    strong { "„API Read Access Token“" }
+                    " kopieren (beginnt mit „eyJ“) – nicht den kurzen „API Key“."
+                }
+                li { "Hier einfügen und speichern. WatchSwifty prüft den Token sofort bei TMDB." }
+            }
+        }
+        .attributes(.custom(name: "open", value: ""), when: open)
     }
 }

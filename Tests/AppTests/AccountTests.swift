@@ -117,3 +117,21 @@ struct AccountTokenTests {
         }
     }
 }
+
+@Suite("TokenHelp")
+struct TokenHelpTests {
+    @Test func accountExplainsTokenSteps() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "pat", tmdbToken: nil)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/account", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains("So bekommst du einen TMDB-Token"))
+                #expect(body.contains(#"href="https://www.themoviedb.org/signup""#))
+                #expect(body.contains(#"href="https://www.themoviedb.org/settings/api""#))
+                #expect(body.contains("API Read Access Token"))
+                #expect(body.contains(#"<details class="token-help" open"#))
+            }
+        }
+    }
+}
