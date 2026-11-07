@@ -2,11 +2,14 @@ import Fluent
 import FluentSQLiteDriver
 import Vapor
 
-func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider) async throws {
+func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
+               releaseFetcher: (any ReleaseFetcher)? = nil) async throws {
     app.appConfig = config
     app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
                                                                databasePath: config.databasePath, logger: app.logger))
     app.tmdbProvider = tmdbProvider
+    app.releaseFetcher = releaseFetcher ?? LiveReleaseFetcher(client: app.client, userAgent: "WatchSwifty/\(config.appVersion.version)")
+    app.updateStatus = UpdateStatus()
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware = Middlewares()
     app.middleware.use(HTMLErrorMiddleware())
@@ -43,11 +46,13 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddEpisodeOverview())
     app.migrations.add(AddFollowFields())
     app.migrations.add(AddRuntimes())
+    app.migrations.add(CreateAppSettings())
 
     try routes(app)
     try await app.autoMigrate()
     let encrypted = try await encryptStoredTokens(db: app.db, cipher: app.tokenCipher)
     if encrypted > 0 { app.logger.notice("\(encrypted) TMDB-Token verschlüsselt gespeichert") }
+    try await app.updates.loadStatus()
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
 
     app.importLock = AsyncMutex()
@@ -56,5 +61,6 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
+        app.lifecycle.use(UpdateCheckLifecycle())
     }
 }

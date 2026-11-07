@@ -29,6 +29,8 @@ struct AppConfig: Sendable {
     /// Server key for the stored TMDB tokens (`TOKEN_KEY`, Base64) or a file holding it (`TOKEN_KEY_FILE`).
     var tokenKey: String? = nil
     var tokenKeyFile: String? = nil
+    /// Version of this build (compared with the latest GitHub release).
+    var appVersion: AppVersion = .current
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {

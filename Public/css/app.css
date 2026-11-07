@@ -253,3 +253,13 @@ summary { cursor: pointer; font-weight: 600; }
   .stats-row .bar, .stats-row .bar-head { display: none; }
   .stats-months .stats-row { padding-left: var(--space-4); }
 }
+
+/* System / update check */
+.update-note { max-width: 46rem; }
+.updates .inline-form { align-items: center; }
+label.checkbox { display: inline-flex; align-items: center; gap: var(--space-2); }
+.update-result { margin-top: var(--space-3); }
+.update-available { padding: var(--space-3) var(--space-4); background: var(--paper-2); border: 1px solid var(--accent-dim); border-radius: var(--radius); max-width: 46rem; }
+.update-available p { margin: 0 0 var(--space-2); }
+.update-available pre { margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); background: var(--paper); border-radius: var(--radius); overflow-x: auto; }
+.site-footer .version a.update-hint { color: var(--accent); }

@@ -2,13 +2,15 @@ import Elementary
 import ElementaryHTMX2
 
 enum NavItem: Sendable, Equatable {
-    case continueWatching, history, library, stats, search, importing, account, admin
+    case continueWatching, history, library, stats, search, importing, account, admin, system
 }
 
 struct NavContext: Sendable {
     let username: String
     let isAdmin: Bool
     let active: NavItem
+    /// Newer release found by the update check (only set for admins).
+    var updateVersion: String? = nil
 }
 
 struct PageLayout<Content: HTML>: HTMLDocument {
@@ -47,7 +49,7 @@ struct PageLayout<Content: HTML>: HTMLDocument {
             div(.id("flash"), .custom(name: "aria-live", value: "polite")) {}
             content
         }
-        SiteFooter()
+        SiteFooter(updateVersion: nav?.updateVersion)
     }
 }
 
@@ -64,7 +66,10 @@ struct SiteNav: HTML {
             (.importing, "Import", "/import"),
             (.account, "Konto", "/account"),
         ]
-        if context.isAdmin { items.append((.admin, "Benutzer", "/admin/users")) }
+        if context.isAdmin {
+            items.append((.admin, "Benutzer", "/admin/users"))
+            items.append((.system, "System", "/admin/system"))
+        }
         return items
     }
 

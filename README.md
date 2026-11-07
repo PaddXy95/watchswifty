@@ -95,6 +95,13 @@ CHANGELOG ein Abschnitt `## [X.Y.Z]`, wird er als Release-Text verwendet, sonst 
 
 Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.3`.
 
+**Auf neue Versionen hinweisen lassen:** Als Admin unter **System** „Automatisch alle 12 Stunden prüfen“
+einschalten oder „Jetzt prüfen“ klicken. Dafür fragt WatchSwifty die GitHub-API (`api.github.com`) nach dem
+neuesten Release; GitHub sieht dabei die IP-Adresse des Servers, Daten aus WatchSwifty werden nicht übertragen.
+Standardmäßig ist die Prüfung aus. Gibt es eine neuere Version, zeigt der Footer Admins „Update auf vX.Y.Z
+verfügbar“ und die System-Seite die Befehle zum Aktualisieren (siehe [Update](#update)). Das Repository muss
+dafür öffentlich sein.
+
 Beim allerersten Release legt GitHub das Paket `watchswifty` als privat an; damit der Server es ohne Login
 laden kann, unter GitHub → Packages → watchswifty → Package settings die Sichtbarkeit auf „Public“ stellen
 (oder auf dem Server `docker login ghcr.io` mit einem Token ausführen).

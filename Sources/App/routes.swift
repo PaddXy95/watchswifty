@@ -13,6 +13,7 @@ func routes(_ app: Application) throws {
     StatsController().register(on: protected)
     ImportController().register(on: protected)
     AdminUsersController().register(on: protected)
+    SystemController().register(on: protected)
     AccountController().register(on: protected)
     SearchController().register(on: protected)
     TitleController().register(on: protected)

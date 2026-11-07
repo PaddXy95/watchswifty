@@ -43,6 +43,7 @@ extension Request {
 extension Request {
     func nav(_ item: NavItem) throws -> NavContext {
         let user = try currentUser
-        return NavContext(username: user.username, isAdmin: user.isAdmin, active: item)
+        return NavContext(username: user.username, isAdmin: user.isAdmin, active: item,
+                          updateVersion: user.isAdmin ? application.updateStatus.newerVersion : nil)
     }
 }
