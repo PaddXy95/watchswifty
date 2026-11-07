@@ -33,6 +33,10 @@ struct ImportPage: HTML {
                     button(.type(.submit), .class("primary")) { "Hochladen" }
                 }
                 state.progress
+                p(.class("muted")) {
+                    "Eigene Filmliste aus Numbers oder Excel? "
+                    a(.href("/import/films")) { "Filmliste importieren" }
+                }
             }
             section {
                 h2 { "Zu prüfen" }

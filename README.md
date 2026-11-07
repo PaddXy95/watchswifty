@@ -163,6 +163,11 @@ Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
    **Zu prüfen**, nicht gefundene Folgen unter **Nicht zugeordnet**. Falsche Treffer lassen sich unter
    **Zuordnungen** ändern oder zurücksetzen.
 
+Eine eigene Filmliste (CSV aus Numbers/Excel mit den Spalten Filmname, Erscheinungsjahr, Datum, „Mit …“,
+Streamingdienst, Übeltäter, Bewertung, Detail, Bemerkung) lässt sich unter **Import → Filmliste importieren**
+übernehmen: „Mit …“, Übeltäter und Bemerkung landen im Kommentar, Detail (0–100) wird zur Bewertung 1–10, und
+jede Zeile wird eine Sichtung. Unklare Filme lassen sich dort aus Vorschlägen auswählen.
+
 Ein erneuter Import desselben (oder eines neueren) Exports legt keine Duplikate an. Auch eine in Excel
 (deutsch) neu gespeicherte Datei mit `;` und `TT.MM.JJJJ` wird erkannt.
 

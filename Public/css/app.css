@@ -263,3 +263,11 @@ label.checkbox { display: inline-flex; align-items: center; gap: var(--space-2);
 .update-available p { margin: 0 0 var(--space-2); }
 .update-available pre { margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); background: var(--paper); border-radius: var(--radius); overflow-x: auto; }
 .site-footer .version a.update-hint { color: var(--accent); }
+
+/* Film list import */
+.film-status { margin: var(--space-4) 0; padding: var(--space-2) var(--space-3); background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); }
+.film-status p { margin: 0 0 var(--space-1); }
+.film-entry { display: block; }
+.film-entry p { margin: 0 0 var(--space-2); }
+.film-imported { margin-top: var(--space-4); }
+.film-imported > summary { cursor: pointer; color: var(--ink-2); }

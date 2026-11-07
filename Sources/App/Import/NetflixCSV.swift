@@ -80,13 +80,13 @@ func netflixDay(_ raw: String) -> String? {
     return CalendarDay.isValid(iso) ? iso : nil
 }
 
-private struct CSVRecord {
+struct CSVRecord {
     let line: Int
     let fields: [String]
 }
 
 /// Minimal RFC 4180 splitter: quoted fields, `""` escapes, commas/newlines inside quotes, LF or CRLF.
-private func splitCSVRecords(_ text: String, delimiter: Character) -> [CSVRecord] {
+func splitCSVRecords(_ text: String, delimiter: Character) -> [CSVRecord] {
     var records: [CSVRecord] = []
     var fields: [String] = []
     var field = ""

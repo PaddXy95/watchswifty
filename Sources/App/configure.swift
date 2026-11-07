@@ -47,6 +47,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddFollowFields())
     app.migrations.add(AddRuntimes())
     app.migrations.add(CreateAppSettings())
+    app.migrations.add(CreateFilmListEntry())
 
     try routes(app)
     try await app.autoMigrate()
@@ -58,6 +59,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.importLock = AsyncMutex()
     app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
                                         enabled: config.backgroundJobsEnabled, lock: app.importLock)
+    app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
+                                        today: config.today, enabled: config.backgroundJobsEnabled)
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())

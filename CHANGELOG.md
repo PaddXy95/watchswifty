@@ -18,6 +18,8 @@ Erste Version.
 - **Netflix-Import:** Wiedergabeaktivität als CSV (auch Excel-Varianten), automatische TMDB-Zuordnung, „Zu prüfen“,
   „Nicht zugeordnet“, „Zuordnungen“, „Erneut versuchen“ und automatische Wiederholung.
 - **Verlauf** und **Bibliothek** mit Filter und Sortierung.
+- **Filmliste importieren:** eigene CSV (z. B. aus Numbers) mit Datum, Dienst, Bewertung 0–100 → 1–10 und
+  Kommentar aus „Mit …“, Übeltäter und Bemerkung; unklare Filme werden zur Auswahl vorgeschlagen.
 - **Update-Hinweis:** Admin-Seite „System“ mit optionaler Prüfung auf neue Releases bei GitHub
   (alle 12 Stunden, standardmäßig aus) und „Jetzt prüfen“.
 - **Statistik:** Filme, Serien, Folgen und verbrachte Zeit (TMDB-Laufzeiten) – insgesamt, pro Jahr und Monat
