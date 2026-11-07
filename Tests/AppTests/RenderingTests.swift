@@ -149,3 +149,14 @@ struct ExternalLinksTests {
         }
     }
 }
+
+@Suite("MobileMenuLayout")
+struct MobileMenuLayoutTests {
+    @Test func openMenuTakesFullWidthBelowHeader() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        let mobile = try #require(css.range(of: "@media (max-width: 700px)")).upperBound
+        let block = String(css[mobile...])
+        // The desktop rule gives .site-nav `flex: 1`, which would keep it beside the logo.
+        #expect(block.contains(".site-nav, .logout { display: none; flex: 0 0 100%;"))
+    }
+}

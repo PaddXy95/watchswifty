@@ -140,7 +140,7 @@ summary { cursor: pointer; font-weight: 600; }
 @media (max-width: 700px) {
   .nav-toggle-label { display: block; margin-left: auto; font-size: 1.4rem; line-height: 1; cursor: pointer;
     padding: var(--space-1) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius); }
-  .site-nav, .logout { display: none; width: 100%; }
+  .site-nav, .logout { display: none; flex: 0 0 100%; width: 100%; }
   .nav-toggle:checked ~ .site-nav { display: flex; flex-direction: column; gap: var(--space-1); }
   .nav-toggle:checked ~ .logout { display: flex; justify-content: space-between; padding-top: var(--space-2); border-top: 1px solid var(--line); }
   .site-nav a { padding: var(--space-2) var(--space-3); }
