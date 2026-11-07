@@ -1,8 +1,8 @@
 # watchswifty – Beispiel für den Betrieb auf einem Server im Heimnetz.
-# "dein-github-name" durch den GitHub-Account ersetzen, unter dem die Action das Image baut.
+# Image wird von der GitHub Action aus github.com/PaddXy95/watchswifty gebaut.
 services:
   watchswifty:
-    image: ghcr.io/dein-github-name/watchswifty:latest
+    image: ghcr.io/paddxy95/watchswifty:latest
     restart: unless-stopped
     ports:
       - "8080:8080"
