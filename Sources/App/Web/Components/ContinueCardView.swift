@@ -30,8 +30,9 @@ struct ContinueCardView: HTML {
                     if let rating = card.rating { " · "; span(.class("rating")) { "★ \(rating)" } }
                 }
                 div(.class("actions")) {
-                    button(.class("primary"), .hx.post("/tv/\(card.tmdbID)/next"), .hx.target("closest .card"),
-                           .hx.swap(.outerHTML)) { "✓ gesehen" }
+                    button(.class("primary"), .hx.post("/tv/\(card.tmdbID)/next"),
+                           .hx.vals(#"{"episodeID":"\#(card.next.id.uuidString)"}"#),
+                           .hx.target("closest .card"), .hx.swap(.outerHTMLGuarded)) { "✓ gesehen" }
                     HiddenToggle(tmdbID: card.tmdbID, hidden: false, context: .card)
                     if card.hasNetflixData {
                         a(.class("button"), .href(netflixSearchURL(card.name)), .target(.blank),

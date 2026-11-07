@@ -39,7 +39,7 @@ struct SeasonSection: HTML {
             summary { "\(season.title) · \(season.watchedCount)/\(season.episodes.count) gesehen" }
             if season.number > 0 {
                 button(.class("season-action"), .hx.post("/tv/\(tmdbID)/seasons/\(season.number)/watch"),
-                       .hx.target("#season-\(season.number)"), .hx.swap(.outerHTML)) { "Ganze Staffel gesehen" }
+                       .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) { "Ganze Staffel gesehen" }
             }
             for episode in season.episodes {
                 EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService)
@@ -62,10 +62,10 @@ struct EpisodeRow: HTML {
         div(.class("episode-row"), .id("ep-\(model.info.season)-\(model.info.number)")) {
             if model.aired {
                 if model.watched {
-                    input(.type(.checkbox), .checked, .hx.delete("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTML),
+                    input(.type(.checkbox), .checked, .hx.delete("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTMLGuarded),
                           .custom(name: "aria-label", value: "\(model.info.code) als ungesehen markieren"))
                 } else {
-                    input(.type(.checkbox), .hx.post("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTML),
+                    input(.type(.checkbox), .hx.post("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTMLGuarded),
                           .custom(name: "aria-label", value: "\(model.info.code) als gesehen markieren"))
                 }
             } else {
@@ -85,7 +85,7 @@ struct EpisodeRow: HTML {
                     summary { "Details" }
                     WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
                               rewatch: model.watched, today: today, defaultService: defaultService)
-                    button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTML)) { "bis hier gesehen" }
+                    button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
                 }
             }
         }

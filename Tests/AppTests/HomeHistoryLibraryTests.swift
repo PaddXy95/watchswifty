@@ -218,3 +218,52 @@ struct HomeHistoryLibraryTests {
         }
     }
 }
+
+@Suite("DoubleClick")
+struct DoubleClickTests {
+    @Test func staleQuickMarkDoesNotAdvanceTwice() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let headers = try await login(app, "pat").adding(.htmx)
+            let show = try await seedSeries(app, tmdbID: 1420, seasons: [4: 24])
+            _ = try await WatchService(db: app.db).markEpisode(userID: user.requireID(), episodeID: episode(app, show, 4, 14).requireID(),
+                                                               day: "2026-11-01", service: .netflix)
+            let expected = try await episode(app, show, 4, 15).requireID()
+            struct NextInput: Content { var episodeID: UUID }
+            for _ in 0..<2 {   // double click: both requests name S04E15
+                try await app.testing().test(.POST, "/tv/1420/next", headers: headers, beforeRequest: { req in
+                    try req.content.encode(NextInput(episodeID: expected), as: .urlEncodedForm)
+                }, afterResponse: { res async in
+                    #expect(res.status == .ok)
+                    #expect(res.body.string.contains("Weiter mit S04E16"))
+                })
+            }
+            let count = try await Watch.query(on: app.db).filter(\.$user.$id == user.requireID()).count()
+            #expect(count == 2)
+        }
+    }
+
+    @Test func cardButtonCarriesEpisodeAndSettleGuard() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 1420, seasons: [4: 3])
+            _ = try await WatchService(db: app.db).markEpisode(userID: user.requireID(), episodeID: episode(app, show, 4, 1).requireID(),
+                                                               day: nil, service: nil)
+            let next = try await episode(app, show, 4, 2).requireID()
+            try await app.testing().test(.GET, "/", headers: headers) { res async in
+                #expect(res.body.string.contains(next.uuidString))
+                #expect(res.body.string.contains("settle:500ms"))
+            }
+            try await app.testing().test(.GET, "/tv/1420", headers: headers) { res async in
+                #expect(res.body.string.contains("settle:500ms"))
+            }
+        }
+    }
+
+    @Test func freshlySwappedControlsIgnoreClicks() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        #expect(css.contains(".htmx-added button"))
+        #expect(css.contains("pointer-events: none"))
+    }
+}

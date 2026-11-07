@@ -109,3 +109,5 @@ summary { cursor: pointer; font-weight: 600; }
 .mapping-item { padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
 .mapping-change { display: inline-block; margin: 0 var(--space-2); padding: 0 var(--space-2); }
 .import-progress p { margin: var(--space-2) 0; }
+/* Double-click guard: controls swapped in less than 500 ms ago ignore clicks (see outerHTMLGuarded). */
+.htmx-added button, .htmx-added input { pointer-events: none; }
