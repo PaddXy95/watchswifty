@@ -24,6 +24,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.http.server.configuration.hostname = config.host
     app.http.server.configuration.port = config.port
 
+    try checkDataDirectory(databasePath: config.databasePath)
     if config.databasePath == ":memory:" {
         app.databases.use(.sqlite(.memory), as: .sqlite)
     } else {

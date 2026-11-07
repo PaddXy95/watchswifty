@@ -27,6 +27,11 @@ enum Entrypoint {
             }
             try await configure(app, config: config, tmdbProvider: provider)
             try await app.execute()
+        } catch let error as ConfigError {
+            // Setup problems (key, data folder) get a clear message instead of a crash dump.
+            FileHandle.standardError.write(Data("\(error.description)\n".utf8))
+            try? await app.asyncShutdown()
+            exit(1)
         } catch {
             app.logger.report(error: error)
             try? await app.asyncShutdown()

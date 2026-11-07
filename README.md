@@ -63,8 +63,9 @@ docker run -d --name watchswifty --restart unless-stopped \
   ghcr.io/paddxy95/watchswifty:latest
 ```
 
-Statt eines benannten Volumes geht auch ein Verzeichnis, z. B. `-v /srv/watchswifty:/data`
-(es muss für den Container-Benutzer beschreibbar sein).
+Statt eines benannten Volumes geht auch ein Verzeichnis, z. B. `-v /srv/watchswifty:/data` (in Compose:
+`- /srv/watchswifty:/data`). Der Container übergibt den Ordner beim Start selbst dem App-Benutzer (UID 999) und
+läuft danach ohne Root-Rechte. Startet man ihn mit eigener `user:`-Angabe, muss der Ordner dieser UID gehören.
 
 ## Versionen und Releases
 

@@ -30,10 +30,12 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor \
+    && chmod 755 /app \
     && mkdir -p /data && chown vapor:vapor /data
 
 WORKDIR /app
 COPY --from=build --chown=vapor:vapor /staging /app
+COPY --chmod=755 scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Version info for the footer and /version (set by the GitHub Action).
 ARG APP_VERSION=dev
@@ -42,9 +44,9 @@ ENV APP_VERSION=$APP_VERSION
 ENV GIT_COMMIT=$GIT_COMMIT
 
 ENV DATABASE_PATH=/data/watchswifty.sqlite
-USER vapor:vapor
 VOLUME /data
 EXPOSE 8080
 
-ENTRYPOINT ["./App"]
+# Starts as root only to hand /data to the user `vapor` (bind mounts), then runs the app as `vapor`.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["serve", "--env", "production"]

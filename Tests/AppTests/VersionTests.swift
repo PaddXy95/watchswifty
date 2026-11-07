@@ -90,3 +90,37 @@ struct VersionTests {
         #expect(workflow.contains("GIT_COMMIT=${{ github.sha }}"))
     }
 }
+
+@Suite("DataDirectory")
+struct DataDirectoryTests {
+    @Test func unwritableDataDirectoryGivesClearError() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("watchswifty-ro-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let database = dir.appendingPathComponent("watchswifty.sqlite").path
+        try checkDataDirectory(databasePath: database)   // writable: fine
+        try checkDataDirectory(databasePath: ":memory:")
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+        if getuid() != 0 {   // root (Linux CI container) may write anyway
+            #expect {
+                try checkDataDirectory(databasePath: database)
+            } throws: { error in
+                guard case ConfigError.invalid(let message) = error else { return false }
+                return message.contains("Kein Schreibzugriff auf \(dir.path)") && message.contains("chown -R")
+            }
+        }
+    }
+
+    @Test func imageHandsDataFolderToAppUser() throws {
+        let dockerfile = try String(contentsOfFile: "Dockerfile", encoding: .utf8)
+        #expect(!dockerfile.contains("USER vapor"))   // starts as root, the entrypoint drops privileges
+        #expect(dockerfile.contains(#"ENTRYPOINT ["/app/docker-entrypoint.sh"]"#))
+        let script = try String(contentsOfFile: "scripts/docker-entrypoint.sh", encoding: .utf8)
+        #expect(script.contains("chown -R vapor:vapor"))
+        #expect(script.contains("exec setpriv --reuid=vapor --regid=vapor --init-groups"))
+    }
+}

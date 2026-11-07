@@ -12,6 +12,11 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 - **Betrieb:** `docker-compose.yml` liest alle Einstellungen aus einer `.env` (Vorlage `.env.example`);
   ohne `TOKEN_KEY` startet Compose nicht.
 
+### Behoben
+- Datenordner als Bind-Mount (z. B. `/home/docker/watchswifty:/data`): Der Container übergibt den Ordner beim
+  Start dem App-Benutzer (UID 999) statt mit „cantOpen“ abzustürzen; ist das nicht möglich, erklärt eine Meldung,
+  was zu tun ist.
+
 ### Geändert
 - CI: GitHub Actions auf Node-24-Versionen; Image-Build läuft parallel zu den Tests, Abhängigkeiten werden im
   Docker-Build zwischengespeichert – ein Push baut nur noch die App neu.
