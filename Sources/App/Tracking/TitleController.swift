@@ -1,0 +1,227 @@
+import Fluent
+import Vapor
+
+struct TitleController {
+    struct WatchInput: Content { var day: String?; var service: String?; var rewatch: String? }
+    struct RatingInput: Content { var rating: String? }
+    struct HiddenInput: Content { var hidden: Bool; var context: String? }
+
+    func register(on protected: any RoutesBuilder) {
+        protected.get("tv", ":tmdbID", use: seriesPage)
+        protected.post("tv", ":tmdbID", "episodes", ":season", ":number", "watch", use: markEpisode)
+        protected.delete("tv", ":tmdbID", "episodes", ":season", ":number", "watch", use: unmarkEpisode)
+        protected.post("tv", ":tmdbID", "episodes", ":season", ":number", "watch-up-to", use: markUpTo)
+        protected.post("tv", ":tmdbID", "seasons", ":season", "watch", use: markSeason)
+        protected.post("tv", ":tmdbID", "hidden", use: setHidden)
+        protected.post("tv", ":tmdbID", "rating") { try await setRating(req: $0, kind: .tv) }
+        protected.get("movie", ":tmdbID", use: moviePage)
+        protected.post("movie", ":tmdbID", "watch", use: markMovie)
+        protected.delete("movie", ":tmdbID", "watch", use: unmarkMovie)
+        protected.post("movie", ":tmdbID", "rating") { try await setRating(req: $0, kind: .movie) }
+    }
+
+    // MARK: Series
+
+    func seriesPage(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            do { try await req.catalog.refreshIfStale(title) } catch {
+                req.logger.warning("TMDB refresh failed for \(title.tmdbID): \(error)")
+            }
+            let userID = try req.userID
+            let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
+            let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
+            return HTMLResponse(SeriesPage(nav: try req.nav(.search), title: title, seasons: seasons, rating: entry?.rating,
+                                           hidden: entry?.hidden ?? false, today: req.watches.today(),
+                                           defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+        }
+    }
+
+    func markEpisode(req: Request) async throws -> Response {
+        try await handle(req) {
+            let (title, episode) = try await resolveEpisode(req)
+            let userID = try req.userID
+            let input = (try? req.content.decode(WatchInput.self)) ?? WatchInput()
+            let service = try await serviceChoice(req, input.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markEpisode(userID: userID, episodeID: episode.requireID(), day: input.day,
+                                                  service: service, rewatch: input.rewatch == "true")
+            return try await seasonResponse(req, title: title, season: episode.season, userID: userID)
+        }
+    }
+
+    func unmarkEpisode(req: Request) async throws -> Response {
+        try await handle(req) {
+            let (title, episode) = try await resolveEpisode(req)
+            let userID = try req.userID
+            try await req.watches.unmarkEpisode(userID: userID, episodeID: episode.requireID())
+            return try await seasonResponse(req, title: title, season: episode.season, userID: userID)
+        }
+    }
+
+    func markSeason(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            guard let season = req.parameters.get("season", as: Int.self) else { throw Abort(.notFound) }
+            let userID = try req.userID
+            let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markSeason(userID: userID, titleID: title.requireID(), season: season, service: service)
+            return try await seasonResponse(req, title: title, season: season, userID: userID)
+        }
+    }
+
+    func markUpTo(req: Request) async throws -> Response {
+        try await handle(req) {
+            let (title, episode) = try await resolveEpisode(req)
+            let userID = try req.userID
+            let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markUpTo(userID: userID, episodeID: episode.requireID(), service: service)
+            let seasons = try await seasonModels(req, title: title, userID: userID, open: episode.season)
+            return HTMLResponse(SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(),
+                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+        }
+    }
+
+    func setHidden(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            let input = try req.content.decode(HiddenInput.self)
+            try await req.watches.setHidden(userID: try req.userID, titleID: title.requireID(), hidden: input.hidden)
+            if !input.hidden {
+                do { try await req.catalog.refresh(title) } catch {
+                    req.logger.warning("TMDB refresh after unhide failed for \(title.tmdbID): \(error)")
+                }
+            }
+            if input.context == HiddenToggle.Context.card.rawValue {
+                return HTMLResponse(EmptyHTML())
+            }
+            return HTMLResponse(HiddenToggle(tmdbID: title.tmdbID, hidden: input.hidden))
+        }
+    }
+
+    // MARK: Movies
+
+    func moviePage(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .movie)
+            let userID = try req.userID
+            let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
+            return HTMLResponse(MoviePage(nav: try req.nav(.search), title: title,
+                                          watches: try await movieWatches(req, userID: userID, titleID: title.requireID()),
+                                          rating: entry?.rating, today: req.watches.today()))
+        }
+    }
+
+    func markMovie(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .movie)
+            let userID = try req.userID
+            let input = (try? req.content.decode(WatchInput.self)) ?? WatchInput()
+            let service = try await serviceChoice(req, input.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markMovie(userID: userID, titleID: title.requireID(), day: input.day, service: service,
+                                                rewatch: input.rewatch == "true")
+            return HTMLResponse(MovieWatchesSection(tmdbID: title.tmdbID, watches: try await movieWatches(req, userID: userID, titleID: title.requireID()),
+                                                    today: req.watches.today()))
+        }
+    }
+
+    func unmarkMovie(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .movie)
+            let userID = try req.userID
+            try await req.watches.unmarkMovie(userID: userID, titleID: title.requireID())
+            return HTMLResponse(MovieWatchesSection(tmdbID: title.tmdbID, watches: [], today: req.watches.today()))
+        }
+    }
+
+    // MARK: Rating
+
+    func setRating(req: Request, kind: TitleKind) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, kind)
+            let raw = (try? req.content.decode(RatingInput.self))?.rating?.trimmingCharacters(in: .whitespaces) ?? ""
+            let rating: Int?
+            if raw.isEmpty { rating = nil } else if let value = Int(raw) { rating = value } else { throw TrackingError.invalidRating }
+            try await req.watches.setRating(userID: try req.userID, titleID: title.requireID(), rating: rating)
+            return HTMLResponse(RatingControl(kind: kind, tmdbID: title.tmdbID, rating: rating))
+        }
+    }
+
+    // MARK: Helpers
+
+    /// Maps domain errors to HTTP: unknown things → 404, validation → 422 flash message.
+    private func handle(_ req: Request, _ body: () async throws -> HTMLResponse) async throws -> Response {
+        do {
+            return try await body().encodeResponse(for: req)
+        } catch let error as TrackingError {
+            switch error {
+            case .notFound: throw Abort(.notFound)
+            case .futureDate: return try await flashError("Datum liegt in der Zukunft.").encodeResponse(for: req)
+            case .invalidDate: return try await flashError("Ungültiges Datum.").encodeResponse(for: req)
+            case .notAired: return try await flashError("Folge ist noch nicht erschienen.").encodeResponse(for: req)
+            case .invalidRating: return try await flashError("Bewertung muss zwischen 1 und 10 liegen.").encodeResponse(for: req)
+            }
+        } catch TMDBError.notFound {
+            throw Abort(.notFound)
+        } catch let error as TMDBError {
+            throw Abort(.badGateway, reason: "TMDB nicht erreichbar: \(error)")
+        }
+    }
+
+    private func resolve(_ req: Request, _ kind: TitleKind) async throws -> Title {
+        guard let tmdbID = req.parameters.get("tmdbID", as: Int.self) else { throw Abort(.notFound) }
+        return try await req.catalog.title(kind: kind, tmdbID: tmdbID)
+    }
+
+    private func resolveEpisode(_ req: Request) async throws -> (Title, Episode) {
+        let title = try await resolve(req, .tv)
+        guard let season = req.parameters.get("season", as: Int.self), let number = req.parameters.get("number", as: Int.self),
+              let episode = try await Episode.query(on: req.db).filter(\.$title.$id == title.requireID())
+                .filter(\.$season == season).filter(\.$number == number).first() else { throw Abort(.notFound) }
+        return (title, episode)
+    }
+
+    /// Absent field → last used service of this title; "" → unknown; otherwise must be a known service.
+    private func serviceChoice(_ req: Request, _ raw: String?, userID: UUID, titleID: UUID) async throws -> StreamingService? {
+        guard let raw else { return try await req.watches.lastService(userID: userID, titleID: titleID) }
+        if raw.isEmpty { return nil }
+        guard let service = StreamingService(rawValue: raw) else { throw Abort(.badRequest, reason: "Unbekannter Dienst") }
+        return service
+    }
+
+    private func findEntry(_ req: Request, userID: UUID, titleID: UUID) async throws -> UserTitle? {
+        try await UserTitle.query(on: req.db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first()
+    }
+
+    private func movieWatches(_ req: Request, userID: UUID, titleID: UUID) async throws -> [Watch] {
+        try await req.watches.watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil)
+            .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending).all()
+    }
+
+    private func seasonResponse(_ req: Request, title: Title, season: Int, userID: UUID) async throws -> HTMLResponse {
+        let seasons = try await seasonModels(req, title: title, userID: userID, open: season)
+        guard let model = seasons.first(where: { $0.number == season }) else { throw Abort(.notFound) }
+        return HTMLResponse(SeasonSection(tmdbID: title.tmdbID, season: model, today: req.watches.today(),
+                                          defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+    }
+
+    /// Season view models; `open` forces a season open, otherwise the season of the next episode
+    /// (or the first season when nothing is watched yet) is open.
+    func seasonModels(_ req: Request, title: Title, userID: UUID, open: Int?) async throws -> [SeasonModel] {
+        let today = req.watches.today()
+        let episodes = try await req.catalog.episodes(of: title.requireID())
+        let watches = try await req.watches.watchesQuery(userID: userID).filter(\.$title.$id == title.requireID())
+            .filter(\.$episode.$id != nil).all()
+        let byEpisode = Dictionary(grouping: watches, by: { $0.$episode.id! }).mapValues { list in
+            list.sorted { ($0.watchedOn ?? "", $0.createdAt ?? .distantPast) > ($1.watchedOn ?? "", $1.createdAt ?? .distantPast) }
+        }
+        let infos = episodes.map(EpisodeInfo.init)
+        let openSeason = open ?? nextEpisode(in: infos, watched: Set(byEpisode.keys), today: today)?.season
+            ?? (watches.isEmpty ? infos.first(where: { $0.season >= 1 })?.season : nil)
+        let grouped = Dictionary(grouping: episodes, by: \.season)
+        return grouped.keys.sorted { a, b in (a == 0 ? Int.max : a) < (b == 0 ? Int.max : b) }.map { number in
+            SeasonModel(number: number, episodes: grouped[number]!.map { e in
+                EpisodeRowModel(info: EpisodeInfo(e), aired: req.watches.isAired(e), watches: byEpisode[e.id!] ?? [])
+            }, isOpen: number == openSeason)
+        }
+    }
+}

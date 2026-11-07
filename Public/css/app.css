@@ -79,3 +79,17 @@ summary { cursor: pointer; font-weight: 600; }
   * { transition: none !important; animation: none !important; }
 }
 .inline-form { display: inline-flex; gap: var(--space-1); margin: 0 var(--space-2) var(--space-1) 0; }
+.title-header { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-6); }
+.title-header .poster { width: 140px; }
+.rating-control { margin: var(--space-2) 0; }
+.rating-control select { display: inline-block; width: auto; }
+.season-action { margin: var(--space-2) 0; }
+.episode-row .code { font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.episode-row .name { flex: 1; }
+.episode-menu { flex-basis: 100%; background: var(--paper); margin: 0; }
+.episode-menu summary { font-weight: 400; color: var(--ink-3); font-size: var(--text-sm); }
+.watch-form { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin: var(--space-2) 0; }
+.watch-form label { margin: 0; }
+.search-form input { width: 100%; max-width: 32rem; font-size: var(--text-lg); }
+.search-result { text-decoration: none; }
+#flash:empty { display: none; }

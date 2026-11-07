@@ -19,3 +19,8 @@ struct HTMLResponse: AsyncResponseEncodable {
         return Response(status: status, headers: headers, body: .init(string: html))
     }
 }
+
+/// Renders nothing (used when an htmx swap should remove its target).
+struct EmptyHTML: HTML {
+    var body: some HTML { "" }
+}

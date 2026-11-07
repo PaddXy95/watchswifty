@@ -37,6 +37,7 @@ struct PageLayout<Content: HTML>: HTMLDocument {
             SiteNav(context: nav)
         }
         main(.class("page")) {
+            div(.id("flash"), .custom(name: "aria-live", value: "polite")) {}
             content
         }
     }
