@@ -1,4 +1,5 @@
 import Elementary
+import ElementaryHTMX2
 
 enum NavItem: Sendable, Equatable {
     case continueWatching, history, library, search, importing, account, admin
@@ -68,11 +69,12 @@ struct SiteNav: HTML {
 
     var body: some HTML {
         header(.class("site-header")) {
-            a(.class("brand"), .href("/")) { "WatchSwifty" }
+            a(.class("brand"), .href("/"), .hx.boost(true)) { "WatchSwifty" }
             // Burger menu on phones: a CSS-only checkbox toggle (no JavaScript).
             input(.type(.checkbox), .id("nav-toggle"), .class("nav-toggle"), .custom(name: "aria-label", value: "Menü öffnen"))
             label(.class("nav-toggle-label"), .for("nav-toggle"), .custom(name: "aria-label", value: "Menü")) { "☰" }
-            nav(.class("site-nav")) {
+            // Boosted: menu clicks load via htmx, so the loading bar shows.
+            nav(.class("site-nav"), .hx.boost(true)) {
                 for (item, label, href) in items {
                     a(.href(href)) { label }
                         .attributes(.class("active"), .custom(name: "aria-current", value: "page"), when: item == context.active)

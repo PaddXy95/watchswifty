@@ -207,3 +207,13 @@ struct ReviewFixesUITests {
         #expect(html.contains(#"hx-preserve="true""#))
     }
 }
+
+@Suite("MenuBoost")
+struct MenuBoostTests {
+    @Test func menuLinksAreBoosted() {
+        let html = SiteNav(context: .init(username: "pat", isAdmin: true, active: .history)).render()
+        #expect(html.contains(#"<a class="brand" href="/" hx-boost="true""#))
+        #expect(html.contains(#"<nav class="site-nav" hx-boost="true""#))
+        #expect(!html.contains(#"<form class="logout" method="post" action="/logout" hx-boost"#))
+    }
+}
