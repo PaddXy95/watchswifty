@@ -217,3 +217,22 @@ struct ServicesTests {
         #expect(StreamingService(rawValue: "netflix") == .netflix)   // existing raw values unchanged
     }
 }
+
+@Suite("MarkSeries")
+struct MarkSeriesTests {
+    @Test func markSeriesOnlyAiredRegular() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [0: 1, 1: 2, 2: 2], unaired: ["2x2"])
+            let ws = WatchService(db: app.db, today: { "2026-11-07" })
+            _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), day: nil, service: nil)
+            let count = try await ws.markSeries(userID: user.requireID(), titleID: show.requireID(), service: nil)
+            #expect(count == 2)
+            let watches = try await Watch.query(on: app.db).filter(\.$user.$id == user.requireID()).all()
+            #expect(watches.count == 3)
+            #expect(watches.filter { $0.watchedOn == nil }.count == 2)
+            let special = try await episode(app, show, 0, 1)
+            #expect(!watches.contains { $0.$episode.id == special.id })
+        }
+    }
+}

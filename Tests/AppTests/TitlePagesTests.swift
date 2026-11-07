@@ -294,3 +294,22 @@ struct PurchasedServiceTests {
         }
     }
 }
+
+@Suite("WatchAll")
+struct WatchAllTests {
+    @Test func watchAllRouteAndButton() async throws {
+        try await withTestApp(tmdb: TitlePagesTests.fake()) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                #expect(res.body.string.contains("Gesamte Serie gesehen"))
+                #expect(res.body.string.contains("/tv/1399/watch-all"))
+            }
+            try await app.testing().test(.POST, "/tv/1399/watch-all", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("Staffel 1 · 2/2 gesehen"))
+                #expect(res.body.string.contains("Staffel 2 · 2/2 gesehen"))
+            }
+        }
+    }
+}

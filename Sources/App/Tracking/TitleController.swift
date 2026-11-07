@@ -12,6 +12,7 @@ struct TitleController {
         protected.delete("tv", ":tmdbID", "episodes", ":season", ":number", "watch", use: unmarkEpisode)
         protected.post("tv", ":tmdbID", "episodes", ":season", ":number", "watch-up-to", use: markUpTo)
         protected.post("tv", ":tmdbID", "seasons", ":season", "watch", use: markSeason)
+        protected.post("tv", ":tmdbID", "watch-all", use: markSeries)
         protected.post("tv", ":tmdbID", "hidden", use: setHidden)
         protected.post("tv", ":tmdbID", "rating") { try await setRating(req: $0, kind: .tv) }
         protected.get("movie", ":tmdbID", use: moviePage)
@@ -66,6 +67,18 @@ struct TitleController {
             let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
             _ = try await req.watches.markSeason(userID: userID, titleID: title.requireID(), season: season, service: service)
             return try await seasonResponse(req, title: title, season: season, userID: userID)
+        }
+    }
+
+    func markSeries(req: Request) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, .tv)
+            let userID = try req.userID
+            let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markSeries(userID: userID, titleID: title.requireID(), service: service)
+            let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
+            return HTMLResponse(SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(),
+                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
         }
     }
 

@@ -38,6 +38,13 @@ struct WatchService {
         return try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
     }
 
+    /// All aired regular episodes (season ≥ 1) of a series, undated – „Gesamte Serie gesehen“.
+    func markSeries(userID: UUID, titleID: UUID, service: StreamingService?) async throws -> Int {
+        guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
+        let episodes = try await Episode.query(on: db).filter(\.$title.$id == titleID).filter(\.$season >= 1).all()
+        return try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
+    }
+
     func markUpTo(userID: UUID, episodeID: UUID, service: StreamingService?) async throws -> Int {
         guard let target = try await Episode.find(episodeID, on: db) else { throw TrackingError.notFound }
         let all = try await Episode.query(on: db).filter(\.$title.$id == target.$title.id).all()

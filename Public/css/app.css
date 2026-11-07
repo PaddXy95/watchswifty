@@ -173,3 +173,4 @@ summary { cursor: pointer; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   .page-loader.htmx-request { animation: none !important; background: var(--accent); }
 }
+.series-action { margin-bottom: var(--space-3); }
