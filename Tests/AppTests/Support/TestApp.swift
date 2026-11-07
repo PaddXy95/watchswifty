@@ -7,7 +7,7 @@ func withTestApp(config: AppConfig = .testing, tmdb: FakeTMDBClient = FakeTMDBCl
                  _ test: (Application) async throws -> Void) async throws {
     let app = try await Application.make(.testing)
     do {
-        try await configure(app, config: config, tmdb: tmdb)
+        try await configure(app, config: config, tmdbProvider: TMDBProvider { _ in tmdb })
         try await test(app)
     } catch {
         try await app.asyncShutdown()
@@ -41,8 +41,10 @@ struct LoginForm: Content {
 }
 
 @discardableResult
-func createUser(_ app: Application, _ username: String, password: String = "password123", isAdmin: Bool = false) async throws -> User {
+func createUser(_ app: Application, _ username: String, password: String = "password123", isAdmin: Bool = false,
+                tmdbToken: String? = "test-token") async throws -> User {
     let user = User(username: User.normalize(username), passwordHash: try app.password.hash(password), isAdmin: isAdmin)
+    user.tmdbToken = tmdbToken
     try await user.save(on: app.db)
     return user
 }

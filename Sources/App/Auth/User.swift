@@ -9,6 +9,8 @@ final class User: Model, @unchecked Sendable {
     @Field(key: "username") var username: String
     @Field(key: "password_hash") var passwordHash: String
     @Field(key: "is_admin") var isAdmin: Bool
+    /// The user's own TMDB read access token (secret; never rendered or logged).
+    @OptionalField(key: "tmdb_token") var tmdbToken: String?
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     init() {}

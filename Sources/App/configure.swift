@@ -2,9 +2,9 @@ import Fluent
 import FluentSQLiteDriver
 import Vapor
 
-func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) async throws {
+func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider) async throws {
     app.appConfig = config
-    app.tmdb = tmdb
+    app.tmdbProvider = tmdbProvider
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     app.middleware.use(OriginCheckMiddleware())
@@ -32,12 +32,13 @@ func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) asyn
     app.migrations.add(CreateNetflixImport())
     app.migrations.add(CreateNetflixMapping())
     app.migrations.add(CreateNetflixRow())
+    app.migrations.add(AddUserTMDBToken())
 
     try routes(app)
     try await app.autoMigrate()
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
 
-    app.matchingWorker = MatchingWorker(db: app.db, tmdb: tmdb, logger: app.logger, enabled: config.backgroundJobsEnabled)
+    app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, enabled: config.backgroundJobsEnabled)
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())

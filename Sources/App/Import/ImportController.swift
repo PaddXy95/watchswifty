@@ -152,7 +152,7 @@ struct ImportController {
             .filter(\.$status == RowStatus.pending.rawValue).all()
         let waiting = pending.filter { $0.$mapping.id.map(review.contains) ?? false }.count
         return ImportProgress(isRunning: await worker.isRunning, pendingRows: pending.count - waiting,
-                              waitingForReview: waiting, lastError: await worker.lastError)
+                              waitingForReview: waiting, lastError: await worker.lastError(for: userID))
     }
 
     func state(_ req: Request) async throws -> ImportState {

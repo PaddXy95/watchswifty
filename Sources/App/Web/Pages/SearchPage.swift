@@ -10,6 +10,7 @@ struct SearchResultModel {
 struct SearchPage: HTML {
     let nav: NavContext
     let query: String
+    let hasToken: Bool
     let results: [SearchResultModel]
 
     var body: some HTML {
@@ -22,16 +23,28 @@ struct SearchPage: HTML {
                       .hx.get("/search/results"), .custom(name: "hx-trigger", value: "input changed delay:300ms, search"),
                       .hx.target("#results"))
             }
-            SearchResults(results: results)
+            SearchResults(results: results, hasToken: hasToken)
+        }
+    }
+}
+
+struct TokenHint: HTML {
+    var body: some HTML {
+        p(.class("notice")) {
+            "Für die Suche brauchst du einen eigenen TMDB-Token. Hinterlege ihn unter "
+            a(.href("/account")) { "Konto" }
+            "."
         }
     }
 }
 
 struct SearchResults: HTML {
     let results: [SearchResultModel]
+    var hasToken = true
 
     var body: some HTML {
         div(.id("results"), .class("card-list")) {
+            if !hasToken { TokenHint() }
             for item in results {
                 a(.class("card search-result"), .href("/\(item.result.kind.rawValue)/\(item.result.id)")) {
                     Poster(path: item.result.posterPath, alt: item.result.name)

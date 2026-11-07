@@ -12,20 +12,24 @@ struct MatchingRunResult: Sendable, Equatable {
 /// One run at a time across all users; TMDB failures stop the run and leave rows pending.
 actor MatchingWorker {
     private let db: any Database
-    private let tmdb: any TMDBClient
+    private let provider: TMDBProvider
     private let logger: Logger
     private let enabled: Bool
 
     private(set) var isRunning = false
-    private(set) var lastError: String?
+    /// Last problem per user (missing/rejected token, TMDB down); cleared after a clean run for that user.
+    private var errors: [UUID: String] = [:]
+    private var failedThisRun: Set<UUID> = []
     private var rerunRequested = false
 
-    init(db: any Database, tmdb: any TMDBClient, logger: Logger, enabled: Bool) {
+    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool) {
         self.db = db
-        self.tmdb = tmdb
+        self.provider = provider
         self.logger = logger
         self.enabled = enabled
     }
+
+    func lastError(for userID: UUID) -> String? { errors[userID] }
 
     /// Starts a run in the background (no-op when disabled); a kick during a run schedules another pass.
     func kick() {
@@ -45,35 +49,32 @@ actor MatchingWorker {
                 let result = try await processAll()
                 logger.info("Zuordnung: \(result.matched) zugeordnet, \(result.unmatched) nicht zugeordnet, \(result.awaitingReview) zu prüfen")
             } catch {
-                lastError = "Zuordnung fehlgeschlagen: \(error)"
                 logger.error("Matching failed: \(error)")
             }
         } while rerunRequested
         isRunning = false
     }
 
-    private var catalog: CatalogService { CatalogService(db: db, tmdb: tmdb) }
     private var watches: WatchService { WatchService(db: db) }
 
     func processAll() async throws -> MatchingRunResult {
         var result = MatchingRunResult()
-        do {
-            var changed = true
-            while changed {
-                changed = false
-                if try await assignMappings() { changed = true }
-                if try await resolveMappings() { changed = true }
-                try await ignoreRowsOfIgnoredMappings()
-                let (matched, unmatched) = try await matchRows()
-                result.matched += matched
-                result.unmatched += unmatched
-                if matched + unmatched > 0 { changed = true }
-            }
-            lastError = nil
-        } catch let error as TMDBError {
-            lastError = "TMDB nicht erreichbar: \(error)"
-            logger.warning("Matching stopped, TMDB error: \(error)")
+        failedThisRun = []
+        var touchedUsers: Set<UUID> = []
+        var changed = true
+        while changed {
+            changed = false
+            if try await assignMappings() { changed = true }
+            let resolved = try await resolveMappings()
+            touchedUsers.formUnion(resolved.users)
+            if resolved.changed { changed = true }
+            try await ignoreRowsOfIgnoredMappings()
+            let (matched, unmatched) = try await matchRows()
+            result.matched += matched
+            result.unmatched += unmatched
+            if matched + unmatched > 0 { changed = true }
         }
+        for user in touchedUsers.subtracting(failedThisRun) { errors[user] = nil }
         result.awaitingReview = try await awaitingReviewCount()
         return result
     }
@@ -121,31 +122,58 @@ actor MatchingWorker {
 
     // MARK: Step 2 – resolve names via TMDB
 
-    private func resolveMappings() async throws -> Bool {
+    /// Resolves pending mappings with each owner's own token. A user without (or with a rejected)
+    /// token is skipped for the rest of the run; other users continue.
+    private func resolveMappings() async throws -> (changed: Bool, users: Set<UUID>) {
         let pending = try await NetflixMapping.query(on: db).filter(\.$status == MappingStatus.pending.rawValue).all()
-        for mapping in pending {
-            let results = try await tmdb.search(mapping.netflixName, kind: mapping.titleKind)
-            var resolved = false
-            if let hit = autoMatch(candidate: mapping.netflixName, in: results) {
-                do {
-                    let title = try await catalog.title(kind: mapping.titleKind, tmdbID: hit.id)
-                    mapping.$title.id = try title.requireID()
-                    mapping.status = MappingStatus.auto.rawValue
-                    resolved = true
-                } catch TMDBError.notFound {
-                    resolved = false
+        var changed = false
+        let byUser = Dictionary(grouping: pending, by: { $0.$user.id })
+        for (userID, mappings) in byUser where !failedThisRun.contains(userID) {
+            guard let token = try await User.find(userID, on: db)?.tmdbToken, !token.isEmpty else {
+                fail(userID, TMDBError.missingToken.description)
+                continue
+            }
+            let tmdb = provider.make(token)
+            let catalog = CatalogService(db: db, tmdb: tmdb)
+            do {
+                for mapping in mappings {
+                    try await resolve(mapping, tmdb: tmdb, catalog: catalog)
+                    changed = true
                 }
-            }
-            if !resolved {
-                mapping.status = MappingStatus.review.rawValue
-                mapping.candidateResults = Array(results.prefix(5))
-            }
-            try await mapping.save(on: db)
-            if !resolved && mapping.titleKind == .movie {
-                try await redirectFallbackRows(from: mapping)
+            } catch let error as TMDBError {
+                fail(userID, "TMDB nicht erreichbar: \(error)")
+                logger.warning("Matching for one user stopped, TMDB error: \(error)")
             }
         }
-        return !pending.isEmpty
+        return (changed, Set(byUser.keys))
+    }
+
+    private func fail(_ userID: UUID, _ message: String) {
+        failedThisRun.insert(userID)
+        errors[userID] = message
+    }
+
+    private func resolve(_ mapping: NetflixMapping, tmdb: any TMDBClient, catalog: CatalogService) async throws {
+        let results = try await tmdb.search(mapping.netflixName, kind: mapping.titleKind)
+        var resolved = false
+        if let hit = autoMatch(candidate: mapping.netflixName, in: results) {
+            do {
+                let title = try await catalog.title(kind: mapping.titleKind, tmdbID: hit.id)
+                mapping.$title.id = try title.requireID()
+                mapping.status = MappingStatus.auto.rawValue
+                resolved = true
+            } catch TMDBError.notFound {
+                resolved = false
+            }
+        }
+        if !resolved {
+            mapping.status = MappingStatus.review.rawValue
+            mapping.candidateResults = Array(results.prefix(5))
+        }
+        try await mapping.save(on: db)
+        if !resolved && mapping.titleKind == .movie {
+            try await redirectFallbackRows(from: mapping)
+        }
     }
 
     /// Single "X: Y" rows tried as a movie first: no clear movie → treat them as an episode of show X.
@@ -183,6 +211,7 @@ actor MatchingWorker {
         var matched = 0, unmatched = 0
         for (mappingID, mappingRows) in Dictionary(grouping: rows, by: { $0.$mapping.id! }) {
             guard let mapping = byID[mappingID], let titleID = mapping.$title.id else { continue }
+            let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
             let candidates: [EpisodeCandidate] = mapping.titleKind == .movie ? [] : try await catalog.episodes(of: titleID).map {
                 EpisodeCandidate(id: try $0.requireID(), season: $0.season, number: $0.number, name: $0.name)
             }

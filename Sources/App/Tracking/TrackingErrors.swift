@@ -15,6 +15,8 @@ func respondMappingTrackingErrors(_ req: Request, _ body: () async throws -> HTM
         }
     } catch TMDBError.notFound {
         throw Abort(.notFound)
+    } catch TMDBError.missingToken {
+        return try await flashError(TMDBError.missingToken.description).encodeResponse(for: req)
     } catch let error as TMDBError {
         throw Abort(.badGateway, reason: "TMDB nicht erreichbar: \(error)")
     }

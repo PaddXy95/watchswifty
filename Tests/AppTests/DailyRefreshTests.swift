@@ -71,3 +71,21 @@ struct DailyRefreshTests {
         }
     }
 }
+
+@Suite("RefreshToken")
+struct RefreshTokenTests {
+    @Test func picksVisibleOwnerWithToken() async throws {
+        try await withTestApp { app in
+            let hiddenOwner = try await createUser(app, "versteckt", tmdbToken: "hidden-token")
+            let noToken = try await createUser(app, "ohne", tmdbToken: nil)
+            let visible = try await createUser(app, "sichtbar", tmdbToken: "visible-token")
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 1])
+            let ws = WatchService(db: app.db)
+            try await ws.setHidden(userID: hiddenOwner.requireID(), titleID: show.requireID(), hidden: true)
+            try await ws.setHidden(userID: noToken.requireID(), titleID: show.requireID(), hidden: false)
+            #expect(try await refreshToken(for: show.requireID(), on: app.db) == nil)
+            try await ws.setHidden(userID: visible.requireID(), titleID: show.requireID(), hidden: false)
+            #expect(try await refreshToken(for: show.requireID(), on: app.db) == "visible-token")
+        }
+    }
+}

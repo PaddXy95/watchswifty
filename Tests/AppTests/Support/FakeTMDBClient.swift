@@ -53,6 +53,10 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         if let failure { throw failure }
     }
 
+    func validate() async throws {
+        try record("validate")
+    }
+
     func search(_ query: String, kind: TitleKind) async throws -> [TMDBSearchResult] {
         try record("search:\(kind.rawValue):\(query)")
         return state.withLockedValue { $0.searchResults["\(kind.rawValue):\(query)"] ?? [] }

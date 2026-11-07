@@ -13,19 +13,23 @@ extension Application {
 }
 
 extension Application {
-    private struct TMDBKey: StorageKey { typealias Value = any TMDBClient }
+    private struct TMDBProviderKey: StorageKey { typealias Value = TMDBProvider }
 
-    var tmdb: any TMDBClient {
+    var tmdbProvider: TMDBProvider {
         get {
-            guard let client = storage[TMDBKey.self] else { fatalError("TMDB client not configured") }
-            return client
+            guard let provider = storage[TMDBProviderKey.self] else { fatalError("TMDB provider not configured") }
+            return provider
         }
-        set { storage[TMDBKey.self] = newValue }
+        set { storage[TMDBProviderKey.self] = newValue }
     }
 }
 
 extension Request {
-    var tmdb: any TMDBClient { application.tmdb }
+    /// TMDB client for the logged-in user's own token (calls fail with `.missingToken` without one).
+    var tmdb: any TMDBClient {
+        guard let token = auth.get(User.self)?.tmdbToken, !token.isEmpty else { return MissingTokenTMDBClient() }
+        return application.tmdbProvider.make(token)
+    }
 }
 
 extension Application {

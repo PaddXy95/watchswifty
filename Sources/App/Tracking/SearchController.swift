@@ -9,12 +9,19 @@ struct SearchController {
 
     func page(req: Request) async throws -> HTMLResponse {
         let query = (try? req.query.get(String.self, at: "q")) ?? ""
-        return HTMLResponse(SearchPage(nav: try req.nav(.search), query: query, results: try await search(req, query)))
+        let hasToken = try hasToken(req)
+        return HTMLResponse(SearchPage(nav: try req.nav(.search), query: query, hasToken: hasToken,
+                                       results: hasToken ? try await search(req, query) : []))
     }
 
     func results(req: Request) async throws -> HTMLResponse {
+        guard try hasToken(req) else { return HTMLResponse(SearchResults(results: [], hasToken: false)) }
         let query = (try? req.query.get(String.self, at: "q")) ?? ""
-        return HTMLResponse(SearchResults(results: try await search(req, query)))
+        return HTMLResponse(SearchResults(results: try await search(req, query), hasToken: true))
+    }
+
+    private func hasToken(_ req: Request) throws -> Bool {
+        !(try req.currentUser.tmdbToken ?? "").isEmpty
     }
 
     private func search(_ req: Request, _ rawQuery: String) async throws -> [SearchResultModel] {

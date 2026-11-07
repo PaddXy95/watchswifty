@@ -4,13 +4,8 @@ import VaporTesting
 
 @Suite("Config")
 struct ConfigTests {
-    @Test func missingTokenFails() {
-        #expect(throws: ConfigError.missing("TMDB_TOKEN")) { try AppConfig.fromEnvironment([:]) }
-    }
-
     @Test func defaults() throws {
-        let c = try AppConfig.fromEnvironment(["TMDB_TOKEN": "t"])
-        #expect(c.tmdbToken == "t")
+        let c = try AppConfig.fromEnvironment([:])
         #expect(c.tmdbLanguage == "de-DE")
         #expect(c.databasePath == "/data/watchswifty.sqlite")
         #expect(c.host == "0.0.0.0")
@@ -22,7 +17,7 @@ struct ConfigTests {
 
     @Test func overrides() throws {
         let c = try AppConfig.fromEnvironment([
-            "TMDB_TOKEN": "t", "TMDB_LANGUAGE": "en-US", "DATABASE_PATH": "/tmp/x.sqlite",
+            "TMDB_LANGUAGE": "en-US", "DATABASE_PATH": "/tmp/x.sqlite",
             "HOST": "127.0.0.1", "PORT": "9000", "ADMIN_USERNAME": "pat", "ADMIN_PASSWORD": "secret123",
         ])
         #expect(c.tmdbLanguage == "en-US")

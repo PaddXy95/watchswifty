@@ -12,6 +12,10 @@ struct LiveTMDBClient: TMDBClient {
 
     // MARK: TMDBClient
 
+    func validate() async throws {
+        _ = try await get("authentication", [:])
+    }
+
     func search(_ query: String, kind: TitleKind) async throws -> [TMDBSearchResult] {
         let data = try await get("search/\(kind.rawValue)", ["query": query, "include_adult": "false"])
         return try Self.decodeSearch(data, kind: kind)

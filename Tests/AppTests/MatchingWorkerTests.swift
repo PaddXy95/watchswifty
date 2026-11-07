@@ -21,7 +21,7 @@ struct MatchingWorkerTests {
     }
 
     func worker(_ app: Application, _ tmdb: FakeTMDBClient) -> MatchingWorker {
-        MatchingWorker(db: app.db, tmdb: tmdb, logger: app.logger, enabled: false)
+        MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
     }
 
     func rows(_ app: Application, _ user: User, containing text: String) async throws -> [NetflixRow] {
@@ -189,11 +189,11 @@ struct MatchingWorkerTests {
             _ = try await w.processAll()
             let all = try await NetflixRow.query(on: app.db).all()
             #expect(all.allSatisfy { $0.rowStatus == .pending })
-            #expect(await w.lastError?.hasPrefix("TMDB nicht erreichbar") == true)
+            #expect(try await w.lastError(for: user.requireID())?.hasPrefix("TMDB nicht erreichbar") == true)
             tmdb.failure = nil
             _ = try await w.processAll()
             #expect(try await rows(app, user, containing: "The Mentalist").allSatisfy { $0.rowStatus == .matched })
-            #expect(await w.lastError == nil)
+            #expect(try await w.lastError(for: user.requireID()) == nil)
         }
     }
 
@@ -220,6 +220,51 @@ struct MatchingWorkerTests {
             _ = worker(app, tmdb)   // never ran (simulated crash)
             _ = try await worker(app, tmdb).processAll()
             #expect(try await rows(app, user, containing: "The Mentalist").allSatisfy { $0.rowStatus == .matched })
+        }
+    }
+}
+
+@Suite("MatchingWorkerTokens")
+struct MatchingWorkerTokenTests {
+    @Test func userWithoutTokenStaysPendingOthersProcessed() async throws {
+        let tmdb = MatchingWorkerTests.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let tokenless = try await createUser(app, "ohne", tmdbToken: nil)
+            let pat = try await createUser(app, "pat")
+            let service = ImportService(db: app.db)
+            _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: tokenless.requireID())
+            _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: pat.requireID())
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
+            _ = try await worker.processAll()
+            let tokenlessRows = try await NetflixRow.query(on: app.db).filter(\.$user.$id == tokenless.requireID()).all()
+            #expect(tokenlessRows.allSatisfy { $0.rowStatus == .pending })
+            #expect(try await worker.lastError(for: tokenless.requireID()) == "Kein TMDB-Token hinterlegt – bitte unter Konto eintragen.")
+            let patMentalist = try await NetflixRow.query(on: app.db).filter(\.$user.$id == pat.requireID()).all()
+                .filter { $0.rawTitle.contains("The Mentalist") }
+            #expect(patMentalist.allSatisfy { $0.rowStatus == .matched })
+            #expect(try await worker.lastError(for: pat.requireID()) == nil)
+        }
+    }
+
+    @Test func rejectedTokenDoesNotBlockOthers() async throws {
+        let good = MatchingWorkerTests.fake()
+        let bad = MatchingWorkerTests.fake()
+        bad.failure = .unauthorized
+        try await withTestApp(tmdb: good) { app in
+            let alice = try await createUser(app, "alice", tmdbToken: "bad-token")
+            let bob = try await createUser(app, "bobby")
+            let service = ImportService(db: app.db)
+            _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: alice.requireID())
+            _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: bob.requireID())
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { token in token == "bad-token" ? bad : good },
+                                        logger: app.logger, enabled: false)
+            _ = try await worker.processAll()
+            #expect(try await worker.lastError(for: alice.requireID())?.hasPrefix("TMDB nicht erreichbar") == true)
+            let bobMentalist = try await NetflixRow.query(on: app.db).filter(\.$user.$id == bob.requireID()).all()
+                .filter { $0.rawTitle.contains("The Mentalist") }
+            #expect(bobMentalist.allSatisfy { $0.rowStatus == .matched })
+            let aliceRows = try await NetflixRow.query(on: app.db).filter(\.$user.$id == alice.requireID()).all()
+            #expect(aliceRows.allSatisfy { $0.rowStatus == .pending })
         }
     }
 }

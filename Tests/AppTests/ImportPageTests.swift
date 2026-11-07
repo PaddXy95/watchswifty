@@ -90,7 +90,7 @@ struct ImportPageTests {
     @Test func resetKeepsMergedManualWatch() async throws {
         var manualID: UUID?
         try await withImported(before: { app, user in
-            _ = try await CatalogService(db: app.db, tmdb: app.tmdb).title(kind: .tv, tmdbID: 1001)
+            _ = try await CatalogService(db: app.db, tmdb: app.tmdbProvider.make("test-token")).title(kind: .tv, tmdbID: 1001)
             let aura = try #require(try await Episode.query(on: app.db).filter(\.$name == "Die Aura des Todes").first())
             manualID = try await WatchService(db: app.db).markEpisode(userID: user.requireID(), episodeID: aura.requireID(),
                                                                       day: "2026-11-06", service: .netflix).id

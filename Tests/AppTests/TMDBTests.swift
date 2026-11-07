@@ -102,3 +102,20 @@ struct TMDBTests {
         await #expect(throws: TMDBError.notFound) { try await client.movie(id: 2) }
     }
 }
+
+@Suite("TMDBValidate")
+struct TMDBValidateTests {
+    @Test func validateCallsAuthentication() async throws {
+        let http = ScriptedHTTPClient(eventLoop: MultiThreadedEventLoopGroup.singleton.next(), responses: [
+            (.ok, [:], #"{"success":true}"#), (.unauthorized, [:], ""),
+        ])
+        let client = LiveTMDBClient(client: http, token: "t", language: "de-DE", limiter: RateLimiter(minInterval: .zero))
+        try await client.validate()
+        await #expect(throws: TMDBError.unauthorized) { try await client.validate() }
+        #expect(http.sent.withLockedValue { $0.first?.url.string.hasPrefix("https://api.themoviedb.org/3/authentication") } == true)
+    }
+
+    @Test func missingTokenClientThrows() async {
+        await #expect(throws: TMDBError.missingToken) { _ = try await MissingTokenTMDBClient().searchMulti("x") }
+    }
+}

@@ -61,7 +61,7 @@ struct TitlePagesTests {
 
     @Test func searchShowsOwnStatus() async throws {
         try await withUser { app, user, headers in
-            let catalog = CatalogService(db: app.db, tmdb: app.tmdb)
+            let catalog = CatalogService(db: app.db, tmdb: app.tmdbProvider.make("test-token"))
             let show = try await catalog.title(kind: .tv, tmdbID: 1399)
             let ws = WatchService(db: app.db)
             _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), day: nil, service: nil)
@@ -237,6 +237,43 @@ struct TitlePagesTests {
         try await withUser { app, _, headers in
             try await app.testing().test(.GET, "/tv/42", headers: headers) { res async in
                 #expect(res.status == .notFound)
+            }
+        }
+    }
+}
+
+@Suite("SearchWithoutToken")
+struct SearchWithoutTokenTests {
+    @Test func searchShowsHint() async throws {
+        let tmdb = TitlePagesTests.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            try await createUser(app, "pat", tmdbToken: nil)
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/search", headers: headers) { res async in
+                #expect(res.body.string.contains("TMDB-Token"))
+                #expect(res.body.string.contains(#"href="/account""#))
+            }
+            try await app.testing().test(.GET, "/search/results?q=Test", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("TMDB-Token"))
+                #expect(!res.body.string.contains("/tv/1399"))
+            }
+            #expect(!tmdb.calls.contains { $0.hasPrefix("multi:") })
+        }
+    }
+
+    @Test func cachedSeriesPageWorksWithoutToken() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "pat", tmdbToken: nil)
+            _ = try await seedSeries(app, tmdbID: 5, name: "Schon bekannt", seasons: [1: 2])
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/5", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("Schon bekannt"))
+            }
+            try await app.testing().test(.GET, "/tv/6", headers: headers) { res async in
+                #expect(res.status == .unprocessableEntity)
+                #expect(res.body.string.contains("Kein TMDB-Token hinterlegt"))
             }
         }
     }

@@ -11,7 +11,6 @@ enum ConfigError: Error, Equatable, CustomStringConvertible {
 }
 
 struct AppConfig: Sendable {
-    var tmdbToken: String
     var tmdbLanguage: String
     var databasePath: String
     var host: String
@@ -27,9 +26,7 @@ struct AppConfig: Sendable {
             guard let raw = env[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
             return raw
         }
-        guard let token = value("TMDB_TOKEN") else { throw ConfigError.missing("TMDB_TOKEN") }
         return AppConfig(
-            tmdbToken: token,
             tmdbLanguage: value("TMDB_LANGUAGE") ?? "de-DE",
             databasePath: value("DATABASE_PATH") ?? "/data/watchswifty.sqlite",
             host: value("HOST") ?? "0.0.0.0",
@@ -43,7 +40,6 @@ struct AppConfig: Sendable {
 
     static var testing: AppConfig {
         AppConfig(
-            tmdbToken: "test",
             tmdbLanguage: "de-DE",
             databasePath: ":memory:",
             host: "127.0.0.1",
