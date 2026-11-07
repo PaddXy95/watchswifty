@@ -31,9 +31,17 @@ func matchEpisodes(title: String, season: Int?, in candidates: [EpisodeCandidate
         if parts.count == 2 { return parts.sorted { $0.number < $1.number }.map(\.id) }
     }
 
-    // 4. Fuzzy: clear winner with similarity ≥ 0.85.
-    let scored = pool.map { (candidate: $0, score: similarity(wanted, normalizeTitle($0.name))) }.sorted { $0.score > $1.score }
+    // 4. Fuzzy: clear winner with similarity ≥ 0.85. Titles whose numbers differ ("Die 7 Leben" vs
+    //    "Die 8 Leben") are never fuzzy matches.
+    let wantedNumbers = numberTokens(wanted)
+    let scored = pool.filter { numberTokens(normalizeTitle($0.name)) == wantedNumbers }
+        .map { (candidate: $0, score: similarity(wanted, normalizeTitle($0.name))) }.sorted { $0.score > $1.score }
     guard let best = scored.first, best.score >= 0.85 else { return [] }
     if scored.count > 1, scored[1].score >= best.score - 0.10 { return [] }
     return [best.candidate.id]
+}
+
+/// Digit runs in a (normalized) title, in order.
+func numberTokens(_ s: String) -> [String] {
+    s.split(whereSeparator: { !$0.isNumber }).map(String.init)
 }

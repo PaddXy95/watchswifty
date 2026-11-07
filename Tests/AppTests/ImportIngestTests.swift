@@ -89,10 +89,10 @@ struct ImportIngestTests {
                 #expect(res.body.string.contains("Das ist keine Netflix-Wiedergabeaktivität"))
             })
             try await app.testing().test(.POST, "/import", headers: headers, beforeRequest: { req in
-                try req.content.encode(UploadForm(file: File(data: ByteBuffer(string: "Title,Date\n\"A\",\"2026-11-07\"\n"), filename: "a.csv")), as: .formData)
+                try req.content.encode(UploadForm(file: File(data: ByteBuffer(string: "Title,Date\n\"A\",\"Nov 7, 2026\"\n"), filename: "a.csv")), as: .formData)
             }, afterResponse: { res async in
                 #expect(res.status == .unprocessableEntity)
-                #expect(res.body.string.contains("Zeile 2: ungültiges Datum „2026-11-07“."))
+                #expect(res.body.string.contains("Zeile 2: ungültiges Datum „Nov 7, 2026“."))
             })
         }
     }

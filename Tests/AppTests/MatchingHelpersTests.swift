@@ -92,3 +92,17 @@ struct MatchingHelpersTests {
         #expect(matchEpisodes(title: "Etwas völlig anderes", season: 1, in: pool).isEmpty)
     }
 }
+
+@Suite("FuzzyDigitGuard")
+struct FuzzyDigitGuardTests {
+    @Test func differentNumbersNeverFuzzyMatch() {
+        let pool = [EpisodeCandidate(id: UUID(), season: 1, number: 1, name: "Die 7 Leben"),
+                    EpisodeCandidate(id: UUID(), season: 1, number: 2, name: "Ein anderer Titel")]
+        #expect(matchEpisodes(title: "Die 8 Leben", season: 1, in: pool).isEmpty)
+    }
+
+    @Test func sameNumbersStillFuzzyMatch() {
+        let target = EpisodeCandidate(id: UUID(), season: 1, number: 1, name: "Die 7 Leben des Herrn")
+        #expect(matchEpisodes(title: "Die 7 Leben des Hern", season: 1, in: [target]) == [target.id])
+    }
+}

@@ -48,11 +48,35 @@ struct NetflixCSVTests {
     }
 
     @Test func invalidDateReportsLine() {
-        #expect(throws: NetflixCSVError.invalidDate(line: 2, value: "2026-11-07")) {
-            try parseNetflixCSV("Title,Date\n\"A\",\"2026-11-07\"\n")
+        #expect(throws: NetflixCSVError.invalidDate(line: 2, value: "Nov 7, 2026")) {
+            try parseNetflixCSV("Title,Date\n\"A\",\"Nov 7, 2026\"\n")
         }
         #expect(throws: NetflixCSVError.invalidDate(line: 3, value: "13/1/24")) {
             try parseNetflixCSV("Title,Date\n\"A\",\"1/1/24\"\n\"B\",\"13/1/24\"\n")
         }
+    }
+}
+
+@Suite("NetflixCSVExcel")
+struct NetflixCSVExcelTests {
+    @Test func germanExcelSemicolonFile() throws {
+        let text = "Title;Date\r\n\"The Mentalist: Staffel 4: Die Aura des Todes\";07.11.2026\r\nDas fünfte Element;24.12.2020\r\n"
+        let result = try parseNetflixCSV(text)
+        #expect(result.rows.map(\.title) == ["The Mentalist: Staffel 4: Die Aura des Todes", "Das fünfte Element"])
+        #expect(result.rows.map(\.day) == ["2026-11-07", "2020-12-24"])
+    }
+
+    @Test func semicolonFileHasSameFingerprintsAsOriginal() throws {
+        let original = try parseNetflixCSV("Title,Date\n\"A: Staffel 1: B\",\"11/7/26\"\n")
+        let excel = try parseNetflixCSV("Title;Date\nA: Staffel 1: B;07.11.2026\n")
+        #expect(original.rows.map(\.fingerprint) == excel.rows.map(\.fingerprint))
+    }
+
+    @Test func otherDateFormats() {
+        #expect(netflixDay("7.11.2026") == "2026-11-07")
+        #expect(netflixDay("07.11.26") == "2026-11-07")
+        #expect(netflixDay("2026-11-07") == "2026-11-07")
+        #expect(netflixDay("11/7/2026") == "2026-11-07")
+        #expect(netflixDay("31.02.2026") == nil)
     }
 }

@@ -22,7 +22,10 @@ enum NetflixCSVError: Error, Equatable {
 func parseNetflixCSV(_ text: String) throws -> NetflixCSVResult {
     var input = text
     if input.hasPrefix("\u{FEFF}") { input.removeFirst() }
-    let records = splitCSVRecords(input)
+    // German Excel/Numbers re-saves CSVs with ";" as the separator.
+    let firstLine = input.prefix { $0 != "\n" && $0 != "\r\n" && $0 != "\r" }
+    let delimiter: Character = firstLine.contains(";") && !firstLine.contains(",") ? ";" : ","
+    let records = splitCSVRecords(input, delimiter: delimiter)
 
     guard let header = records.first, header.fields.map({ $0.trimmingCharacters(in: .whitespaces) }) == ["Title", "Date"] else {
         throw NetflixCSVError.notNetflixHistory
@@ -50,14 +53,30 @@ func parseNetflixCSV(_ text: String) throws -> NetflixCSVResult {
     return NetflixCSVResult(rows: rows, skippedBlank: skipped)
 }
 
-/// `M/D/YY` (or `M/D/YYYY`) → `yyyy-MM-dd`.
+/// Netflix's `M/D/YY` (also `M/D/YYYY`), plus what spreadsheet round-trips produce:
+/// German `D.M.YYYY` / `D.M.YY` and ISO `YYYY-MM-DD` → `yyyy-MM-dd`.
 func netflixDay(_ raw: String) -> String? {
-    let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
-    guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
-          let month = Int(parts[0]), let day = Int(parts[1]), var year = Int(parts[2]),
-          parts[2].count == 2 || parts[2].count == 4 else { return nil }
-    if parts[2].count == 2 { year += 2000 }
-    let iso = CalendarDay.format(year: year, month: month, day: day)
+    func numbers(_ separator: Character) -> [Substring]? {
+        let parts = raw.split(separator: separator, omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }) else { return nil }
+        return parts
+    }
+    func year(_ part: Substring) -> Int? {
+        guard part.count == 2 || part.count == 4, let value = Int(part) else { return nil }
+        return part.count == 2 ? 2000 + value : value
+    }
+    let ymd: (Int, Int, Int)?
+    if let p = numbers("/"), let y = year(p[2]), let m = Int(p[0]), let d = Int(p[1]) {
+        ymd = (y, m, d)
+    } else if let p = numbers("."), let y = year(p[2]), let d = Int(p[0]), let m = Int(p[1]) {
+        ymd = (y, m, d)
+    } else if let p = numbers("-"), p[0].count == 4, let y = Int(p[0]), let m = Int(p[1]), let d = Int(p[2]) {
+        ymd = (y, m, d)
+    } else {
+        ymd = nil
+    }
+    guard let (y, m, d) = ymd else { return nil }
+    let iso = CalendarDay.format(year: y, month: m, day: d)
     return CalendarDay.isValid(iso) ? iso : nil
 }
 
@@ -67,7 +86,7 @@ private struct CSVRecord {
 }
 
 /// Minimal RFC 4180 splitter: quoted fields, `""` escapes, commas/newlines inside quotes, LF or CRLF.
-private func splitCSVRecords(_ text: String) -> [CSVRecord] {
+private func splitCSVRecords(_ text: String, delimiter: Character) -> [CSVRecord] {
     var records: [CSVRecord] = []
     var fields: [String] = []
     var field = ""
@@ -93,7 +112,7 @@ private func splitCSVRecords(_ text: String) -> [CSVRecord] {
             }
         } else if c == "\"" {
             inQuotes = true
-        } else if c == "," {
+        } else if c == delimiter {
             fields.append(field)
             field = ""
         } else if c == "\n" || c == "\r\n" || c == "\r" {
