@@ -4,6 +4,8 @@ import Vapor
 
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider) async throws {
     app.appConfig = config
+    app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
+                                                               databasePath: config.databasePath, logger: app.logger))
     app.tmdbProvider = tmdbProvider
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware = Middlewares()
@@ -44,10 +46,12 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
 
     try routes(app)
     try await app.autoMigrate()
+    let encrypted = try await encryptStoredTokens(db: app.db, cipher: app.tokenCipher)
+    if encrypted > 0 { app.logger.notice("\(encrypted) TMDB-Token verschlüsselt gespeichert") }
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
 
     app.importLock = AsyncMutex()
-    app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger,
+    app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
                                         enabled: config.backgroundJobsEnabled, lock: app.importLock)
     if config.backgroundJobsEnabled {
         app.lifecycle.use(MatchingWorkerLifecycle())

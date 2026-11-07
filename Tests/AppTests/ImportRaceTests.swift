@@ -53,7 +53,7 @@ struct ImportRaceTests {
         try await withTestApp(tmdb: tmdb) { app in
             let user = try await createUser(app, "pat")
             _ = try await ImportService(db: app.db).ingest(text: try fixtureText(), filename: "a.csv", userID: user.requireID())
-            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, cipher: app.tokenCipher, enabled: false)
             async let first = worker.processAll()
             async let second = worker.processAll()
             _ = try await (first, second)

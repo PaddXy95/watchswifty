@@ -21,7 +21,7 @@ struct MatchingWorkerTests {
     }
 
     func worker(_ app: Application, _ tmdb: FakeTMDBClient) -> MatchingWorker {
-        MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
+        MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, cipher: app.tokenCipher, enabled: false)
     }
 
     func rows(_ app: Application, _ user: User, containing text: String) async throws -> [NetflixRow] {
@@ -234,7 +234,7 @@ struct MatchingWorkerTokenTests {
             let service = ImportService(db: app.db)
             _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: tokenless.requireID())
             _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: pat.requireID())
-            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, cipher: app.tokenCipher, enabled: false)
             _ = try await worker.processAll()
             let tokenlessRows = try await NetflixRow.query(on: app.db).filter(\.$user.$id == tokenless.requireID()).all()
             #expect(tokenlessRows.allSatisfy { $0.rowStatus == .pending })
@@ -257,7 +257,7 @@ struct MatchingWorkerTokenTests {
             _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: alice.requireID())
             _ = try await service.ingest(text: try fixtureText(), filename: "a.csv", userID: bob.requireID())
             let worker = MatchingWorker(db: app.db, provider: TMDBProvider { token in token == "bad-token" ? bad : good },
-                                        logger: app.logger, enabled: false)
+                                        logger: app.logger, cipher: app.tokenCipher, enabled: false)
             _ = try await worker.processAll()
             #expect(try await worker.lastError(for: alice.requireID())?.hasPrefix("TMDB nicht erreichbar") == true)
             let bobMentalist = try await NetflixRow.query(on: app.db).filter(\.$user.$id == bob.requireID()).all()

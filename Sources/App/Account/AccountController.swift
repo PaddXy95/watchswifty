@@ -42,7 +42,7 @@ struct AccountController {
         } catch {
             return try await page(req, status: .unprocessableEntity, error: "TMDB nicht erreichbar – Token nicht gespeichert.")
         }
-        user.tmdbToken = token
+        user.tmdbToken = try req.application.tokenCipher.seal(token)
         try await user.save(on: req.db)
         await req.application.matchingWorker.kick()
         return try await page(req, notice: "TMDB-Token gespeichert.")
@@ -56,10 +56,11 @@ struct AccountController {
     }
 
     private func page(_ req: Request, status: HTTPStatus = .ok, error: String? = nil, notice: String? = nil) async throws -> HTMLResponse {
-        let token = try req.currentUser.tmdbToken
-        let suffix = token.flatMap { $0.isEmpty ? nil : "…" + String($0.suffix(4)) }
+        let stored = try req.currentUser.tmdbToken
+        let suffix = req.tmdbToken.map { "…" + String($0.suffix(4)) }
+        let unreadable = suffix == nil && !(stored ?? "").isEmpty
         let followed = try await NewEpisodesService(db: req.db).followedSeries(userID: try req.userID, today: req.watches.today())
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
-                                                        followed: followed))
+                                                        followed: followed, tokenUnreadable: unreadable))
     }
 }

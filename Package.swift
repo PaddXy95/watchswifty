@@ -11,6 +11,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent.git", from: "4.13.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.9.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
         .package(url: "https://github.com/elementary-swift/elementary.git", exact: "0.9.0"),
         .package(url: "https://github.com/elementary-swift/elementary-htmx.git", exact: "0.7.0"),
     ],
@@ -23,6 +24,7 @@ let package = Package(
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Elementary", package: "elementary"),
                 .product(name: "ElementaryHTMX2", package: "elementary-htmx"),
             ],
@@ -33,6 +35,7 @@ let package = Package(
             dependencies: [
                 .target(name: "App"),
                 .product(name: "VaporTesting", package: "vapor"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Elementary", package: "elementary"),
             ],
             resources: [.copy("Fixtures")],

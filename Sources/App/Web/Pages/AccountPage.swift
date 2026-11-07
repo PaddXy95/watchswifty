@@ -7,6 +7,8 @@ struct AccountPage: HTML {
     let error: String?
     let notice: String?
     var followed: [FollowedSeries] = []
+    /// A token is stored but cannot be decrypted (server key changed).
+    var tokenUnreadable = false
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -22,6 +24,8 @@ struct AccountPage: HTML {
             }
             if let tokenSuffix {
                 p { "Hinterlegt: \(tokenSuffix)" }
+            } else if tokenUnreadable {
+                p(.class("error")) { "Token nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
             } else {
                 p { "Kein TMDB-Token hinterlegt." }
             }

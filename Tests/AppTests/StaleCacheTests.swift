@@ -21,7 +21,7 @@ struct StaleCacheTests {
     }
 
     func worker(_ app: Application, _ tmdb: FakeTMDBClient) -> MatchingWorker {
-        MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: false)
+        MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, cipher: app.tokenCipher, enabled: false)
     }
 
     @Test func staleCacheIsRefreshedWhenRowsDoNotMatch() async throws {

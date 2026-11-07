@@ -24,10 +24,27 @@ extension Application {
     }
 }
 
+extension Application {
+    private struct TokenCipherKey: StorageKey { typealias Value = TokenCipher }
+
+    var tokenCipher: TokenCipher {
+        get {
+            guard let cipher = storage[TokenCipherKey.self] else { fatalError("Token cipher not configured") }
+            return cipher
+        }
+        set { storage[TokenCipherKey.self] = newValue }
+    }
+}
+
 extension Request {
+    /// The logged-in user's decrypted TMDB token (nil without one or when it cannot be decrypted).
+    var tmdbToken: String? {
+        application.tokenCipher.open(auth.get(User.self)?.tmdbToken)
+    }
+
     /// TMDB client for the logged-in user's own token (calls fail with `.missingToken` without one).
     var tmdb: any TMDBClient {
-        guard let token = auth.get(User.self)?.tmdbToken, !token.isEmpty else { return MissingTokenTMDBClient() }
+        guard let token = tmdbToken else { return MissingTokenTMDBClient() }
         return application.tmdbProvider.make(token)
     }
 }

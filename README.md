@@ -19,11 +19,19 @@ Repository: https://github.com/PaddXy95/watchswifty
 Die GitHub Action baut bei jedem Push auf `main` das Image `ghcr.io/paddxy95/watchswifty:latest`.
 
 1. `docker-compose.yml` aus diesem Repository auf den Server kopieren (oder das Repo klonen).
-2. Ersten Admin festlegen und starten:
+2. Schlüssel für die TMDB-Tokens erzeugen und sicher aufbewahren (z. B. im Passwortmanager), dann den ersten
+   Admin festlegen und starten:
 
    ```bash
-   ADMIN_USERNAME=admin ADMIN_PASSWORD='ein-langes-passwort' docker compose up -d
+   openssl rand -base64 32
    ```
+
+   ```bash
+   TOKEN_KEY='<ausgabe von oben>' ADMIN_USERNAME=admin ADMIN_PASSWORD='ein-langes-passwort' docker compose up -d
+   ```
+
+   Den `TOKEN_KEY` bei jedem `docker compose up` mitgeben, am einfachsten in einer `.env`-Datei neben der
+   `docker-compose.yml` (`TOKEN_KEY=…`). Siehe [TMDB-Tokens verschlüsselt](#tmdb-tokens-verschlüsselt).
 
 3. Im Browser `http://<server>:8080` öffnen und mit dem Admin anmelden.
 4. Unter **Konto** den eigenen TMDB-Token hinterlegen (siehe unten).
@@ -54,6 +62,7 @@ docker run -d --name watchswifty --restart unless-stopped \
   -p 8080:8080 \
   -v watchswifty-data:/data \
   -e TZ=Europe/Berlin \
+  -e TOKEN_KEY='<openssl rand -base64 32>' \
   -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD='ein-langes-passwort' \
   ghcr.io/paddxy95/watchswifty:latest
 ```
@@ -122,7 +131,22 @@ Jeder Benutzer hinterlegt unter **Konto** seinen eigenen kostenlosen TMDB *Read 
 5. In WatchSwifty unter **Konto** einfügen und speichern.
  Ohne Token funktionieren Suche und Netflix-Zuordnung nicht;
 bereits bekannte Titel, Weiterschauen, Verlauf und Bibliothek schon. Der Token wird beim Speichern bei
-TMDB geprüft und danach nur noch mit den letzten vier Zeichen angezeigt – auch Admins sehen ihn nicht.
+TMDB geprüft, verschlüsselt gespeichert und danach nur noch mit den letzten vier Zeichen angezeigt – auch
+Admins sehen ihn nicht.
+
+### TMDB-Tokens verschlüsselt
+
+Die Tokens liegen mit AES-GCM verschlüsselt in der Datenbank. Eine abhandengekommene Datenbankdatei oder ein
+SQLite-Backup enthält sie damit nicht lesbar. Der Schlüssel kommt aus:
+
+1. `TOKEN_KEY` – 32 Byte als Base64 (`openssl rand -base64 32`), **empfohlen**;
+2. sonst `TOKEN_KEY_FILE` – Pfad zu einer Datei mit diesem Wert (z. B. ein Docker-Secret);
+3. sonst wird beim ersten Start `token.key` neben der Datenbank im Volume erzeugt (Hinweis im Log). Das schützt
+   ein reines SQLite-Backup, aber nicht eine Kopie des ganzen Volumes.
+
+Schlüssel getrennt von den Daten aufbewahren. Geht er verloren oder ändert er sich, sind die gespeicherten
+Tokens nicht mehr lesbar: jeder trägt seinen Token unter **Konto** neu ein, alle anderen Daten bleiben erhalten.
+Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
 
 ## Netflix-Verlauf importieren
 
@@ -142,14 +166,18 @@ Ein erneuter Import desselben (oder eines neueren) Exports legt keine Duplikate 
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | nur erster Start | Erster Admin (Passwort mindestens 8 Zeichen) |
 | `TZ` | empfohlen | Zeitzone für „heute“, z. B. `Europe/Berlin` |
 | `TMDB_LANGUAGE` | nein | Sprache der TMDB-Daten, Standard `de-DE` |
+| `TOKEN_KEY` | empfohlen | Schlüssel für die gespeicherten TMDB-Tokens (Base64, 32 Byte) |
+| `TOKEN_KEY_FILE` | nein | Datei mit dem Schlüssel statt `TOKEN_KEY` (z. B. Docker-Secret) |
 | `PUBLIC_ORIGIN` | nein | Öffentliche Adresse(n) hinter einem Reverse-Proxy, kommagetrennt, z. B. `https://nas.lan:8443` |
 | `DATABASE_PATH` | nein | Standard `/data/watchswifty.sqlite` |
 | `HOST` / `PORT` | nein | Standard `0.0.0.0` / `8080` |
 
 ## Backup und Wiederherstellung
 
-Alle Daten liegen in einer SQLite-Datei im Volume (`/data/watchswifty.sqlite`). Die Datei enthält die
-TMDB-Tokens der Benutzer im Klartext – Backups entsprechend geschützt aufbewahren.
+Alle Daten liegen in einer SQLite-Datei im Volume (`/data/watchswifty.sqlite`). Die TMDB-Tokens darin sind
+verschlüsselt; Verlauf, Bewertungen und Kommentare nicht – Backups entsprechend geschützt aufbewahren. Ohne
+`TOKEN_KEY` liegt der Schlüssel als `/data/token.key` im Volume; ihn bei Bedarf mitsichern, sonst müssen die
+Tokens nach einer Wiederherstellung neu eingetragen werden.
 
 Backup (Container kurz stoppen, damit die Datei konsistent ist):
 

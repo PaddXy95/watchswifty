@@ -2,10 +2,12 @@ import Foundation
 
 enum ConfigError: Error, Equatable, CustomStringConvertible {
     case missing(String)
+    case invalid(String)
 
     var description: String {
         switch self {
         case .missing(let name): "Fehlende Umgebungsvariable: \(name)"
+        case .invalid(let message): message
         }
     }
 }
@@ -24,6 +26,9 @@ struct AppConfig: Sendable {
     var today: @Sendable () -> String = { CalendarDay.today() }
     /// Extra origins accepted by the CSRF check (behind reverse proxies), e.g. `https://nas.lan:8443`.
     var publicOrigins: [String] = []
+    /// Server key for the stored TMDB tokens (`TOKEN_KEY`, Base64) or a file holding it (`TOKEN_KEY_FILE`).
+    var tokenKey: String? = nil
+    var tokenKeyFile: String? = nil
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
@@ -40,7 +45,9 @@ struct AppConfig: Sendable {
             loginFailureDelay: .seconds(1),
             backgroundJobsEnabled: true,
             publicOrigins: (value("PUBLIC_ORIGIN") ?? "").split(separator: ",").map { OriginCheckMiddleware.normalizeOrigin(String($0)) }
-                .filter { !$0.isEmpty }
+                .filter { !$0.isEmpty },
+            tokenKey: value("TOKEN_KEY"),
+            tokenKeyFile: value("TOKEN_KEY_FILE")
         )
     }
 

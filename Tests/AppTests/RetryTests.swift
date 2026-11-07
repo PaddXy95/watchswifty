@@ -25,7 +25,7 @@ struct RetryTests {
             for user in [alice, bob] {
                 _ = try await ImportService(db: app.db).ingest(text: try fixtureText(), filename: "a.csv", userID: user.requireID())
             }
-            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { $0 == "broken" ? broken : good }, logger: app.logger, enabled: false)
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { $0 == "broken" ? broken : good }, logger: app.logger, cipher: app.tokenCipher, enabled: false)
             _ = try await worker.processAll()
             #expect(try await worker.lastError(for: alice.requireID())?.hasPrefix("Zuordnung fehlgeschlagen") == true)
             let bobMentalist = try await NetflixRow.query(on: app.db).filter(\.$user.$id == bob.requireID()).all()
@@ -61,7 +61,7 @@ struct RetryTests {
         try await withTestApp(tmdb: tmdb) { app in
             let user = try await createUser(app, "pat")
             _ = try await ImportService(db: app.db).ingest(text: try fixtureText(), filename: "a.csv", userID: user.requireID())
-            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, enabled: true,
+            let worker = MatchingWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, logger: app.logger, cipher: app.tokenCipher, enabled: true,
                                         retryDelay: .milliseconds(100))
             await worker.kick()
             var sawError = false

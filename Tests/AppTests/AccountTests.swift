@@ -74,7 +74,8 @@ struct AccountTokenTests {
             })
             #expect(tmdb.calls.contains("validate"))
             let reloaded = try await User.find(user.requireID(), on: app.db)
-            #expect(reloaded?.tmdbToken == "eyJsecret-token-abcd")
+            #expect(reloaded?.tmdbToken?.hasPrefix("enc:v1:") == true)   // encrypted at rest
+            #expect(app.tokenCipher.open(reloaded?.tmdbToken) == "eyJsecret-token-abcd")
         }
     }
 

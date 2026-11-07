@@ -21,7 +21,8 @@ struct SearchController {
     }
 
     private func hasToken(_ req: Request) throws -> Bool {
-        !(try req.currentUser.tmdbToken ?? "").isEmpty
+        _ = try req.currentUser
+        return req.tmdbToken != nil
     }
 
     private func search(_ req: Request, _ rawQuery: String) async throws -> [SearchResultModel] {

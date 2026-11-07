@@ -6,3 +6,6 @@
 DerivedData/
 .DS_Store
 .dev/
+
+# Server key for TMDB tokens (created next to a local dev database)
+token.key

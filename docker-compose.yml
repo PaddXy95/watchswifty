@@ -12,6 +12,8 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       TZ: Europe/Berlin
+      # Schlüssel für die gespeicherten TMDB-Tokens (openssl rand -base64 32). Leer = token.key im Volume.
+      TOKEN_KEY: ${TOKEN_KEY:-}
     volumes:
       - watchswifty-data:/data
 

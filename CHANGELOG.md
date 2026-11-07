@@ -20,7 +20,8 @@ Erste Version.
 - **Verlauf** und **Bibliothek** mit Filter und Sortierung.
 - **Statistik:** Filme, Serien, Folgen und verbrachte Zeit (TMDB-Laufzeiten) – insgesamt, pro Jahr und Monat
   sowie nach Bewertung.
-- **Benutzer:** mehrere Konten mit getrennten Daten, Admin-Verwaltung, eigener TMDB-Token pro Benutzer.
+- **Benutzer:** mehrere Konten mit getrennten Daten, Admin-Verwaltung, eigener TMDB-Token pro Benutzer
+  (in der Datenbank mit AES-GCM verschlüsselt, Schlüssel über `TOKEN_KEY`).
 - **Oberfläche:** WatchSwifty-Branding, Smartphone-Layout mit Burger-Menü, Ladebalken und Lade-Animation auf Kacheln,
   deutsche Fehlerseiten.
 - **Betrieb:** Docker-Image über GitHub Actions (`ghcr.io/paddxy95/watchswifty`), Compose-Datei, SQLite-Datenbank im

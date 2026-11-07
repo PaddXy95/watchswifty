@@ -16,11 +16,11 @@ func seriesDueForRefresh(on db: any Database) async throws -> [Title] {
 }
 
 /// Token of a user who has the series visible in their library (nil if nobody with a token does).
-func refreshToken(for titleID: UUID, on db: any Database) async throws -> String? {
+func refreshToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
     let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID).filter(\.$hidden == false).all().map(\.$user.id)
     guard !owners.isEmpty else { return nil }
     return try await User.query(on: db).filter(\.$id ~~ owners).filter(\.$tmdbToken != nil).all()
-        .compactMap(\.tmdbToken).first { !$0.isEmpty }
+        .lazy.compactMap { cipher.open($0.tmdbToken) }.first
 }
 
 /// Watched titles cached before runtimes were stored (`runtime == nil`), sorted by TMDB id.
@@ -32,15 +32,15 @@ func titlesMissingRuntime(on db: any Database) async throws -> [Title] {
 }
 
 /// Token of any user who watched the title (nil if none of them stored one).
-func backfillToken(for titleID: UUID, on db: any Database) async throws -> String? {
+func backfillToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
     let watchers = try await Watch.query(on: db).filter(\.$title.$id == titleID).unique().all(\.$user.$id)
     guard !watchers.isEmpty else { return nil }
     return try await User.query(on: db).filter(\.$id ~~ watchers).filter(\.$tmdbToken != nil).sort(\.$username).all()
-        .compactMap(\.tmdbToken).first { !$0.isEmpty }
+        .lazy.compactMap { cipher.open($0.tmdbToken) }.first
 }
 
 /// Loads runtimes for watched titles that lack them (one refresh each); returns how many were refreshed.
-func backfillRuntimes(db: any Database, provider: TMDBProvider, logger: Logger) async -> Int {
+func backfillRuntimes(db: any Database, provider: TMDBProvider, cipher: TokenCipher, logger: Logger) async -> Int {
     let titles: [Title]
     do { titles = try await titlesMissingRuntime(on: db) } catch {
         logger.warning("Laufzeiten: Abfrage fehlgeschlagen: \(error)")
@@ -50,7 +50,7 @@ func backfillRuntimes(db: any Database, provider: TMDBProvider, logger: Logger) 
     for title in titles {
         if Task.isCancelled { break }
         do {
-            guard let token = try await backfillToken(for: title.requireID(), on: db) else { continue }
+            guard let token = try await backfillToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
             try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
             refreshed += 1
         } catch {
@@ -69,10 +69,11 @@ struct DailyRefreshLifecycle: LifecycleHandler {
         let provider = application.tmdbProvider
         let worker = application.matchingWorker
         let logger = application.logger
+        let cipher = application.tokenCipher
         application.storage[TaskKey.self] = Task {
             try? await Task.sleep(for: .seconds(60))
             while !Task.isCancelled {
-                let filled = await backfillRuntimes(db: db, provider: provider, logger: logger)
+                let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
                 if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
                 do {
                     let due = try await seriesDueForRefresh(on: db)
@@ -80,7 +81,7 @@ struct DailyRefreshLifecycle: LifecycleHandler {
                     for title in due {
                         if Task.isCancelled { break }
                         do {
-                            guard let token = try await refreshToken(for: title.requireID(), on: db) else { continue }
+                            guard let token = try await refreshToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
                             try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
                             requeued += try await requeueUnmatchedRows(titleID: title.requireID(), on: db)
                         } catch {

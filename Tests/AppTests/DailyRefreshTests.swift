@@ -83,9 +83,9 @@ struct RefreshTokenTests {
             let ws = WatchService(db: app.db)
             try await ws.setHidden(userID: hiddenOwner.requireID(), titleID: show.requireID(), hidden: true)
             try await ws.setHidden(userID: noToken.requireID(), titleID: show.requireID(), hidden: false)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db) == nil)
+            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == nil)
             try await ws.setHidden(userID: visible.requireID(), titleID: show.requireID(), hidden: false)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db) == "visible-token")
+            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "visible-token")
         }
     }
 }

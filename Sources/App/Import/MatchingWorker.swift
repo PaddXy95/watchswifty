@@ -13,6 +13,7 @@ struct MatchingRunResult: Sendable, Equatable {
 actor MatchingWorker {
     private let db: any Database
     private let provider: TMDBProvider
+    private let cipher: TokenCipher
     private let logger: Logger
     private let enabled: Bool
     /// Shared with MappingService so user decisions and worker writes never interleave.
@@ -32,10 +33,11 @@ actor MatchingWorker {
     static let staleCacheAge: TimeInterval = 3600
     private var rerunRequested = false
 
-    init(db: any Database, provider: TMDBProvider, logger: Logger, enabled: Bool, lock: AsyncMutex = AsyncMutex(),
+    init(db: any Database, provider: TMDBProvider, logger: Logger, cipher: TokenCipher, enabled: Bool, lock: AsyncMutex = AsyncMutex(),
          retryDelay: Duration = .seconds(300)) {
         self.db = db
         self.provider = provider
+        self.cipher = cipher
         self.logger = logger
         self.enabled = enabled
         self.lock = lock
@@ -191,7 +193,7 @@ actor MatchingWorker {
         var changed = false
         let byUser = Dictionary(grouping: pending, by: { $0.$user.id })
         for (userID, mappings) in byUser where !failedThisRun.contains(userID) {
-            guard let token = try await User.find(userID, on: db)?.tmdbToken, !token.isEmpty else {
+            guard let token = cipher.open(try await User.find(userID, on: db)?.tmdbToken) else {
                 fail(userID, TMDBError.missingToken.description)
                 continue
             }
@@ -318,7 +320,7 @@ actor MatchingWorker {
         if mapping.titleKind == .tv, matches.contains(where: \.isEmpty), !refreshAttempted.contains(titleID),
            let title = try await Title.find(titleID, on: db),
            (title.refreshedAt.map { Date().timeIntervalSince($0) > Self.staleCacheAge } ?? true),
-           let token = try await User.find(mapping.$user.id, on: db)?.tmdbToken, !token.isEmpty {
+           let token = cipher.open(try await User.find(mapping.$user.id, on: db)?.tmdbToken) {
             refreshAttempted.insert(titleID)
             do {
                 try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
