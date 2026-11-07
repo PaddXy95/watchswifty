@@ -78,3 +78,4 @@ summary { cursor: pointer; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+.inline-form { display: inline-flex; gap: var(--space-1); margin: 0 var(--space-2) var(--space-1) 0; }

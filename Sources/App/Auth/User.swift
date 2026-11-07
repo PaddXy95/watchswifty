@@ -37,3 +37,10 @@ extension Request {
         get throws { try currentUser.requireID() }
     }
 }
+
+extension Request {
+    func nav(_ item: NavItem) throws -> NavContext {
+        let user = try currentUser
+        return NavContext(username: user.username, isAdmin: user.isAdmin, active: item)
+    }
+}

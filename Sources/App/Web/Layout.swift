@@ -26,6 +26,8 @@ struct PageLayout<Content: HTML>: HTMLDocument {
 
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
+        // Swap 422 responses (validation messages) like successes; other errors are not swapped.
+        meta(.name("htmx-config"), .content(#"{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}"#))
         link(.rel(.stylesheet), .href("/css/app.css"))
         script(.src("/js/htmx.min.js")) {}
     }

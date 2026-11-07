@@ -10,4 +10,6 @@ func routes(_ app: Application) throws {
         let user = try req.currentUser
         return HTMLResponse(ContinuePlaceholderPage(nav: .init(username: user.username, isAdmin: user.isAdmin, active: .continueWatching)))
     }
+    AdminUsersController().register(on: protected)
+    AccountController().register(on: protected)
 }
