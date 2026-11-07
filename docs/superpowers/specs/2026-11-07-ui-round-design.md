@@ -90,3 +90,19 @@ Platzierung der Kommentar-Felder im Detail.
 - Ergebnis wird gespeichert (letzte Prüfung, neueste Version, Link zu den Release-Notes, Fehler). Ist eine neuere
   Version da, zeigt die Seite die Update-Befehle und der Footer zeigt Admins „Update auf vX.Y.Z verfügbar“. [Vorschlag]
 - Aktualisieren bleibt Handarbeit (`docker compose pull && docker compose up -d`); die App tauscht sich nicht selbst aus.
+
+## Nachtrag: Import einer eigenen Filmliste (CSV aus Numbers) [entschieden]
+Vorlage: Nutzer-Tabelle mit Kopfzeile `;Filmname;Erscheinungsjahr;Genre;Datum;Mit Ela;Mit Martin;Streamingdienst;
+Übeltäter;Bewertung;Detail;Bemerkung`, Gruppenzeilen „5 ★“ usw. (ohne Filmname), Häkchen als WAHR/FALSCH,
+Datum wie „Mo., 1. Jan. 2024“, Bewertung in Sternen (0,5–5) und „Detail“ 0–100.
+- „Mit …“-Spalten, „Übeltäter“ und „Bemerkung“ landen im Kommentar zum Film. [entschieden]
+- Bewertung: „Detail“ 0–100 → 1–10 (gerundet, mindestens 1, weil die App 1–10 kennt); fehlt sie, Sterne × 2. [entschieden, Rundung Vorschlag]
+- Steht ein Film mehrfach mit Datum drin, wird jede Zeile eine Sichtung mit ihrem Datum. [entschieden]
+- [Vorschlag] Eigene Seite „Filmliste“ (`/import/films`, verlinkt von „Import“). Die Zuordnung zu TMDB läuft im
+  Hintergrund mit dem eigenen Token (Titel + Erscheinungsjahr ±1; eindeutiger Treffer → automatisch). Unklare Filme
+  erscheinen mit Vorschlägen („Titel (Jahr) · Übernehmen“), anderem Suchbegriff oder „Überspringen“.
+- [Vorschlag] Kommentar: „Mit Ela und Martin“, „Übeltäter: Patrick“, Bemerkung – je Zeile; bei mehreren Zeilen mit
+  Datum davor. Vorhandener Kommentar wird ergänzt, nicht ersetzt. Dienste: Netflix, Amazon Prime → Prime Video,
+  Disney+, AppleTV+, WowTV → WOW, Gekauft, Kino; Unbekanntes (YouTube, Geliehen) → Sonstiges.
+- [Vorschlag] Erneuter Import legt keine doppelten Sichtungen an (gleicher Film, Datum ±1 Tag bzw. schon eine ohne
+  Datum). Unlesbare/zukünftige Daten → Sichtung ohne Datum.

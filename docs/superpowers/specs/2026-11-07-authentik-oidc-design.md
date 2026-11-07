@@ -10,6 +10,9 @@ statt für die App eigene Passwörter zu pflegen.
 1. **OpenID Connect direkt in der App** (Authorization Code Flow), kein Forward-Auth über den Reverse-Proxy.
 2. **Beide Logins:** Passwort-Login bleibt, ist aber per `PASSWORD_LOGIN=false` abschaltbar.
 3. **Signatur des ID-Tokens prüfen** über Authentiks öffentliche Schlüssel (JWKS) mit `jwt-kit` (Vapor).
+4. **Eine Adresse für Authentik:** Der WatchSwifty-Container erreicht Authentik unter derselben
+   https-Adresse wie der Browser, mit öffentlich vertrauenswürdigem Zertifikat. `OIDC_ISSUER` reicht; die
+   Endpunkte aus der Discovery werden unverändert genutzt.
 
 ## Ziele, Nicht-Ziele, Anti-Ziele
 
@@ -23,7 +26,8 @@ statt für die App eigene Passwörter zu pflegen.
 - Abmelden bei Authentik (Single Logout): „Abmelden“ beendet nur die WatchSwifty-Sitzung.
 - Admin-Rechte aus Authentik-Gruppen: bleiben in der App unter **Benutzer**.
 - Mehrere Login-Anbieter gleichzeitig; Abgleich von Name/E-Mail aus Authentik.
-- Verknüpfung wieder lösen.
+- Verknüpfung über die Oberfläche wieder lösen (nur per Container-Befehl, s. Notausgang).
+- Getrennte interne Adresse für Authentik oder Zertifikate einer eigenen CA.
 - Sitzung sofort beenden, wenn ein Benutzer in Authentik gesperrt wird: die WatchSwifty-Sitzung
   läuft wie heute bis zu 30 Tage weiter.
 
@@ -45,7 +49,9 @@ statt für die App eigene Passwörter zu pflegen.
 
 1. **Login-Seite:** Ist OIDC konfiguriert, Button „Mit {OIDC_NAME} anmelden“ (Standard „Mit Authentik
    anmelden“). Das Passwortformular erscheint nur, wenn der Passwort-Login an ist.
-2. **`GET /auth/oidc/start`:** erzeugt `state`, `nonce` und einen PKCE-`code_verifier` (S256), legt sie in
+2. **`GET /auth/oidc/start`:** Kommt die Anfrage nicht über die Adresse der Rücksprung-URL (z. B.
+   `http://<server>:8080` statt der Proxy-Adresse), leitet die App zuerst auf `/auth/oidc/start` unter
+   dieser Adresse um – sonst fehlt beim Rücksprung das Session-Cookie mit `state`. Danach erzeugt sie `state`, `nonce` und einen PKCE-`code_verifier` (S256), legt sie in
    der Session ab und leitet zum `authorization_endpoint` weiter (`response_type=code`,
    `scope=openid profile`, `redirect_uri`, `code_challenge`).
 3. **`GET /auth/oidc/callback`:**
@@ -127,6 +133,21 @@ statt für die App eigene Passwörter zu pflegen.
 | Benutzername vergeben, Konto nicht verknüpft | s. Ablauf 4.3 |
 | `sub` gehört beim Verknüpfen schon einem anderen Konto | „Dieses Authentik-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.“ (auf der Konto-Seite) |
 
+## Notausgang bei Aussperrung
+
+Ändert sich die `sub` eines Kontos (Authentik-Benutzer neu angelegt, Subject-Modus geändert, Authentik neu
+installiert) oder wurde `PASSWORD_LOGIN=false` gesetzt, bevor ein Konto verknüpft war, kommt man über die
+Oberfläche nicht mehr hinein. Dafür zwei Befehle im Container (Vapor-Commands):
+
+- `docker exec -it watchswifty App unlink-oidc <benutzername>` – löst die Authentik-Verknüpfung; beim
+  nächsten Login lässt sich das Konto neu verknüpfen (bzw. mit Passwort anmelden, falls vorhanden).
+- `docker exec -it watchswifty App set-password <benutzername>` – setzt ein Passwort (Eingabe verdeckt
+  über stdin, mind. 8 Zeichen); hilft zusammen mit vorübergehend `PASSWORD_LOGIN=true`.
+
+Ist der Passwort-Login aus, lautet die Meldung bei vergebenem, nicht verknüpftem Benutzernamen statt
+„Mit Passwort anmelden …“: „Es gibt schon ein Konto „x“, das nicht mit Authentik verknüpft ist. Bitte den
+Admin fragen.“ README beschreibt beide Befehle.
+
 ## Datenmodell
 
 - `users.oidc_subject` (Text, optional, eindeutig). Neue Migration; in SQLite die Eindeutigkeit als
@@ -163,6 +184,9 @@ statt für die App eigene Passwörter zu pflegen.
 - Ungültiger Authentik-Benutzername → Meldung statt automatischer Umwandlung.
 - Nur RS256/ES256, kein HS256.
 - Erster Authentik-Login wird Admin, wenn es noch keinen Benutzer gibt.
+- Login über eine andere Adresse als die Rücksprung-URL: erst auf diese Adresse umleiten (statt mehrere
+  Rücksprung-URLs in Authentik zu pflegen).
+- Notausgang über zwei Container-Befehle (`unlink-oidc`, `set-password`) statt Reparatur der Datenbank von Hand.
 
 ## Dem Builder überlassen
 
