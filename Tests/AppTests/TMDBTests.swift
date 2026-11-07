@@ -140,3 +140,11 @@ struct TMDBIMDbTests {
         #expect(try LiveTMDBClient.decodeExternalIDs(Data(#"{"id":1,"imdb_id":""}"#.utf8)) == nil)
     }
 }
+
+@Suite("TMDBEpisodeOverview")
+struct TMDBEpisodeOverviewTests {
+    @Test func decodesEpisodeOverview() throws {
+        let episodes = try LiveTMDBClient.decodeSeason(Data(#"{"episodes":[{"id":1,"episode_number":1,"season_number":1,"name":"Pilot","air_date":"2008-09-23","overview":"Jane hilft dem CBI."},{"id":2,"episode_number":2,"season_number":1,"name":"Zwei","overview":""}]}"#.utf8))
+        #expect(episodes.map(\.overview) == ["Jane hilft dem CBI.", nil])
+    }
+}

@@ -156,10 +156,13 @@ struct LiveTMDBClient: TMDBClient {
     }
 
     static func decodeSeason(_ data: Data) throws -> [TMDBEpisode] {
-        struct Episode: Decodable { let id: Int; let episode_number: Int; let season_number: Int; let name: String?; let air_date: String? }
+        struct Episode: Decodable {
+            let id: Int; let episode_number: Int; let season_number: Int; let name: String?; let air_date: String?; let overview: String?
+        }
         struct Season: Decodable { let episodes: [Episode]? }
         return try (JSONDecoder().decode(Season.self, from: data).episodes ?? []).map {
-            TMDBEpisode(id: $0.id, season: $0.season_number, number: $0.episode_number, name: $0.name ?? "", airDate: blankToNil($0.air_date))
+            TMDBEpisode(id: $0.id, season: $0.season_number, number: $0.episode_number, name: $0.name ?? "", airDate: blankToNil($0.air_date),
+                        overview: blankToNil($0.overview))
         }
     }
 

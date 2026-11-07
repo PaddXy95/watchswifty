@@ -351,3 +351,44 @@ struct OverviewPagesTests {
         }
     }
 }
+
+@Suite("EpisodeOverviewPages")
+struct EpisodeOverviewPagesTests {
+    static func fake() -> FakeTMDBClient {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 7, name: "Mit Folgentexten", originalName: nil, year: nil, posterPath: nil, status: nil,
+                                  seasonNumbers: [1], overview: "Serie."), episodes: [:])
+        tmdb.setSeason(seriesID: 7, number: 1, [
+            TMDBEpisode(id: 71, season: 1, number: 1, name: "Pilot", airDate: "2020-01-01", overview: "Die erste Folge erzählt alles."),
+            TMDBEpisode(id: 72, season: 1, number: 2, name: "Bald", airDate: "2999-01-01", overview: "Kommt noch."),
+        ])
+        return tmdb
+    }
+
+    @Test func seriesPageShowsEpisodeOverview() async throws {
+        try await withTestApp(tmdb: Self.fake()) { app in
+            try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/7", headers: headers) { res async in
+                #expect(res.body.string.contains("Die erste Folge erzählt alles."))
+                #expect(res.body.string.contains("Kommt noch."))   // unaired episodes show their text too
+            }
+        }
+    }
+
+    @Test func missingEpisodeOverviewsTriggerOneRefresh() async throws {
+        let tmdb = Self.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            try await createUser(app, "pat")
+            let title = try await seedSeries(app, tmdbID: 7, name: "Mit Folgentexten", seasons: [1: 2])
+            title.overview = "Serie."   // title already has its overview, episodes do not
+            try await title.save(on: app.db)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/tv/7", headers: headers) { res async in
+                #expect(res.body.string.contains("Die erste Folge erzählt alles."))
+            }
+            try await app.testing().test(.GET, "/tv/7", headers: headers) { _ async in }
+            #expect(tmdb.calls.filter { $0 == "series:7" }.count == 1)
+        }
+    }
+}

@@ -83,12 +83,17 @@ struct EpisodeRow: HTML {
                     model.info.airDate.map { "erscheint \(CalendarDay.display($0))" } ?? "noch nicht erschienen"
                 }
             }
-            if model.aired {
+            if model.aired || !(model.info.overview ?? "").isEmpty {
                 details(.class("episode-menu")) {
                     summary { "Details" }
-                    WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
-                              rewatch: model.watched, today: today, defaultService: defaultService)
-                    button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+                    if let overview = model.info.overview, !overview.isEmpty {
+                        p(.class("episode-overview")) { overview }
+                    }
+                    if model.aired {
+                        WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
+                                  rewatch: model.watched, today: today, defaultService: defaultService)
+                        button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+                    }
                 }
             }
         }

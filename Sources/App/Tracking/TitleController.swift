@@ -195,7 +195,10 @@ struct TitleController {
     /// Failures (no token, TMDB down) only log – the cached data is shown.
     private func refreshForDetails(_ req: Request, _ title: Title) async {
         do {
-            if title.overview == nil {
+            let episodesMissingOverview = title.titleKind == .tv
+                ? try await Episode.query(on: req.db).filter(\.$title.$id == title.requireID()).filter(\.$overview == nil).count() > 0
+                : false
+            if title.overview == nil || episodesMissingOverview {
                 try await req.catalog.refresh(title)
             } else {
                 try await req.catalog.refreshIfStale(title)

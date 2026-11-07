@@ -12,6 +12,8 @@ final class Episode: Model, @unchecked Sendable {
     @Field(key: "name") var name: String
     @OptionalField(key: "air_date") var airDate: String?
     @Field(key: "tmdb_episode_id") var tmdbEpisodeID: Int
+    /// TMDB overview of the episode; "" = none, nil = not fetched yet.
+    @OptionalField(key: "overview") var overview: String?
 
     init() {}
 

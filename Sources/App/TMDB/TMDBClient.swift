@@ -30,6 +30,7 @@ struct TMDBEpisode: Sendable, Equatable {
     let number: Int
     let name: String
     let airDate: String?
+    var overview: String? = nil
 }
 
 struct TMDBMovie: Sendable, Equatable {

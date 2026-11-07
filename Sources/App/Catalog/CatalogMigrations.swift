@@ -52,3 +52,13 @@ struct AddTitleDetails: AsyncMigration {
         try await database.schema(Title.schema).deleteField("overview").update()
     }
 }
+
+struct AddEpisodeOverview: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(Episode.schema).field("overview", .string).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(Episode.schema).deleteField("overview").update()
+    }
+}

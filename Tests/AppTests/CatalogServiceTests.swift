@@ -135,3 +135,21 @@ struct CatalogIMDbTests {
         }
     }
 }
+
+@Suite("CatalogEpisodeOverview")
+struct CatalogEpisodeOverviewTests {
+    @Test func refreshStoresEpisodeOverview() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 1, name: "S", originalName: nil, year: nil, posterPath: nil, status: nil, seasonNumbers: [1]), episodes: [:])
+        tmdb.setSeason(seriesID: 1, number: 1, [
+            TMDBEpisode(id: 11, season: 1, number: 1, name: "Pilot", airDate: "2020-01-01", overview: "Es beginnt."),
+            TMDBEpisode(id: 12, season: 1, number: 2, name: "Zwei", airDate: "2020-01-08"),
+        ])
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let title = try await catalog.title(kind: .tv, tmdbID: 1)
+            let episodes = try await catalog.episodes(of: title.requireID())
+            #expect(episodes.map(\.overview) == ["Es beginnt.", ""])
+        }
+    }
+}

@@ -197,3 +197,4 @@ summary { cursor: pointer; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   .search-result.htmx-request::after, .library-item.htmx-request::after, .continue-card.htmx-request::after { animation: none; border-color: var(--accent); }
 }
+.episode-overview { color: var(--ink-2); font-size: var(--text-sm); margin: var(--space-2) 0; max-width: 46rem; }

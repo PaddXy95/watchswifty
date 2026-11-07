@@ -71,15 +71,19 @@ struct CatalogService {
         var byKey = Dictionary(existing.map { ("\($0.season)/\($0.number)", $0) }, uniquingKeysWith: { first, _ in first })
         for item in fetched {
             let key = "\(item.season)/\(item.number)"
+            let overview = item.overview ?? ""
             if let episode = byKey[key] {
-                guard episode.name != item.name || episode.airDate != item.airDate || episode.tmdbEpisodeID != item.id else { continue }
+                guard episode.name != item.name || episode.airDate != item.airDate || episode.tmdbEpisodeID != item.id
+                    || episode.overview != overview else { continue }
                 episode.name = item.name
                 episode.airDate = item.airDate
                 episode.tmdbEpisodeID = item.id
+                episode.overview = overview
                 try await episode.save(on: db)
             } else {
                 let episode = Episode(titleID: titleID, season: item.season, number: item.number, name: item.name,
                                       airDate: item.airDate, tmdbEpisodeID: item.id)
+                episode.overview = overview
                 try await episode.save(on: db)
                 byKey[key] = episode
             }
