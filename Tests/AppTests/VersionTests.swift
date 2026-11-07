@@ -38,6 +38,16 @@ struct VersionTests {
         #expect(html.contains(AppVersion.current.label))
     }
 
+    /// Node 20 actions are deprecated on GitHub runners; these majors run on Node 24.
+    @Test func workflowUsesNode24Actions() throws {
+        let workflow = try String(contentsOfFile: ".github/workflows/docker.yml", encoding: .utf8)
+        for action in ["actions/checkout@v7", "actions/cache@v6", "docker/setup-buildx-action@v4",
+                       "docker/login-action@v4", "docker/build-push-action@v7"] {
+            #expect(workflow.contains(action), "\(action) missing")
+        }
+        #expect(!workflow.contains("@v3"))
+    }
+
     @Test func buildPassesVersion() throws {
         let dockerfile = try String(contentsOfFile: "Dockerfile", encoding: .utf8)
         #expect(dockerfile.contains("ARG APP_VERSION=dev"))
