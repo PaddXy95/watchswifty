@@ -27,3 +27,15 @@ extension Application {
 extension Request {
     var tmdb: any TMDBClient { application.tmdb }
 }
+
+extension Application {
+    private struct MatchingWorkerKey: StorageKey { typealias Value = MatchingWorker }
+
+    var matchingWorker: MatchingWorker {
+        get {
+            guard let worker = storage[MatchingWorkerKey.self] else { fatalError("MatchingWorker not configured") }
+            return worker
+        }
+        set { storage[MatchingWorkerKey.self] = newValue }
+    }
+}

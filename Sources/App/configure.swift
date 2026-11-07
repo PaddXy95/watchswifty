@@ -36,4 +36,9 @@ func configure(_ app: Application, config: AppConfig, tmdb: any TMDBClient) asyn
     try routes(app)
     try await app.autoMigrate()
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
+
+    app.matchingWorker = MatchingWorker(db: app.db, tmdb: tmdb, logger: app.logger, enabled: config.backgroundJobsEnabled)
+    if config.backgroundJobsEnabled {
+        app.lifecycle.use(MatchingWorkerLifecycle())
+    }
 }

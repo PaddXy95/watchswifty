@@ -67,6 +67,32 @@ struct WatchService {
         try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil))
     }
 
+    // MARK: Imported watches
+
+    /// Records a watch found in a Netflix export (§6.2 step 5): merges into a manual watch of the
+    /// same episode/movie with service Netflix or unknown that is dated within ±1 day (closest first)
+    /// or undated (takes the CSV date); otherwise inserts an import watch. Never unhides.
+    func recordImportedWatch(userID: UUID, titleID: UUID, episodeID: UUID?, day: String) async throws -> Watch {
+        _ = try await userTitle(userID: userID, titleID: titleID)
+        var query = watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$origin == WatchOrigin.manual.rawValue)
+        query = episodeID.map { id in query.filter(\.$episode.$id == id) } ?? query.filter(\.$episode.$id == nil)
+        let candidates = try await query.all().filter { $0.service == nil || $0.streamingService == .netflix }
+        let dated = candidates.compactMap { watch -> (Watch, Int)? in
+            guard let on = watch.watchedOn else { return nil }
+            let distance = abs(CalendarDay.daysBetween(on, day))
+            return distance <= 1 ? (watch, distance) : nil
+        }
+        if let (watch, _) = dated.min(by: { $0.1 < $1.1 }) { return watch }
+        if let undated = candidates.first(where: { $0.watchedOn == nil }) {
+            undated.watchedOn = day
+            try await undated.save(on: db)
+            return undated
+        }
+        let watch = Watch(userID: userID, titleID: titleID, episodeID: episodeID, watchedOn: day, service: .netflix, origin: .import)
+        try await watch.save(on: db)
+        return watch
+    }
+
     // MARK: Single watches
 
     func editWatch(userID: UUID, watchID: UUID, day: String?, service: StreamingService?) async throws {

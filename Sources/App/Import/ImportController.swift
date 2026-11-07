@@ -23,6 +23,7 @@ struct ImportController {
         }
         do {
             let summary = try await ImportService(db: req.db).ingest(text: text, filename: input.file.filename, userID: try req.userID)
+            await req.application.matchingWorker.kick()
             return HTMLResponse(ImportPage(nav: nav, summary: summary, error: nil))
         } catch NetflixCSVError.notNetflixHistory {
             return HTMLResponse(status: .unprocessableEntity, ImportPage(nav: nav, summary: nil, error: Self.notNetflixMessage))
