@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.1.2] – 2026-11-08
+
+### Neu
+- **TMDB-Bedingungen:** tägliche Cache-Pflege – jeder Titel wird spätestens nach 60 Tagen mit dem Token eines
+  Benutzers, der ihn nutzt, neu geholt; ungenutzte Titel werden gelöscht, alte Vorschlagslisten verworfen. Footer
+  rechts zeigt TMDB-Logo und -Hinweis (statt „GitHub“).
+
 ## [0.1.1] – 2026-11-07
 
 ### Neu
@@ -12,9 +19,6 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 - **Betrieb:** `docker-compose.yml` liest alle Einstellungen aus einer `.env` (Vorlage `.env.example`);
   ohne `TOKEN_KEY` startet Compose nicht.
 
-- **TMDB-Bedingungen:** tägliche Cache-Pflege – jeder Titel wird spätestens nach 60 Tagen mit dem Token eines
-  Benutzers, der ihn nutzt, neu geholt; ungenutzte Titel werden gelöscht, alte Vorschlagslisten verworfen. Footer
-  rechts zeigt TMDB-Logo und -Hinweis (statt „GitHub“).
 
 ### Behoben
 - Datenordner als Bind-Mount (z. B. `/home/docker/watchswifty:/data`): Der Container übergibt den Ordner beim
