@@ -15,6 +15,8 @@ tags:
   - name: Serien
   - name: Filme
   - name: Verlauf
+  - name: Bibliothek
+  - name: Statistik
 paths:
   /v1/version:
     get:
@@ -700,6 +702,57 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/library:
+    get:
+      operationId: getLibrary
+      tags: [Bibliothek]
+      summary: Gesehene, bewertete oder ausgeblendete Titel
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, tv, movie, hidden]
+            default: all
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [recent, rating, name]
+            default: recent
+      responses:
+        "200":
+          description: Titel
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LibraryEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/stats:
+    get:
+      operationId: getStats
+      tags: [Statistik]
+      summary: Filme, Serien, Folgen und Zeit – insgesamt, pro Jahr/Monat und nach Bewertung
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: year
+          in: query
+          description: Grenzt nur die Aufteilung nach Bewertung auf ein Jahr ein.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Statistik
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 components:
   parameters:
     TmdbID:
@@ -977,6 +1030,89 @@ components:
           description: Tag `yyyy-MM-dd`; fehlt er, ist die Sichtung danach ohne Datum.
         service:
           $ref: "#/components/schemas/Service"
+    LibraryEntry:
+      type: object
+      required: [kind, tmdbId, name, hidden]
+      properties:
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        rating:
+          type: integer
+        hidden:
+          type: boolean
+    Period:
+      type: object
+      required: [movies, series, episodes, minutes, unknownRuntime]
+      properties:
+        movies:
+          type: integer
+        series:
+          type: integer
+        episodes:
+          type: integer
+        minutes:
+          type: integer
+        unknownRuntime:
+          type: integer
+          description: Sichtungen ohne bekannte Laufzeit (nicht in `minutes`).
+    StatsMonth:
+      type: object
+      required: [month, stats]
+      properties:
+        month:
+          type: integer
+        stats:
+          $ref: "#/components/schemas/Period"
+    StatsYear:
+      type: object
+      required: [year, stats, months]
+      properties:
+        year:
+          type: integer
+        stats:
+          $ref: "#/components/schemas/Period"
+        months:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatsMonth"
+    RatingBucket:
+      type: object
+      required: [movies, series, minutes]
+      properties:
+        rating:
+          type: integer
+          description: 10 … 1; fehlt = ohne Bewertung
+        movies:
+          type: integer
+        series:
+          type: integer
+        minutes:
+          type: integer
+    Stats:
+      type: object
+      required: [total, undated, years, ratings, missingRuntimeTitles]
+      properties:
+        total:
+          $ref: "#/components/schemas/Period"
+        undated:
+          $ref: "#/components/schemas/Period"
+        years:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatsYear"
+        ratings:
+          type: array
+          items:
+            $ref: "#/components/schemas/RatingBucket"
+        missingRuntimeTitles:
+          type: integer
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
@@ -985,7 +1121,7 @@ components:
       properties:
         day:
           type: string
-          description: Tag `yyyy-MM-dd`; fehlt er, wird ohne Datum gespeichert.
+          description: Tag `yyyy-MM-dd`; fehlt er, gilt heute. (Ohne Datum markieren „bis hier“, Staffel und Serie.)
         service:
           type: string
           enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other, unknown]
