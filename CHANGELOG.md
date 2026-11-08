@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 ## [0.1.2] – 2026-11-08
 
 ### Neu
+- **Weiterschauen:** Button für den zuletzt genutzten Dienst statt nur „Auf Netflix suchen“ – Suche bei Netflix,
+  Prime Video, Apple TV+ und Paramount+; „Disney+ / HBO Max / WOW öffnen“ (dort gibt es ohne Login keine Websuche).
 - **TMDB-Bedingungen:** tägliche Cache-Pflege – jeder Titel wird spätestens nach 60 Tagen mit dem Token eines
   Benutzers, der ihn nutzt, neu geholt; ungenutzte Titel werden gelöscht, alte Vorschlagslisten verworfen. Footer
   rechts zeigt TMDB-Logo und -Hinweis (statt „GitHub“).

@@ -45,13 +45,16 @@ struct HomeHistoryLibraryTests {
         }
     }
 
-    @Test func netflixLinkOnlyWithNetflixData() async throws {
+    @Test func serviceButtonForLastStreamingService() async throws {
         try await withUser { app, user, headers in
-            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3])
-            try await mark(app, user, show, 1, 1, service: .disneyPlus)
+            let show = try await seedSeries(app, tmdbID: 1, name: "The Boys", seasons: [1: 3])
+            try await mark(app, user, show, 1, 1, service: .primeVideo)
             try await app.testing().test(.GET, "/", headers: headers) { res async in
-                #expect(res.body.string.contains("Weiter mit S01E02"))
-                #expect(!res.body.string.contains("Auf Netflix suchen"))
+                let body = res.body.string
+                #expect(body.contains("Weiter mit S01E02"))
+                #expect(body.contains(#"href="https://www.amazon.de/s?k=The%20Boys&amp;i=instant-video""#))
+                #expect(body.contains("Auf Prime Video suchen"))
+                #expect(!body.contains("Auf Netflix suchen"))
             }
         }
     }

@@ -2,12 +2,6 @@ import Elementary
 import ElementaryHTMX2
 import Foundation
 
-func netflixSearchURL(_ name: String) -> String {
-    var allowed = CharacterSet.alphanumerics
-    allowed.insert(charactersIn: "-._~")
-    return "https://www.netflix.com/search?q=" + (name.addingPercentEncoding(withAllowedCharacters: allowed) ?? name)
-}
-
 struct ContinueCardView: HTML {
     let card: ContinueCard
 
@@ -35,9 +29,9 @@ struct ContinueCardView: HTML {
                            .hx.vals(#"{"episodeID":"\#(card.next.id.uuidString)"}"#),
                            .hx.target("closest .card"), .hx.swap(.outerHTMLGuarded)) { "✓ gesehen" }
                     HiddenToggle(tmdbID: card.tmdbID, hidden: false, context: .card)
-                    if card.hasNetflixData {
-                        a(.class("button"), .href(netflixSearchURL(card.name)), .target(.blank),
-                          .custom(name: "rel", value: "noopener noreferrer"), .hx.boost(false)) { "Auf Netflix suchen" }
+                    if let link = card.watchService?.watchLink(for: card.name) {
+                        a(.class("button"), .href(link.url), .target(.blank),
+                          .custom(name: "rel", value: "noopener noreferrer"), .hx.boost(false)) { link.label }
                     }
                 }
             }

@@ -24,7 +24,7 @@ struct ContinueWatchingTests {
             #expect(result.first?.remaining == 2)
             #expect(result.first?.lastWatchedOn == "2026-11-05")
             #expect(result.first?.lastService == .netflix)
-            #expect(result.first?.hasNetflixData == true)
+            #expect(result.first?.watchService == .netflix)
         }
     }
 
@@ -80,13 +80,46 @@ struct ContinueWatchingTests {
         }
     }
 
-    @Test func netflixFlagFalseForOtherServices() async throws {
+    @Test func watchServiceFollowsLastStreamingService() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 4])
+            let mark = { (n: Int, day: String, service: StreamingService) in
+                _ = try await ws(app).markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, n).requireID(), day: day, service: service)
+            }
+            try await mark(1, "2026-11-01", .disneyPlus)
+            #expect(try await cards(app, user).first?.watchService == .disneyPlus)
+            try await mark(2, "2026-11-02", .netflix)
+            try await mark(3, "2026-11-03", .cinema)   // no streaming link: the latest service that has one counts
+            #expect(try await cards(app, user).first?.watchService == .netflix)
+        }
+    }
+
+    @Test func noWatchServiceWithoutStreaming() async throws {
         try await withTestApp { app in
             let user = try await createUser(app, "pat")
             let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3])
-            _ = try await ws(app).markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), day: nil, service: .disneyPlus)
-            #expect(try await cards(app, user).first?.hasNetflixData == false)
+            _ = try await ws(app).markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), day: nil, service: .purchased)
+            #expect(try await cards(app, user).first?.watchService == nil)
         }
+    }
+
+    @Test func watchLinksPerService() {
+        #expect(StreamingService.netflix.watchLink(for: "The Mentalist")
+                == WatchLink(label: "Auf Netflix suchen", url: "https://www.netflix.com/search?q=The%20Mentalist"))
+        #expect(StreamingService.primeVideo.watchLink(for: "The Boys")
+                == WatchLink(label: "Auf Prime Video suchen", url: "https://www.amazon.de/s?k=The%20Boys&i=instant-video"))
+        #expect(StreamingService.appleTV.watchLink(for: "Severance")
+                == WatchLink(label: "Auf Apple TV+ suchen", url: "https://tv.apple.com/de/search?term=Severance"))
+        #expect(StreamingService.paramountPlus.watchLink(for: "Yellowstone")
+                == WatchLink(label: "Auf Paramount+ suchen", url: "https://www.paramountplus.com/de/search/?q=Yellowstone"))
+        #expect(StreamingService.disneyPlus.watchLink(for: "Loki") == WatchLink(label: "Disney+ öffnen", url: "https://www.disneyplus.com/"))
+        #expect(StreamingService.hboMax.watchLink(for: "X") == WatchLink(label: "HBO Max öffnen", url: "https://play.hbomax.com/"))
+        #expect(StreamingService.wow.watchLink(for: "X") == WatchLink(label: "WOW öffnen", url: "https://www.wowtv.de/"))
+        #expect(StreamingService.cinema.watchLink(for: "X") == nil)
+        #expect(StreamingService.purchased.watchLink(for: "X") == nil)
+        #expect(StreamingService.other.watchLink(for: "X") == nil)
+        #expect(StreamingService.netflix.watchLink(for: "Fluch & Segen")?.url == "https://www.netflix.com/search?q=Fluch%20%26%20Segen")
     }
 
     @Test func singleCardLookup() async throws {

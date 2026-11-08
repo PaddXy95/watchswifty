@@ -99,7 +99,7 @@ struct LoadingBarTests {
     @Test func netflixLinkOpensNewTab() {
         let card = ContinueCard(titleID: UUID(), tmdbID: 1, name: "The Mentalist", posterPath: nil, rating: nil,
                                 next: EpisodeInfo(id: UUID(), season: 4, number: 15, name: "X", airDate: "2020-01-01"),
-                                remaining: 3, lastWatchedOn: "2026-11-01", lastService: .netflix, hasNetflixData: true)
+                                remaining: 3, lastWatchedOn: "2026-11-01", lastService: .netflix, watchService: .netflix)
         let html = ContinueCardView(card: card).render()
         #expect(html.contains(#"hx-boost="true""#))
         let link = try? #require(html.range(of: #"<a class="button""#).map { String(html[$0.lowerBound...].prefix(260)) })
@@ -173,7 +173,7 @@ struct TileLoadingTests {
         #expect(library.contains(##"hx-indicator="closest .library-item, #page-loader""##))
         let card = ContinueCard(titleID: UUID(), tmdbID: 1, name: "Dark", posterPath: nil, rating: nil,
                                 next: EpisodeInfo(id: UUID(), season: 1, number: 2, name: "Lügen", airDate: "2017-12-01"),
-                                remaining: 1, lastWatchedOn: nil, lastService: nil, hasNetflixData: false)
+                                remaining: 1, lastWatchedOn: nil, lastService: nil, watchService: nil)
         #expect(ContinueCardView(card: card).render().contains(##"hx-indicator="closest .card, #page-loader""##))
     }
 
