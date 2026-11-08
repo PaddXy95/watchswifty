@@ -194,3 +194,12 @@ Aufteilung in Typen (z. B. `OIDCConfig`, `OIDCClient`, `OIDCController`), `jwt-k
 Authentifizierung am Token-Endpunkt (Basic oder Post – Authentik kann beides), Caching im Detail,
 Session-ID beim Login erneuern (dann für beide Login-Wege), Test-Aufbau (Fake-Provider wie
 `FakeTMDBClient`, Schlüssel im Test erzeugen), genaue Texte und Gestaltung.
+
+## Nachtrag (2026-11-08): Rücksprung für die App-Anmeldung
+Die App-API (`2026-11-08-app-api-design.md`) öffnet `/api/auth/authorize` im Browser-Fenster. Nicht angemeldete
+Browser landen auf `/login?returnTo=<Pfad>`; der Passwort-Login kehrt danach zu diesem Pfad zurück
+(`isSafeReturnTo`: nur Pfade unter `/api/auth/authorize?`).
+- Der Button „Mit Authentik anmelden“ gibt denselben `returnTo` an `GET /auth/oidc/start` weiter.
+- `/auth/oidc/start` legt `returnTo` (nur wenn `isSafeReturnTo`) zusammen mit `state`/`nonce` in der Session ab; beim
+  Wechsel auf die kanonische Adresse wird `returnTo` als Query-Parameter mitgegeben.
+- `/auth/oidc/callback` leitet nach erfolgreicher Anmeldung auf den gespeicherten `returnTo` statt auf `/` weiter.

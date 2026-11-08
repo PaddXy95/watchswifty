@@ -48,6 +48,11 @@ struct APITokenService {
         try await record.delete(on: db)
     }
 
+    /// Revokes the presented token itself (app logout).
+    func revoke(bearer: String) async throws {
+        try await APIToken.query(on: db).filter(\.$tokenHash == Self.hash(bearer)).delete()
+    }
+
     func deleteExpired(now: Date = .now) async throws -> Int {
         let expired = try await APIToken.query(on: db).filter(\.$expiresAt <= now).all()
         for record in expired { try await record.delete(on: db) }

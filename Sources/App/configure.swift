@@ -10,6 +10,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.tmdbProvider = tmdbProvider
     app.releaseFetcher = releaseFetcher ?? LiveReleaseFetcher(client: app.client, userAgent: "WatchSwifty/\(config.appVersion.version)")
     app.updateStatus = UpdateStatus()
+    app.authCodes = AuthCodeStore()
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.middleware = Middlewares()
     app.middleware.use(HTMLErrorMiddleware())

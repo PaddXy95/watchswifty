@@ -23,6 +23,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Version"
+  /v1/auth/token:
+    post:
+      operationId: createToken
+      tags: [Konto]
+      summary: Einmal-Code aus dem Browser-Login gegen ein Geräte-Token tauschen
+      description: |
+        Ablauf: Die App öffnet `/api/auth/authorize?redirect_uri=watchswifty://auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
+        im System-Browser-Fenster. Nach Anmeldung und „Verbinden“ springt der Browser zu `watchswifty://auth?code=…&state=…`.
+        Den Code (60 s gültig, einmal einlösbar) hier mit dem PKCE-`codeVerifier` einlösen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+      responses:
+        "200":
+          description: Geräte-Token (wird nur hier einmal ausgegeben)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenGrant"
+        "400":
+          description: Code ungültig, abgelaufen oder Verifier falsch (`invalidGrant`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: revokeCurrentToken
+      tags: [Konto]
+      summary: Dieses Gerät abmelden
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Token widerrufen
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/me:
     get:
       operationId: getMe
@@ -62,6 +100,60 @@ components:
         message:
           type: string
           description: Deutsche Meldung wie in der Weboberfläche.
+    TokenRequest:
+      type: object
+      required: [code, codeVerifier, redirectUri]
+      properties:
+        code:
+          type: string
+        codeVerifier:
+          type: string
+        redirectUri:
+          type: string
+          description: Muss `watchswifty://auth` sein.
+    TokenGrant:
+      type: object
+      required: [token, expiresAt, device, user]
+      properties:
+        token:
+          type: string
+          description: "Geräte-Token `ws_…` für den Header `Authorization: Bearer`."
+        expiresAt:
+          type: string
+          format: date-time
+        device:
+          $ref: "#/components/schemas/Device"
+        user:
+          $ref: "#/components/schemas/UserInfo"
+    Device:
+      type: object
+      required: [id, name, kind, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [device, manual]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+    UserInfo:
+      type: object
+      required: [username, isAdmin]
+      properties:
+        username:
+          type: string
+        isAdmin:
+          type: boolean
     Me:
       type: object
       required: [username, isAdmin, hasPassword, tmdbToken]

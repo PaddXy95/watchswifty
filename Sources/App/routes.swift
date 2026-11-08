@@ -5,6 +5,7 @@ func routes(_ app: Application) throws {
     app.get("healthz") { _ in "ok" }
     app.get("version") { _ in AppVersion.current }
     try registerAPI(app)
+    APIAuthorizeController().register(on: app)
     AuthController().register(on: app)
 
     let protected = app.grouped(User.sessionAuthenticator(), AuthRedirectMiddleware())

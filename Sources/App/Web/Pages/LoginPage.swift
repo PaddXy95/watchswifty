@@ -3,6 +3,8 @@ import Elementary
 struct LoginPage: HTML {
     let error: String?
     let username: String
+    /// Where to continue after signing in (only the app login, see `isSafeReturnTo`).
+    var returnTo: String? = nil
 
     var body: some HTML {
         PageLayout(title: "Anmelden", nav: nil) {
@@ -12,6 +14,7 @@ struct LoginPage: HTML {
                     p(.class("error"), .custom(name: "role", value: "alert")) { error }
                 }
                 form(.method(.post), .action("/login")) {
+                    if let returnTo { input(.type(.hidden), .name("returnTo"), .value(returnTo)) }
                     label {
                         "Benutzername"
                         input(.type(.text), .name("username"), .value(username), .required, .autofocus,
