@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.2] – 2026-11-08
+
+### Neu
+- **App-API (Phase 3):** Verlauf (blättern, Sichtung ändern/löschen), Bibliothek, Statistik und Konto (Passwort,
+  TMDB-Token, beobachtete Serien).
+
 ## [0.2.1] – 2026-11-08
 
 ### Neu

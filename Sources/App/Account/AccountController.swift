@@ -36,41 +36,28 @@ struct AccountController {
     }
 
     func changePassword(req: Request) async throws -> HTMLResponse {
-        let user = try req.currentUser
         let input = try req.content.decode(ChangeInput.self)
-        guard try await req.password.async.verify(input.currentPassword, created: user.passwordHash) else {
-            return try await page(req, status: .unprocessableEntity, error: AccountValidation.wrongCurrentPasswordMessage)
+        do {
+            try await req.account.changePassword(user: try req.currentUser, current: input.currentPassword, new: input.newPassword)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
         }
-        if let error = AccountValidation.passwordError(input.newPassword) {
-            return try await page(req, status: .unprocessableEntity, error: error)
-        }
-        user.passwordHash = try await req.password.async.hash(input.newPassword)
-        try await user.save(on: req.db)
         return try await page(req, notice: "Passwort geändert.")
     }
 
     /// Stores the user's TMDB token after TMDB accepted it.
     func saveToken(req: Request) async throws -> HTMLResponse {
-        let user = try req.currentUser
-        let token = try req.content.decode(TokenInput.self).token.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty else { return try await page(req, status: .unprocessableEntity, error: "Bitte einen Token eingeben.") }
+        let token = try req.content.decode(TokenInput.self).token
         do {
-            try await req.application.tmdbProvider.make(token).validate()
-        } catch TMDBError.unauthorized {
-            return try await page(req, status: .unprocessableEntity, error: "TMDB hat den Token abgelehnt.")
-        } catch {
-            return try await page(req, status: .unprocessableEntity, error: "TMDB nicht erreichbar – Token nicht gespeichert.")
+            try await req.account.saveTMDBToken(user: try req.currentUser, token: token)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
         }
-        user.tmdbToken = try req.application.tokenCipher.seal(token)
-        try await user.save(on: req.db)
-        await req.application.matchingWorker.kick()
         return try await page(req, notice: "TMDB-Token gespeichert.")
     }
 
     func removeToken(req: Request) async throws -> HTMLResponse {
-        let user = try req.currentUser
-        user.tmdbToken = nil
-        try await user.save(on: req.db)
+        try await req.account.removeTMDBToken(user: try req.currentUser)
         return try await page(req, notice: "TMDB-Token entfernt.")
     }
 
