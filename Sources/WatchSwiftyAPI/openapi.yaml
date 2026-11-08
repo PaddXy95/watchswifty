@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: WatchSwifty API
+  version: 1.0.0
+  description: |
+    JSON-API für die WatchSwifty-App. Anmeldung über das Browser-Fenster (Authorization Code + PKCE),
+    danach mit Geräte-Token im Header `Authorization: Bearer ws_…` (90 Tage gültig).
+servers:
+  - url: /api
+tags:
+  - name: Meta
+paths:
+  /v1/version:
+    get:
+      operationId: getVersion
+      tags: [Meta]
+      summary: Version des Servers
+      responses:
+        "200":
+          description: Version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Geräte-Token (`ws_…`)
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Maschinenlesbarer Fehlercode, z. B. `notFound`, `unauthorized`, `tokenExpired`.
+        message:
+          type: string
+          description: Deutsche Meldung wie in der Weboberfläche.
+    Version:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: string
+        commit:
+          type: string

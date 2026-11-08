@@ -12,10 +12,19 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.9.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
+        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.14.4"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.13.4"),
+        .package(url: "https://github.com/vapor/swift-openapi-vapor", from: "1.2.0"),
         .package(url: "https://github.com/elementary-swift/elementary.git", exact: "0.9.0"),
         .package(url: "https://github.com/elementary-swift/elementary-htmx.git", exact: "0.7.0"),
     ],
     targets: [
+        // Types and server protocol generated from openapi.yaml (the App API's single source).
+        .target(
+            name: "WatchSwiftyAPI",
+            dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
+        ),
         .executableTarget(
             name: "App",
             dependencies: [
@@ -27,6 +36,9 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Elementary", package: "elementary"),
                 .product(name: "ElementaryHTMX2", package: "elementary-htmx"),
+                .target(name: "WatchSwiftyAPI"),
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
             ],
             swiftSettings: swiftSettings
         ),

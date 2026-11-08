@@ -12,7 +12,8 @@ struct OriginCheckMiddleware: AsyncMiddleware {
     }
 
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
-        guard request.method != .GET, request.method != .HEAD else {
+        // The App API authenticates with bearer tokens only (no cookies), so cross-site requests cannot act as a user.
+        guard request.method != .GET, request.method != .HEAD, !request.isAPIRequest else {
             return try await next.respond(to: request)
         }
         if let origin = request.headers.first(name: .origin) {
