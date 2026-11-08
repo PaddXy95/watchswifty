@@ -32,6 +32,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
         app.databases.use(.sqlite(.file(config.databasePath)), as: .sqlite)
     }
 
+    app.asyncCommands.use(ResetPasswordCommand(), as: "reset-password")
+
     app.migrations.add(CreateUser())
     app.migrations.add(SessionRecord.migration)
     app.migrations.add(CreateTitle())
@@ -61,13 +63,21 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
 
     app.importLock = AsyncMutex()
+    let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)
     app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
-                                        enabled: config.backgroundJobsEnabled, lock: app.importLock)
+                                        enabled: backgroundJobs, lock: app.importLock)
     app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
-                                        today: config.today, enabled: config.backgroundJobsEnabled)
-    if config.backgroundJobsEnabled {
+                                        today: config.today, enabled: backgroundJobs)
+    if backgroundJobs {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
         app.lifecycle.use(UpdateCheckLifecycle())
     }
+}
+
+/// True when the process runs the web server (`serve`, also the default command), not a one-off command such as
+/// `reset-password` – only then do the background jobs start.
+func servesHTTP(arguments: [String]) -> Bool {
+    guard let command = arguments.dropFirst().first, !command.hasPrefix("-") else { return true }
+    return command == "serve"
 }

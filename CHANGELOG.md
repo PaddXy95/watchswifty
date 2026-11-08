@@ -7,6 +7,9 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 ### Neu
 - **App-Icon:** „WS“ mit einem startenden Mauersegler – als Favicon im Browser-Tab, im Kopf der Seite, als Icon auf
   dem Homescreen (iPhone/Android) und im README.
+- **Passwort vergessen:** `reset-password <benutzer>` setzt ein Passwort auf dem Server neu, auch für den
+  einzigen Admin (`docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <benutzer>`, Passwort wird
+  verdeckt abgefragt).
 
 ## [0.2.5] – 2026-11-08
 

@@ -42,6 +42,19 @@ Die GitHub Action baut bei jedem Push auf `main` das Image `ghcr.io/paddxy95/wat
 `ADMIN_USERNAME`/`ADMIN_PASSWORD` werden nur beim allerersten Start gebraucht, solange es noch keinen
 Benutzer gibt; danach werden sie ignoriert. Weitere Konten legt der Admin unter **Benutzer** an.
 
+### Passwort vergessen
+
+Wer sich nicht mehr anmelden kann – auch der einzige Admin –, setzt das Passwort auf dem Server neu:
+
+```bash
+docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <benutzername>
+```
+
+Der Befehl fragt das neue Passwort zweimal verdeckt ab; es landet also weder in der Shell-History noch in der
+`.env`. Er läuft über `docker-entrypoint.sh`, damit die Datenbank dem App-Benutzer gehören bleibt. Ein geändertes
+`ADMIN_PASSWORD` in der `.env` hilft hier nicht (siehe oben); andere Benutzer kann ein Admin auch unter
+**Benutzer** zurücksetzen.
+
 Logs ansehen bzw. stoppen:
 
 ```bash
