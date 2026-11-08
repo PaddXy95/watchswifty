@@ -17,6 +17,7 @@ tags:
   - name: Verlauf
   - name: Bibliothek
   - name: Statistik
+  - name: Netflix-Import
 paths:
   /v1/version:
     get:
@@ -832,6 +833,297 @@ paths:
                   $ref: "#/components/schemas/FollowedSeries"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/imports/netflix:
+    post:
+      operationId: uploadNetflix
+      tags: [Netflix-Import]
+      summary: Netflix-Wiedergabeaktivität (CSV, höchstens 10 MB) hochladen
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: "*/*"
+      responses:
+        "200":
+          description: Neue, bekannte und übersprungene Zeilen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Datei zu groß (`payloadTooLarge`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    get:
+      operationId: getNetflixImport
+      tags: [Netflix-Import]
+      summary: Stand des Imports – Fortschritt, „Zu prüfen“, „Nicht zugeordnet“, Zuordnungen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: mappings
+          in: query
+          description: Filter der Zuordnungsliste (`all` = alle außer „Zu prüfen“)
+          schema:
+            type: string
+            enum: [all, auto, confirmed, ignored]
+            default: all
+      responses:
+        "200":
+          description: Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetflixImport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/imports/netflix/retry:
+    post:
+      operationId: retryNetflix
+      tags: [Netflix-Import]
+      summary: Zuordnung jetzt erneut starten
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Fortschritt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportProgress"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/imports/netflix/mappings/{id}/accept:
+    post:
+      operationId: acceptMapping
+      tags: [Netflix-Import]
+      summary: Vorschlag übernehmen (aus „Zu prüfen“)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MappingDecision"
+      responses:
+        "200":
+          description: Zuordnung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/imports/netflix/mappings/{id}/change:
+    post:
+      operationId: changeMapping
+      tags: [Netflix-Import]
+      summary: Zuordnung auf einen anderen Titel ändern
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MappingDecision"
+      responses:
+        "200":
+          description: Zuordnung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/imports/netflix/mappings/{id}/ignore:
+    post:
+      operationId: ignoreMapping
+      tags: [Netflix-Import]
+      summary: Netflix-Namen ignorieren
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Zuordnung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/imports/netflix/mappings/{id}/reset:
+    post:
+      operationId: resetMapping
+      tags: [Netflix-Import]
+      summary: Zuordnung zurücksetzen (neu zuordnen)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Zuordnung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mapping"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/imports/netflix/mappings/{id}/search:
+    get:
+      operationId: searchMappingCandidates
+      tags: [Netflix-Import]
+      summary: Andere Treffer für eine Zuordnung suchen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Treffer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/imports/netflix/rows/{id}/options:
+    get:
+      operationId: getRowOptions
+      tags: [Netflix-Import]
+      summary: Folgen, denen eine nicht zugeordnete Zeile zugewiesen werden kann
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Folgen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EpisodeOption"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/imports/netflix/rows/{id}/assign:
+    post:
+      operationId: assignRow
+      tags: [Netflix-Import]
+      summary: Zeile einer Folge zuweisen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RowAssignment"
+      responses:
+        "204":
+          description: Erledigt
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/imports/netflix/rows/{id}/ignore:
+    post:
+      operationId: ignoreRow
+      tags: [Netflix-Import]
+      summary: Zeile ignorieren
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Erledigt
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     TmdbID:
@@ -1218,6 +1510,133 @@ components:
           type: string
         nextEpisode:
           $ref: "#/components/schemas/NextEpisode"
+    ImportSummary:
+      type: object
+      required: [new, known, skipped]
+      properties:
+        new:
+          type: integer
+        known:
+          type: integer
+        skipped:
+          type: integer
+          description: Zeilen ohne Titel
+    ImportProgress:
+      type: object
+      required: [running, pendingRows, waitingForReview]
+      properties:
+        running:
+          type: boolean
+        pendingRows:
+          type: integer
+        waitingForReview:
+          type: integer
+        lastError:
+          type: string
+    MappingReview:
+      type: object
+      required: [id, netflixName, kind, rowCount, candidates]
+      properties:
+        id:
+          type: string
+          format: uuid
+        netflixName:
+          type: string
+        kind:
+          type: string
+          enum: [tv, movie]
+        rowCount:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+    UnmatchedRow:
+      type: object
+      required: [id, rawTitle, day, canAssign]
+      properties:
+        id:
+          type: string
+          format: uuid
+        rawTitle:
+          type: string
+        day:
+          type: string
+        canAssign:
+          type: boolean
+          description: Die Serie ist bekannt, die Zeile lässt sich einer Folge zuweisen.
+    TitleRef:
+      type: object
+      required: [tmdbId, name]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+    Mapping:
+      type: object
+      required: [id, netflixName, kind, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        netflixName:
+          type: string
+        kind:
+          type: string
+          enum: [tv, movie]
+        status:
+          type: string
+          enum: [pending, auto, confirmed, review, ignored]
+        title:
+          $ref: "#/components/schemas/TitleRef"
+    NetflixImport:
+      type: object
+      required: [progress, review, unmatched, unmatchedTotal, mappings]
+      properties:
+        progress:
+          $ref: "#/components/schemas/ImportProgress"
+        review:
+          type: array
+          items:
+            $ref: "#/components/schemas/MappingReview"
+        unmatched:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnmatchedRow"
+        unmatchedTotal:
+          type: integer
+        mappings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mapping"
+    MappingDecision:
+      type: object
+      required: [kind, tmdbId]
+      properties:
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+    EpisodeOption:
+      type: object
+      required: [episodeId, code, name]
+      properties:
+        episodeId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RowAssignment:
+      type: object
+      required: [episodeId]
+      properties:
+        episodeId:
+          type: string
+          format: uuid
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
