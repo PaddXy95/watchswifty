@@ -1,5 +1,6 @@
 import Fluent
 import Foundation
+import SQLKit
 
 /// Shared TMDB cache entry for one episode. Never deleted by refreshes (watches point here).
 final class Episode: Model, @unchecked Sendable {
@@ -30,4 +31,33 @@ final class Episode: Model, @unchecked Sendable {
 
     /// `S04E15`
     var code: String { String(format: "S%02dE%02d", season, number) }
+
+    /// Lightweight episode list of several titles (no overview), read with a plain SQL projection: building ~13,000
+    /// Fluent models made „Weiterschauen“ take about a second.
+    static func infos(ofTitles titleIDs: [UUID], minSeason: Int = 0, on db: any Database) async throws -> [UUID: [EpisodeInfo]] {
+        guard !titleIDs.isEmpty else { return [:] }
+        guard let sql = db as? any SQLDatabase else {
+            let episodes = try await Episode.query(on: db).filter(\.$title.$id ~~ titleIDs).filter(\.$season >= minSeason).all()
+            return Dictionary(grouping: episodes, by: { $0.$title.id }).mapValues { $0.map(EpisodeInfo.init) }
+        }
+        struct Row: Decodable {
+            let id: UUID
+            let title_id: UUID
+            let season_number: Int
+            let episode_number: Int
+            let name: String
+            let air_date: String?
+            let runtime: Int?
+        }
+        let rows = try await sql.select()
+            .columns("id", "title_id", "season_number", "episode_number", "name", "air_date", "runtime")
+            .from(Episode.schema)
+            .where(SQLColumn("title_id"), .in, SQLBind.group(titleIDs))
+            .where(SQLColumn("season_number"), .greaterThanOrEqual, SQLBind(minSeason))
+            .all(decoding: Row.self)
+        return Dictionary(grouping: rows, by: \.title_id).mapValues { list in
+            list.map { EpisodeInfo(id: $0.id, season: $0.season_number, number: $0.episode_number, name: $0.name, airDate: $0.air_date,
+                                   runtime: $0.runtime) }
+        }
+    }
 }

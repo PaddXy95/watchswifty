@@ -49,8 +49,7 @@ struct ContinueWatchingService {
         let titles = try await Title.query(on: db).filter(\.$id ~~ titleIDs).filter(\.$kind == TitleKind.tv.rawValue).all()
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id ~~ titleIDs).all()
         let entryByTitle = Dictionary(entries.map { ($0.$title.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let episodes = try await Episode.query(on: db).filter(\.$title.$id ~~ titleIDs).all()
-        let episodesByTitle = Dictionary(grouping: episodes.map { ($0.$title.id, EpisodeInfo($0)) }, by: { $0.0 }).mapValues { $0.map(\.1) }
+        let episodesByTitle = try await Episode.infos(ofTitles: titles.compactMap(\.id), on: db)
 
         var result: [(card: ContinueCard, sortKey: (Int, String, Date))] = []
         for title in titles {
