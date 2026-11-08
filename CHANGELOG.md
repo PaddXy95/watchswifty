@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.4] – 2026-11-08
+
+### Neu
+- **App-API (Phase 5):** Benutzerverwaltung (nie für das eigene Konto) und System (Version, Update-Prüfung) –
+  damit kann die API alles, was die Weboberfläche kann.
+
+### Geändert
+- **Benutzer (Web):** Admins können ihr eigenes Passwort und Admin-Recht nicht mehr über die Benutzerverwaltung
+  ändern (eigenes Passwort unter **Konto**).
+
 ## [0.2.3] – 2026-11-08
 
 ### Neu

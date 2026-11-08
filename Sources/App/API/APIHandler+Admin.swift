@@ -44,4 +44,37 @@ extension APIHandler {
         .init(id: user.id?.uuidString ?? "", username: user.username, isAdmin: user.isAdmin,
               hasTMDBToken: !(user.tmdbToken ?? "").isEmpty, createdAt: user.createdAt)
     }
+
+    func getSystem(_ input: Operations.getSystem.Input) async throws -> Operations.getSystem.Output {
+        _ = try APIContext.requireAdmin()
+        return .ok(.init(body: .json(try await Self.system(APIContext.request()))))
+    }
+
+    /// Enabling checks GitHub once right away (as the web page does).
+    func setUpdateCheck(_ input: Operations.setUpdateCheck.Input) async throws -> Operations.setUpdateCheck.Output {
+        _ = try APIContext.requireAdmin()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        let request = try APIContext.request()
+        let updates = request.application.updates
+        let wasEnabled = try await updates.settings().updateCheck
+        try await updates.setEnabled(body.enabled)
+        if body.enabled && !wasEnabled { try await updates.checkNow() }
+        return .ok(.init(body: .json(try await Self.system(request))))
+    }
+
+    func checkUpdatesNow(_ input: Operations.checkUpdatesNow.Input) async throws -> Operations.checkUpdatesNow.Output {
+        _ = try APIContext.requireAdmin()
+        let request = try APIContext.request()
+        try await request.application.updates.checkNow()
+        return .ok(.init(body: .json(try await Self.system(request))))
+    }
+
+    static func system(_ request: Request) async throws -> Components.Schemas.System {
+        let version = request.application.appConfig.appVersion
+        let settings = try await request.application.updates.settings()
+        return .init(version: .init(version: version.version, commit: version.commit),
+                     updateCheck: .init(enabled: settings.updateCheck, checkedAt: settings.checkedAt, latestVersion: settings.latestVersion,
+                                        latestUrl: settings.latestURL, error: settings.checkError,
+                                        updateAvailable: settings.latestVersion.flatMap { isNewerVersion($0, than: version.version) }))
+    }
 }

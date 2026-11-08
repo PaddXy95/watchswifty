@@ -146,6 +146,9 @@ WatchSwifty hat eine JSON-API für Apps unter `/api/v1`. Die vollständige Besch
 - **Geräte verwalten:** unter **Konto → Geräte** – abmelden oder ein Token für Skripte bzw. die Doku erstellen
   (wird nur einmal angezeigt).
 - Die API nimmt keine Session-Cookies an; Fehler kommen als `{"code": …, "message": …}`.
+- **Umfang** (alles wie im Web): Weiterschauen und Hinweise, Suche, Serien und Filme (abhaken, bewerten,
+  kommentieren, beobachten, ausblenden), Verlauf, Bibliothek, Statistik, Konto und Geräte, Netflix-Import und
+  Filmliste, für Admins Benutzerverwaltung und System. Details und „Ausprobieren“ unter `/api`.
 
 ## TMDB-Token
 
