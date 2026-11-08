@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.6] – 2026-11-08
+
+### Neu
+- **App-Icon:** „WS“ mit einem startenden Mauersegler – als Favicon im Browser-Tab, im Kopf der Seite, als Icon auf
+  dem Homescreen (iPhone/Android) und im README.
+
 ## [0.2.5] – 2026-11-08
 
 ### Neu

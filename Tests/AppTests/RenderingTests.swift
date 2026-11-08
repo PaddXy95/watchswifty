@@ -18,6 +18,37 @@ struct RenderingTests {
         #expect(!html.contains("Benutzer"))
     }
 
+    @Test func everyPageLinksTheAppIcon() {
+        for nav in [NavContext(username: "pat", isAdmin: false, active: .history), nil] {
+            let html = PageLayout(title: "X", nav: nav) { p { "x" } }.render()
+            #expect(html.contains(#"<link rel="icon" href="/favicon.ico" sizes="32x32">"#))
+            #expect(html.contains(#"<link rel="icon" href="/favicon.svg" type="image/svg+xml">"#))
+            #expect(html.contains(#"<link rel="apple-touch-icon" href="/apple-touch-icon.png">"#))
+            #expect(html.contains(#"<link rel="manifest" href="/manifest.json">"#))
+            #expect(html.contains(##"<meta name="theme-color" content="#0f1218">"##))
+        }
+    }
+
+    @Test func brandShowsTheIcon() {
+        let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: false, active: .history)) { p { "x" } }.render()
+        #expect(html.contains(#"<img class="brand-icon" src="/favicon.svg" alt="" width="28" height="28">WatchSwifty</a>"#))
+    }
+
+    @Test func iconFilesServed() async throws {
+        try await withTestApp { app in
+            for path in ["/favicon.svg", "/favicon.ico", "/apple-touch-icon.png", "/img/icon-192.png", "/img/icon-512.png"] {
+                try await app.testing().test(.GET, path) { res async in
+                    #expect(res.status == .ok, "\(path)")
+                }
+            }
+            try await app.testing().test(.GET, "/manifest.json") { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains(#""name": "WatchSwifty""#))
+                #expect(res.body.string.contains(#""src": "/img/icon-512.png""#))
+            }
+        }
+    }
+
     @Test func adminSeesUserNav() {
         let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: true, active: .admin)) { p { "x" } }.render()
         #expect(html.contains("Benutzer"))

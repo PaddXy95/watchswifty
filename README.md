@@ -1,3 +1,5 @@
+<img src="Public/favicon.svg" width="96" height="96" alt="WatchSwifty-Icon">
+
 # WatchSwifty
 
 Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Elementary + htmx).

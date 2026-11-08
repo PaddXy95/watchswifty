@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>WatchSwifty</title>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2029"/><stop offset="1" stop-color="#07090e"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- WS -->
+  <g fill="none" stroke="#e8ebf1" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M70 236L110 396L158 282L206 396L246 236"/>
+    <path d="M432 258C420 232 394 222 366 222C330 222 304 242 304 272C304 336 440 298 440 366C440 398 410 420 370 420C338 420 312 408 298 382"/>
+  </g>
+  <!-- swift (Mauersegler) taking off from the S -->
+  <path d="M50 33C53.5 33 55 36.5 55 40C68 35 85 41 96 62C85 51 68 48 55 52C55 56 54 58 53 60L58 71L50 64L42 71L47 60C46 58 45 56 45 52C32 48 15 51 4 62C15 41 32 35 45 40C45 36.5 46.5 33 50 33Z" fill="#f0584b" transform="translate(268 116) rotate(38) scale(1.8) translate(-50 -50)"/>
+</svg>

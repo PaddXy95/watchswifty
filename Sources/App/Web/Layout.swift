@@ -36,6 +36,12 @@ struct PageLayout<Content: HTML>: HTMLDocument {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
         // Error responses are swapped too: they carry German messages (usually retargeted to #flash).
         meta(.name("htmx-config"), .content(#"{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}"#))
+        meta(.name("theme-color"), .content("#0f1218"))
+        // App icon: "WS" with a swift taking off (the 16 px favicon drops the bird).
+        link(.rel(.icon), .href("/favicon.ico"), .custom(name: "sizes", value: "32x32"))
+        link(.rel(.icon), .href("/favicon.svg"), .custom(name: "type", value: "image/svg+xml"))
+        link(.rel("apple-touch-icon"), .href("/apple-touch-icon.png"))
+        link(.rel("manifest"), .href("/manifest.json"))
         link(.rel(.stylesheet), .href("/css/app.css"))
         script(.src("/js/htmx.min.js")) {}
     }
@@ -75,7 +81,10 @@ struct SiteNav: HTML {
 
     var body: some HTML {
         header(.class("site-header")) {
-            a(.class("brand"), .href("/"), .hx.boost(true)) { "WatchSwifty" }
+            a(.class("brand"), .href("/"), .hx.boost(true)) {
+                img(.class("brand-icon"), .src("/favicon.svg"), .alt(""), .width(28), .height(28))
+                "WatchSwifty"
+            }
             // Burger menu on phones: a CSS-only checkbox toggle (no JavaScript).
             input(.type(.checkbox), .id("nav-toggle"), .class("nav-toggle"), .custom(name: "aria-label", value: "Menü öffnen"))
             label(.class("nav-toggle-label"), .for("nav-toggle"), .custom(name: "aria-label", value: "Menü")) { "☰" }
