@@ -7,21 +7,14 @@ struct HomeController {
         protected.post("tv", ":tmdbID", "next", use: markNext)
     }
 
-    /// Series inactive for longer than this are hidden unless `?all=1`.
-    static let cutoffMonths = 3
-
     func home(req: Request) async throws -> HTMLResponse {
         let today = req.watches.today()
-        let cards = try await ContinueWatchingService(db: req.db).cards(userID: try req.userID, today: today)
         let showAll = (try? req.query.get(String.self, at: "all")) == "1"
-        let cutoff = CalendarDay.adding(months: -Self.cutoffMonths, to: today)
-        let visible = showAll ? cards : cards.filter { $0.lastActivityOn >= cutoff }
-        let reminders = NewEpisodesService(db: req.db)
-        let newEpisodes = try await reminders.notes(userID: try req.userID, today: today)
-        let upcoming = try await reminders.upcoming(userID: try req.userID, today: today)
-        return HTMLResponse(ContinuePage(nav: try req.nav(.continueWatching), cards: visible,
-                                         hiddenCount: cards.count - visible.count, showingAll: showAll,
-                                         newEpisodes: newEpisodes, upcoming: upcoming))
+        let shelf = try await req.home.shelf(userID: try req.userID, today: today, showAll: showAll)
+        let notes = try await req.home.notes(userID: try req.userID, today: today)
+        return HTMLResponse(ContinuePage(nav: try req.nav(.continueWatching), cards: shelf.cards,
+                                         hiddenCount: shelf.olderCount, showingAll: showAll,
+                                         newEpisodes: notes.newEpisodes, upcoming: notes.upcoming))
     }
 
     struct NextInput: Content { var episodeID: UUID? }
@@ -33,18 +26,9 @@ struct HomeController {
         try await respondMappingTrackingErrors(req) {
             guard let tmdbID = req.parameters.get("tmdbID", as: Int.self) else { throw Abort(.notFound) }
             let title = try await req.catalog.title(kind: .tv, tmdbID: tmdbID)
-            let userID = try req.userID
-            let service = ContinueWatchingService(db: req.db)
-            let today = req.watches.today()
-            guard let card = try await service.card(userID: userID, titleID: title.requireID(), today: today) else {
-                return HTMLResponse(EmptyHTML())
-            }
             let expected = (try? req.content.decode(NextInput.self))?.episodeID
-            if expected == nil || expected == card.next.id {
-                _ = try await req.watches.markEpisode(userID: userID, episodeID: card.next.id, day: today,
-                                                      service: try await req.watches.lastService(userID: userID, titleID: title.requireID()))
-            }
-            if let updated = try await service.card(userID: userID, titleID: title.requireID(), today: today) {
+            if let updated = try await req.home.markNext(userID: try req.userID, title: title, expectedEpisodeID: expected,
+                                                         today: req.watches.today()) {
                 return HTMLResponse(ContinueCardView(card: updated))
             }
             return HTMLResponse(EmptyHTML())

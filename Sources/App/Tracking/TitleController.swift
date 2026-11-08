@@ -248,8 +248,7 @@ struct TitleController {
     }
 
     private func movieWatches(_ req: Request, userID: UUID, titleID: UUID) async throws -> [Watch] {
-        try await req.watches.watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil)
-            .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending).all()
+        try await req.seriesDetails.movieWatches(userID: userID, titleID: titleID)
     }
 
     private func seasonResponse(_ req: Request, title: Title, season: Int, userID: UUID) async throws -> HTMLResponse {

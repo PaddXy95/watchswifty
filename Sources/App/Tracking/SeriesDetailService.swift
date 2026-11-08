@@ -40,6 +40,12 @@ struct SeriesDetailService {
         try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first()
     }
 
+    /// A movie's watches, newest first.
+    func movieWatches(userID: UUID, titleID: UUID) async throws -> [Watch] {
+        try await watches.watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil)
+            .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending).all()
+    }
+
     func detail(userID: UUID, title: Title, open: Int? = nil) async throws -> SeriesDetailModel {
         let titleID = try title.requireID()
         let entry = try await entry(userID: userID, titleID: titleID)

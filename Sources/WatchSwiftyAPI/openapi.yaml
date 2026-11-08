@@ -10,7 +10,10 @@ servers:
 tags:
   - name: Meta
   - name: Konto
+  - name: Start
+  - name: Suche
   - name: Serien
+  - name: Filme
 paths:
   /v1/version:
     get:
@@ -397,6 +400,228 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
+  /v1/continue-watching:
+    get:
+      operationId: getContinueWatching
+      tags: [Start]
+      summary: Weiterschauen (Serien der letzten 3 Monate; mit `all=true` alle)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: all
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Karten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContinueWatching"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/notes:
+    get:
+      operationId: getNotes
+      tags: [Start]
+      summary: Neue Folgen beobachteter Serien und Folgen der nächsten 14 Tage
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Hinweise
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notes"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/tv/{tmdbID}/next:
+    post:
+      operationId: markNextEpisode
+      tags: [Start]
+      summary: Nächste Folge der Karte gesehen (heute, zuletzt genutzter Dienst)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NextInput"
+      responses:
+        "200":
+          description: Aktualisierte Karte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContinueCard"
+        "204":
+          description: Serie ist aufgeholt (keine Karte mehr)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/new-episodes/dismiss:
+    post:
+      operationId: dismissNewEpisodes
+      tags: [Start]
+      summary: Hinweis „Neue Folgen“ erledigen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "204":
+          description: Erledigt
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/search:
+    get:
+      operationId: search
+      tags: [Suche]
+      summary: Serien und Filme bei TMDB suchen (mindestens 2 Zeichen)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Treffer mit eigenem Stand
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchHit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/movies/{tmdbID}:
+    get:
+      operationId: getMovie
+      tags: [Filme]
+      summary: Film mit eigenen Sichtungen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "200":
+          description: Film mit eigenen Sichtungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovieDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/movies/{tmdbID}/watch:
+    post:
+      operationId: markMovie
+      tags: [Filme]
+      summary: Film gesehen (mit `rewatch` erneut gesehen)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchInput"
+      responses:
+        "200":
+          description: Film mit eigenen Sichtungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovieDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: unmarkMovie
+      tags: [Filme]
+      summary: Alle Sichtungen des Films löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "200":
+          description: Film mit eigenen Sichtungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovieDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/movies/{tmdbID}/rating:
+    put:
+      operationId: setMovieRating
+      tags: [Filme]
+      summary: Bewertung 1–10; ohne `rating` löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingInput"
+      responses:
+        "200":
+          description: Film mit eigenen Sichtungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovieDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/movies/{tmdbID}/comment:
+    put:
+      operationId: setMovieComment
+      tags: [Filme]
+      summary: Kommentar zum Film; ohne `comment` löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "200":
+          description: Film mit eigenen Sichtungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovieDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
 components:
   parameters:
     TmdbID:
@@ -452,6 +677,173 @@ components:
         message:
           type: string
           description: Deutsche Meldung wie in der Weboberfläche.
+    NextEpisode:
+      type: object
+      required: [episodeId, season, number, name]
+      properties:
+        episodeId:
+          type: string
+          format: uuid
+        season:
+          type: integer
+        number:
+          type: integer
+        name:
+          type: string
+        airDate:
+          type: string
+    WatchLink:
+      type: object
+      required: [label, url]
+      properties:
+        label:
+          type: string
+          description: z. B. „Auf Netflix suchen“, „Disney+ öffnen“
+        url:
+          type: string
+    ContinueCard:
+      type: object
+      required: [tmdbId, name, next, remaining]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        rating:
+          type: integer
+        next:
+          $ref: "#/components/schemas/NextEpisode"
+        remaining:
+          type: integer
+        lastWatchedOn:
+          type: string
+        lastService:
+          $ref: "#/components/schemas/Service"
+        watchLink:
+          $ref: "#/components/schemas/WatchLink"
+    ContinueWatching:
+      type: object
+      required: [cards, olderCount]
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContinueCard"
+        olderCount:
+          type: integer
+          description: Serien, die länger als 3 Monate pausieren (mit `all=true` enthalten).
+    NewEpisodesNote:
+      type: object
+      required: [tmdbId, name, count, first]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        count:
+          type: integer
+        first:
+          $ref: "#/components/schemas/NextEpisode"
+    UpcomingNote:
+      type: object
+      required: [tmdbId, name, count, next]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        count:
+          type: integer
+        next:
+          $ref: "#/components/schemas/NextEpisode"
+    Notes:
+      type: object
+      required: [newEpisodes, upcoming]
+      properties:
+        newEpisodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewEpisodesNote"
+        upcoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingNote"
+    NextInput:
+      type: object
+      properties:
+        episodeId:
+          type: string
+          format: uuid
+          description: Folge, die die App als nächste angezeigt hat (verhindert Doppelklicks).
+    SearchResult:
+      type: object
+      required: [kind, tmdbId, name]
+      properties:
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        posterPath:
+          type: string
+    SearchHit:
+      type: object
+      required: [kind, tmdbId, name, inLibrary]
+      properties:
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        posterPath:
+          type: string
+        inLibrary:
+          type: boolean
+        watchedEpisodes:
+          type: integer
+        totalEpisodes:
+          type: integer
+        rating:
+          type: integer
+    MovieDetail:
+      type: object
+      required: [tmdbId, name, links, watches]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        posterPath:
+          type: string
+        overview:
+          type: string
+        runtime:
+          type: integer
+          description: Minuten
+        links:
+          $ref: "#/components/schemas/Links"
+        rating:
+          type: integer
+        comment:
+          type: string
+        watches:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchSummary"
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]

@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.1] – 2026-11-08
+
+### Neu
+- **App-API (Phase 2):** Weiterschauen inkl. „nächste Folge gesehen“ und Dienst-Link, Hinweise (neue Folgen,
+  demnächst), Suche, Serien (Details, Folgen/Staffel/Serie abhaken, Bewertung, Kommentare, Beobachten,
+  Ausblenden) und Filme.
+
 ## [0.2.0] – 2026-11-08
 
 ### Neu
