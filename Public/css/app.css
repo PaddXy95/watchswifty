@@ -272,3 +272,9 @@ label.checkbox { display: inline-flex; align-items: center; gap: var(--space-2);
 .film-entry p { margin: 0 0 var(--space-2); }
 .film-imported { margin-top: var(--space-4); }
 .film-imported > summary { cursor: pointer; color: var(--ink-2); }
+
+/* Konto → Geräte */
+.device-list { list-style: none; padding: 0; margin: 0 0 var(--space-3); }
+.device-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+.device-list .inline-form { margin: 0 0 0 auto; }
+code.new-token { user-select: all; word-break: break-all; padding: 0 var(--space-1); background: var(--paper-3); border-radius: 4px; }

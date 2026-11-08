@@ -1,5 +1,6 @@
 import Elementary
 import ElementaryHTMX2
+import Foundation
 
 struct AccountPage: HTML {
     let nav: NavContext
@@ -9,6 +10,10 @@ struct AccountPage: HTML {
     var followed: [FollowedSeries] = []
     /// A token is stored but cannot be decrypted (server key changed).
     var tokenUnreadable = false
+    /// App devices and manual tokens (App API).
+    var devices: [APIToken] = []
+    /// A token created just now (shown only once).
+    var newToken: String? = nil
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -58,6 +63,43 @@ struct AccountPage: HTML {
                         }
                     }
                 }
+            }
+
+            h2 { "Geräte" }
+            p(.class("muted")) {
+                "Apps und Skripte mit Zugriff auf dein Konto über die API (Doku unter "
+                a(.href("/api")) { "/api" }
+                "). Jede Anmeldung gilt 90 Tage."
+            }
+            if let newToken {
+                p(.class("notice"), .custom(name: "role", value: "status")) {
+                    "Neues Token (wird nur jetzt angezeigt): "
+                    code(.class("new-token")) { newToken }
+                }
+            }
+            if devices.isEmpty {
+                p(.class("muted")) { "Keine Geräte verbunden." }
+            } else {
+                ul(.class("device-list")) {
+                    for device in devices {
+                        li {
+                            strong { device.name }
+                            span(.class("muted")) {
+                                " \(device.tokenKind == .manual ? "manuell erstellt" : "Gerät") · angelegt \(formatDateTime(device.createdAt))"
+                                " · läuft ab \(formatDateTime(device.expiresAt))"
+                                " · zuletzt benutzt \(device.lastUsedAt.map(formatDateTime) ?? "nie")"
+                            }
+                            form(.method(.post), .action("/account/devices/\(device.id?.uuidString ?? "")/revoke"), .class("inline-form")) {
+                                button(.type(.submit), .class("link-button")) { "Abmelden" }
+                            }
+                        }
+                    }
+                }
+            }
+            form(.method(.post), .action("/account/devices"), .class("inline-form")) {
+                input(.type(.text), .name("name"), .required, .custom(name: "maxlength", value: "60"),
+                      .custom(name: "placeholder", value: "Name, z. B. Skript"), .custom(name: "aria-label", value: "Name des Tokens"))
+                button(.type(.submit)) { "Token erstellen" }
             }
 
             h2 { "Passwort ändern" }

@@ -75,6 +75,9 @@ struct DailyRefreshLifecycle: LifecycleHandler {
             while !Task.isCancelled {
                 let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
                 if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
+                if let expired = try? await APITokenService(db: db).deleteExpired(), expired > 0 {
+                    logger.info("App-API: \(expired) abgelaufene Geräte-Tokens gelöscht")
+                }
                 let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
                 if !maintenance.isEmpty {
                     logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")

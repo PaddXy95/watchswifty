@@ -24,6 +24,8 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
 
     static func describe(_ error: any Error, path: String) -> (HTTPStatus, String) {
         switch error {
+        case let error as APIError:
+            return (error.status, error.message)
         case let error as TrackingError:
             switch error {
             case .notFound: return (.notFound, "Nicht gefunden.")

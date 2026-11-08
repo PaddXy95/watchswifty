@@ -76,8 +76,51 @@ paths:
                 $ref: "#/components/schemas/Me"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/me/devices:
+    get:
+      operationId: listDevices
+      tags: [Konto]
+      summary: Geräte und manuell erstellte Tokens
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Geräte (ohne Token-Werte)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/me/devices/{id}:
+    delete:
+      operationId: revokeDevice
+      tags: [Konto]
+      summary: Gerät abmelden
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Abgemeldet
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   responses:
+    NotFound:
+      description: Nicht gefunden (`notFound`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Unauthorized:
       description: Kein oder ungültiges Token (`unauthorized`) bzw. abgelaufen (`tokenExpired`)
       content:
