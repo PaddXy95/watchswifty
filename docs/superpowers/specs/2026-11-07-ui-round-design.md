@@ -121,3 +121,17 @@ unterstützt …“ sind Pflicht.
 - **Footer rechts** [entschieden]: statt „GitHub“ das offizielle TMDB-Logo (kleiner als der Markenname, Link zu
   themoviedb.org) mit dem Hinweis „Diese Anwendung verwendet TMDB und die TMDB-APIs, ist aber nicht von TMDB
   unterstützt, zertifiziert oder anderweitig genehmigt.“
+
+## Nachtrag: Statistik übersichtlicher [entschieden: Entwurf vom Nutzer freigegeben]
+Problem: Die Seite ist unübersichtlich (lange Tabellen, Jahresfilter wirkt nur auf die Bewertungen).
+- **Ein Zeitraum für alles:** Auswahl „Alle Jahre“ / einzelnes Jahr oben (`?year=`); Kennzahlen, Diagramm,
+  Dienste, Bewertungen und Meistgesehen richten sich danach. [entschieden]
+- **Kennzahlen:** Zeit, Folgen, Serien, Filme; bei einem Jahr mit Veränderung zum Vorjahr in Prozent. [entschieden]
+- **Diagramm „Zeit pro Monat“:** gestapelte Säulen Serien/Filme; bei „Alle Jahre“ eine Säule pro Jahr; genaue Werte
+  beim Drüberfahren. [entschieden]
+- **Neu: Dienste** (Anteil der Zeit je Dienst) und **Meistgesehen** (Top-5-Serien nach Zeit mit Poster, Folgen,
+  Stunden, Bewertung). Bewertungen als ein Säulendiagramm 1–10 plus „ohne“. [entschieden]
+- Die bisherigen Tabellen (Jahre/Monate, ohne Datum) eingeklappt unter „Alle Zahlen“. [entschieden]
+- [Vorschlag] Diagramme serverseitig als SVG (kein JavaScript, Tooltip über `<title>`); „ohne Datum“ zählt nur bei
+  „Alle Jahre“ in den Kennzahlen; Dienst-Anteile nach bekannter Zeit, Sichtungen ohne Dienst als „ohne Dienst“.
+  Die App-API liefert dieselben Felder (`GET /v1/stats?year=` filtert jetzt alles).
