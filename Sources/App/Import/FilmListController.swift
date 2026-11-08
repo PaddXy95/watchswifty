@@ -6,7 +6,7 @@ struct FilmListController {
     struct AcceptInput: Content { var tmdbID: Int }
     struct SearchInput: Content { var q: String }
 
-    static let notFilmListMessage = "Keine Filmliste erkannt – erwartet wird eine CSV mit einer Kopfzeile, die „Filmname“ enthält."
+    static let notFilmListMessage = FilmListService.notFilmListMessage
 
     func register(on protected: any RoutesBuilder) {
         protected.get("import", "films", use: page)
@@ -29,18 +29,14 @@ struct FilmListController {
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) else {
             return try await render(req, status: .unprocessableEntity, error: "Die Datei ließ sich nicht lesen.")
         }
-        let drafts: [FilmListDraft]
+        let count: Int
         do {
-            drafts = groupFilmList(try parseFilmList(text))
-        } catch {
-            return try await render(req, status: .unprocessableEntity, error: Self.notFilmListMessage)
+            count = try await FilmListService(db: req.db).upload(userID: try req.userID, text: text)
+        } catch let error as APIError {
+            return try await render(req, status: .unprocessableEntity, error: error.message)
         }
-        guard !drafts.isEmpty else {
-            return try await render(req, status: .unprocessableEntity, error: "Die Liste enthält keine Filme.")
-        }
-        try await FilmListService(db: req.db).replace(userID: try req.userID, drafts: drafts)
         await req.application.filmListWorker.kick()
-        return try await render(req, notice: "\(drafts.count) Filme übernommen – die Zuordnung zu TMDB läuft im Hintergrund.")
+        return try await render(req, notice: "\(count) Filme übernommen – die Zuordnung zu TMDB läuft im Hintergrund.")
     }
 
     /// Progress fragment for polling; when nothing is pending any more, the page reloads to show the results.
@@ -54,11 +50,7 @@ struct FilmListController {
     }
 
     func retry(req: Request) async throws -> HTMLResponse {
-        let entries = try await FilmListService(db: req.db).entries(userID: try req.userID)
-        for entry in entries where entry.filmStatus == .pending && entry.error != nil {
-            entry.error = nil
-            try await entry.save(on: req.db)
-        }
+        try await FilmListService(db: req.db).retry(userID: try req.userID)
         await req.application.filmListWorker.kick()
         return HTMLResponse(FilmListStatusBox(entries: try await FilmListService(db: req.db).entries(userID: try req.userID)))
     }
@@ -77,10 +69,8 @@ struct FilmListController {
     }
 
     func skip(req: Request) async throws -> HTMLResponse {
-        let entry = try await ownEntry(req)
-        entry.status = FilmListStatus.skipped.rawValue
-        try await entry.save(on: req.db)
-        return HTMLResponse(FilmEntryCard(entry: entry))
+        guard let id = req.parameters.get("entryID", as: UUID.self) else { throw Abort(.notFound) }
+        return HTMLResponse(FilmEntryCard(entry: try await FilmListService(db: req.db).skip(userID: try req.userID, id: id)))
     }
 
     private func importer(_ req: Request) -> FilmListImporter {

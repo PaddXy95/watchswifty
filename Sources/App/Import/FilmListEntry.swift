@@ -97,6 +97,36 @@ struct FilmListService {
         }
     }
 
+    static let notFilmListMessage = "Keine Filmliste erkannt – erwartet wird eine CSV mit einer Kopfzeile, die „Filmname“ enthält."
+
+    /// Parses an uploaded list and replaces the user's earlier one; returns the number of films.
+    func upload(userID: UUID, text: String) async throws -> Int {
+        let drafts: [FilmListDraft]
+        do {
+            drafts = groupFilmList(try parseFilmList(text))
+        } catch {
+            throw APIError.validation(Self.notFilmListMessage)
+        }
+        guard !drafts.isEmpty else { throw APIError.validation("Die Liste enthält keine Filme.") }
+        try await replace(userID: userID, drafts: drafts)
+        return drafts.count
+    }
+
+    /// Clears the errors of entries still waiting for TMDB so the worker tries them again.
+    func retry(userID: UUID) async throws {
+        for entry in try await entries(userID: userID) where entry.filmStatus == .pending && entry.error != nil {
+            entry.error = nil
+            try await entry.save(on: db)
+        }
+    }
+
+    func skip(userID: UUID, id: UUID) async throws -> FilmListEntry {
+        let entry = try await ownEntry(userID: userID, id: id)
+        entry.status = FilmListStatus.skipped.rawValue
+        try await entry.save(on: db)
+        return entry
+    }
+
     func entries(userID: UUID) async throws -> [FilmListEntry] {
         try await FilmListEntry.query(on: db).filter(\.$user.$id == userID).sort(\.$position).all()
     }

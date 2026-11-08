@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.3] – 2026-11-08
+
+### Neu
+- **App-API (Phase 4):** Netflix-Import (Upload bis 10 MB, Stand, „Zu prüfen“, Zuordnungen ändern, nicht
+  zugeordnete Zeilen zuweisen) und Filmliste (Upload bis 2 MB, Vorschläge, Suchen, Überspringen).
+
 ## [0.2.2] – 2026-11-08
 
 ### Neu

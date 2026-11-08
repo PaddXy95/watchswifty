@@ -18,6 +18,7 @@ tags:
   - name: Bibliothek
   - name: Statistik
   - name: Netflix-Import
+  - name: Filmliste
 paths:
   /v1/version:
     get:
@@ -1124,6 +1125,160 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/imports/films:
+    post:
+      operationId: uploadFilmList
+      tags: [Filmliste]
+      summary: Eigene Filmliste (CSV mit Kopfzeile „Filmname“, höchstens 2 MB) hochladen; ersetzt die bisherige Liste
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: "*/*"
+      responses:
+        "200":
+          description: Anzahl übernommener Filme (Zuordnung läuft im Hintergrund)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmUploadResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Datei zu groß (`payloadTooLarge`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    get:
+      operationId: getFilmList
+      tags: [Filmliste]
+      summary: Stand der Filmliste
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/imports/films/retry:
+    post:
+      operationId: retryFilmList
+      tags: [Filmliste]
+      summary: Zuordnung erneut versuchen (nach TMDB-Fehlern)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/imports/films/{id}/accept:
+    post:
+      operationId: acceptFilm
+      tags: [Filmliste]
+      summary: Film einem TMDB-Treffer zuordnen und Sichtungen anlegen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmAccept"
+      responses:
+        "200":
+          description: Eintrag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/imports/films/{id}/search:
+    post:
+      operationId: searchFilm
+      tags: [Filmliste]
+      summary: Mit anderem Suchbegriff Vorschläge holen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmSearch"
+      responses:
+        "200":
+          description: Eintrag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/imports/films/{id}/skip:
+    post:
+      operationId: skipFilm
+      tags: [Filmliste]
+      summary: Film überspringen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Eintrag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     TmdbID:
@@ -1637,6 +1792,77 @@ components:
         episodeId:
           type: string
           format: uuid
+    FilmUploadResult:
+      type: object
+      required: [films]
+      properties:
+        films:
+          type: integer
+    FilmEntry:
+      type: object
+      required: [id, title, watchCount, status, candidates]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        year:
+          type: integer
+        watchCount:
+          type: integer
+        rating:
+          type: integer
+        status:
+          type: string
+          enum: [pending, imported, review, not_found, skipped]
+        tmdbId:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        error:
+          type: string
+    FilmCounts:
+      type: object
+      required: [imported, review, notFound, skipped, pending]
+      properties:
+        imported:
+          type: integer
+        review:
+          type: integer
+        notFound:
+          type: integer
+        skipped:
+          type: integer
+        pending:
+          type: integer
+    FilmList:
+      type: object
+      required: [counts, entries]
+      properties:
+        counts:
+          $ref: "#/components/schemas/FilmCounts"
+        error:
+          type: string
+          description: Fehler der Zuordnung (z. B. kein TMDB-Token); Einträge bleiben offen.
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmEntry"
+    FilmAccept:
+      type: object
+      required: [tmdbId]
+      properties:
+        tmdbId:
+          type: integer
+    FilmSearch:
+      type: object
+      required: [q]
+      properties:
+        q:
+          type: string
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
