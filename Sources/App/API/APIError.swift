@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import OpenAPIRuntime
 import Vapor
 
@@ -27,7 +28,17 @@ struct APIError: Error, Sendable, Equatable {
         case let error as APIError:
             return error
         case let error as ServerError:
-            return from(error.underlyingError, path: path)
+            let inner = from(error.underlyingError, path: path)
+            // Request problems found by the generated code (content type, missing body, Accept) keep their 4xx status.
+            guard inner.status.code >= 500, (400..<500).contains(error.httpStatus.code) else { return inner }
+            let status = HTTPStatus(statusCode: error.httpStatus.code)
+            let code: String = switch status.code {
+            case 406: "notAcceptable"
+            case 413: "payloadTooLarge"
+            case 415: "unsupportedMediaType"
+            default: "validation"
+            }
+            return APIError(status: status, code: code, message: "Ungültige Anfrage: \(error.underlyingError.localizedDescription)")
         case TMDBError.missingToken:
             return APIError(status: .unprocessableEntity, code: "missingTMDBToken", message: TMDBError.missingToken.description)
         case TMDBError.notFound:

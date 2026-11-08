@@ -13,7 +13,7 @@ struct HistoryController {
     }
 
     func history(req: Request) async throws -> HTMLResponse {
-        let page = max(1, (try? req.query.get(Int.self, at: "page")) ?? 1)
+        let page = min(max(1, (try? req.query.get(Int.self, at: "page")) ?? 1), HistoryService.maxPage)
         let result = try await req.history.page(userID: try req.userID, page: page, perPage: Self.pageSize)
         let rows = HistoryRows(rows: result.entries.map { ($0, $0.title, $0.episode) },
                                nextPage: page * Self.pageSize < result.total ? page + 1 : nil, today: req.watches.today())

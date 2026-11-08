@@ -8,7 +8,13 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
         do {
             return try await next.respond(to: request)
         } catch {
-            if request.isAPIRequest { return APIError.from(error, path: request.url.path).response() }
+            if request.isAPIRequest {
+                let apiError = APIError.from(error, path: request.url.path)
+                if apiError.status.code >= 500 {
+                    request.logger.error("\(request.method) \(request.url.path) → \(apiError.status.code): \(APIErrorMiddleware.logDescription(of: error))")
+                }
+                return apiError.response()
+            }
             let (status, message) = Self.describe(error, path: request.url.path)
             if status.code >= 500 {
                 request.logger.error("\(request.method) \(request.url.path) → \(status.code): \(String(reflecting: error))")

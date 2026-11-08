@@ -7,5 +7,5 @@ import WatchSwiftyAPI
 func registerAPI(_ app: Application) throws {
     let api = app.grouped(APIErrorMiddleware(), APIContextMiddleware())
     let transport = VaporTransport(routesBuilder: api)
-    try APIHandler().registerHandlers(on: transport, serverURL: URL(string: "/api")!, middlewares: [EmptyBodyMiddleware()])
+    try APIHandler().registerHandlers(on: transport, serverURL: URL(string: "/api")!, middlewares: [EmptyBodyMiddleware(), BodyLimitMiddleware()])
 }

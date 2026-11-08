@@ -7,7 +7,7 @@ extension APIHandler {
     func getHistory(_ input: Operations.getHistory.Input) async throws -> Operations.getHistory.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
-        let page = max(1, input.query.page ?? 1)
+        let page = min(max(1, input.query.page ?? 1), HistoryService.maxPage)
         let perPage = min(200, max(1, input.query.perPage ?? 50))
         let result = try await request.history.page(userID: user.requireID(), page: page, perPage: perPage)
         return .ok(.init(body: .json(.init(items: result.entries.map(Self.historyItem), total: result.total, page: page, perPage: perPage))))
