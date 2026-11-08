@@ -15,6 +15,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.14.4"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.13.4"),
         .package(url: "https://github.com/vapor/swift-openapi-vapor", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-http-types", from: "1.0.0"),
         .package(url: "https://github.com/elementary-swift/elementary.git", exact: "0.9.0"),
         .package(url: "https://github.com/elementary-swift/elementary-htmx.git", exact: "0.7.0"),
     ],
@@ -39,6 +40,7 @@ let package = Package(
                 .target(name: "WatchSwiftyAPI"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
             ],
             swiftSettings: swiftSettings
         ),

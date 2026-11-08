@@ -214,21 +214,8 @@ struct TitleController {
 
     // MARK: Helpers
 
-    /// Stale caches are refreshed; titles cached before overviews/runtimes existed fetch them once.
-    /// Failures (no token, TMDB down) only log – the cached data is shown.
     private func refreshForDetails(_ req: Request, _ title: Title) async {
-        do {
-            let episodesMissingOverview = title.titleKind == .tv
-                ? try await Episode.query(on: req.db).filter(\.$title.$id == title.requireID()).filter(\.$overview == nil).count() > 0
-                : false
-            if title.overview == nil || title.runtime == nil || episodesMissingOverview {
-                try await req.catalog.refresh(title)
-            } else {
-                try await req.catalog.refreshIfStale(title)
-            }
-        } catch {
-            req.logger.warning("TMDB refresh failed for \(title.tmdbID): \(error)")
-        }
+        await req.seriesDetails.refreshForDetails(title)
     }
 
     private func handle(_ req: Request, _ body: () async throws -> HTMLResponse) async throws -> Response {
@@ -257,7 +244,7 @@ struct TitleController {
     }
 
     private func findEntry(_ req: Request, userID: UUID, titleID: UUID) async throws -> UserTitle? {
-        try await UserTitle.query(on: req.db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first()
+        try await req.seriesDetails.entry(userID: userID, titleID: titleID)
     }
 
     private func movieWatches(_ req: Request, userID: UUID, titleID: UUID) async throws -> [Watch] {
@@ -272,25 +259,7 @@ struct TitleController {
                                           defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
     }
 
-    /// Season view models; `open` forces a season open, otherwise the season of the next episode
-    /// (or the first season when nothing is watched yet) is open.
     func seasonModels(_ req: Request, title: Title, userID: UUID, open: Int?) async throws -> [SeasonModel] {
-        let today = req.watches.today()
-        let episodes = try await req.catalog.episodes(of: title.requireID())
-        let watches = try await req.watches.watchesQuery(userID: userID).filter(\.$title.$id == title.requireID())
-            .filter(\.$episode.$id != nil).all()
-        let byEpisode = Dictionary(grouping: watches, by: { $0.$episode.id! }).mapValues { list in
-            list.sorted { ($0.watchedOn ?? "", $0.createdAt ?? .distantPast) > ($1.watchedOn ?? "", $1.createdAt ?? .distantPast) }
-        }
-        let infos = episodes.map(EpisodeInfo.init)
-        let openSeason = open ?? nextEpisode(in: infos, watched: Set(byEpisode.keys), today: today)?.season
-            ?? (watches.isEmpty ? infos.first(where: { $0.season >= 1 })?.season : nil)
-        let grouped = Dictionary(grouping: episodes, by: \.season)
-        let comments = try await req.watches.seasonComments(userID: userID, titleID: title.requireID())
-        return grouped.keys.sorted { a, b in (a == 0 ? Int.max : a) < (b == 0 ? Int.max : b) }.map { number in
-            SeasonModel(number: number, episodes: grouped[number]!.map { e in
-                EpisodeRowModel(info: EpisodeInfo(e), aired: req.watches.isAired(e), watches: byEpisode[e.id!] ?? [])
-            }, isOpen: number == openSeason, comment: comments[number])
-        }
+        try await req.seriesDetails.seasons(title: title, userID: userID, open: open)
     }
 }

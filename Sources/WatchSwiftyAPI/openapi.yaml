@@ -10,6 +10,7 @@ servers:
 tags:
   - name: Meta
   - name: Konto
+  - name: Serien
 paths:
   /v1/version:
     get:
@@ -113,8 +114,316 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/tv/{tmdbID}:
+    get:
+      operationId: getSeries
+      tags: [Serien]
+      summary: Serie mit Staffeln, Folgen und eigenen Sichtungen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/episodes/{season}/{number}/watch:
+    post:
+      operationId: markEpisode
+      tags: [Serien]
+      summary: Folge als gesehen markieren
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+        - $ref: "#/components/parameters/Season"
+        - $ref: "#/components/parameters/Episode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: unmarkEpisode
+      tags: [Serien]
+      summary: Folge als ungesehen markieren (alle Sichtungen)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+        - $ref: "#/components/parameters/Season"
+        - $ref: "#/components/parameters/Episode"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/episodes/{season}/{number}/watch-up-to:
+    post:
+      operationId: markUpTo
+      tags: [Serien]
+      summary: Alle Folgen bis hier gesehen (ohne Datum)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+        - $ref: "#/components/parameters/Season"
+        - $ref: "#/components/parameters/Episode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/seasons/{season}/watch:
+    post:
+      operationId: markSeason
+      tags: [Serien]
+      summary: Ganze Staffel gesehen (ohne Datum)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+        - $ref: "#/components/parameters/Season"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/watch-all:
+    post:
+      operationId: markSeries
+      tags: [Serien]
+      summary: Gesamte Serie gesehen (ohne Datum)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/hidden:
+    put:
+      operationId: setHidden
+      tags: [Serien]
+      summary: Serie aus- oder einblenden
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HiddenInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/follow:
+    put:
+      operationId: setFollowed
+      tags: [Serien]
+      summary: Serie beobachten (Hinweis auf neue Folgen)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/rating:
+    put:
+      operationId: setSeriesRating
+      tags: [Serien]
+      summary: Bewertung 1–10 setzen; ohne `rating` löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/comment:
+    put:
+      operationId: setSeriesComment
+      tags: [Serien]
+      summary: Kommentar zur Serie; ohne `comment` löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/seasons/{season}/comment:
+    put:
+      operationId: setSeasonComment
+      tags: [Serien]
+      summary: Kommentar zur Staffel
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+        - $ref: "#/components/parameters/Season"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "200":
+          description: Serie mit Staffeln und Folgen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
 components:
+  parameters:
+    TmdbID:
+      name: tmdbID
+      in: path
+      required: true
+      schema:
+        type: integer
+    Season:
+      name: season
+      in: path
+      required: true
+      schema:
+        type: integer
+    Episode:
+      name: number
+      in: path
+      required: true
+      schema:
+        type: integer
   responses:
+    Unprocessable:
+      description: "Ungültige Eingabe (`validation`) oder kein TMDB-Token (`missingTMDBToken`)"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     NotFound:
       description: Nicht gefunden (`notFound`)
       content:
@@ -143,6 +452,147 @@ components:
         message:
           type: string
           description: Deutsche Meldung wie in der Weboberfläche.
+    Service:
+      type: string
+      enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
+    WatchInput:
+      type: object
+      properties:
+        day:
+          type: string
+          description: Tag `yyyy-MM-dd`; fehlt er, wird ohne Datum gespeichert.
+        service:
+          type: string
+          enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other, unknown]
+          description: Fehlt er, gilt der zuletzt genutzte Dienst dieser Serie; `unknown` = ohne Dienst.
+        rewatch:
+          type: boolean
+          description: Erneut gesehen (zusätzliche Sichtung statt Ersetzen).
+    HiddenInput:
+      type: object
+      required: [hidden]
+      properties:
+        hidden:
+          type: boolean
+    FollowInput:
+      type: object
+      required: [followed]
+      properties:
+        followed:
+          type: boolean
+    RatingInput:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 10
+    CommentInput:
+      type: object
+      properties:
+        comment:
+          type: string
+          maxLength: 2000
+    Links:
+      type: object
+      required: [tmdb, imdb, rottenTomatoes]
+      properties:
+        tmdb:
+          type: string
+        imdb:
+          type: string
+        rottenTomatoes:
+          type: string
+        seriesGraph:
+          type: string
+    WatchSummary:
+      type: object
+      required: [id, origin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        day:
+          type: string
+        service:
+          $ref: "#/components/schemas/Service"
+        origin:
+          type: string
+          enum: [manual, import]
+    Episode:
+      type: object
+      required: [season, number, name, aired, watches]
+      properties:
+        season:
+          type: integer
+        number:
+          type: integer
+        name:
+          type: string
+        airDate:
+          type: string
+        overview:
+          type: string
+        runtime:
+          type: integer
+          description: Minuten
+        aired:
+          type: boolean
+        watches:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchSummary"
+    Season:
+      type: object
+      required: [number, title, watchedCount, episodes]
+      properties:
+        number:
+          type: integer
+        title:
+          type: string
+        watchedCount:
+          type: integer
+        comment:
+          type: string
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
+    SeriesDetail:
+      type: object
+      required: [tmdbId, name, links, hidden, followed, seasons]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        posterPath:
+          type: string
+        overview:
+          type: string
+        status:
+          type: string
+        runtime:
+          type: integer
+          description: Typische Folgenlänge in Minuten
+        links:
+          $ref: "#/components/schemas/Links"
+        rating:
+          type: integer
+        comment:
+          type: string
+        hidden:
+          type: boolean
+        followed:
+          type: boolean
+        lastService:
+          $ref: "#/components/schemas/Service"
+        seasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Season"
     TokenRequest:
       type: object
       required: [code, codeVerifier, redirectUri]
