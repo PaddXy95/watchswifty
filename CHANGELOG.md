@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.0] – 2026-11-08
+
+### Neu
+- **App-API (Phase 1):** JSON-API unter `/api/v1`, beschrieben in einer OpenAPI-Datei (Server-Code wird daraus
+  erzeugt), Doku mit „Ausprobieren“ unter `/api`.
+- **App-Anmeldung:** Login im Browser-Fenster mit Bestätigung („App verbinden“), danach ein Geräte-Token
+  (90 Tage gültig, nur als Hash gespeichert). Unter **Konto → Geräte** alle Geräte sehen und abmelden sowie
+  Tokens für Skripte erstellen.
+
 ## [0.1.2] – 2026-11-08
 
 ### Neu

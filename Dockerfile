@@ -22,7 +22,7 @@ RUN swift build -c release --static-swift-stdlib --product App
 
 WORKDIR /staging
 RUN cp "$(swift build --package-path /build -c release --show-bin-path)/App" ./ \
-    && cp -R /build/Public ./Public
+    && cp -RL /build/Public ./Public
 
 # ---- Run ----
 FROM ubuntu:noble

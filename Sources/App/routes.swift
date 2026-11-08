@@ -5,6 +5,7 @@ func routes(_ app: Application) throws {
     app.get("healthz") { _ in "ok" }
     app.get("version") { _ in AppVersion.current }
     try registerAPI(app)
+    app.get("api") { _ in HTMLResponse(APIDocsPage()) }
     APIAuthorizeController().register(on: app)
     AuthController().register(on: app)
 

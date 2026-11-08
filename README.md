@@ -133,6 +133,20 @@ docker rm -f watchswifty
 Danach den `docker run`-Befehl von oben erneut ausführen (das Volume bleibt erhalten).
 Datenbank-Änderungen neuer Versionen werden beim Start automatisch angewendet.
 
+## App-API
+
+WatchSwifty hat eine JSON-API für Apps unter `/api/v1`. Die vollständige Beschreibung (OpenAPI) liegt unter
+`http://<server>:8080/api/openapi.yaml`, eine Doku-Seite zum Ausprobieren unter `http://<server>:8080/api`.
+
+- **Anmeldung einer App:** Die App öffnet im System-Browser-Fenster
+  `/api/auth/authorize?redirect_uri=watchswifty://auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
+  (PKCE). Nach Login und „Verbinden“ springt der Browser zu `watchswifty://auth?code=…&state=…`; die App tauscht den
+  Code über `POST /api/v1/auth/token` gegen ein Geräte-Token.
+- **Aufrufe:** mit Header `Authorization: Bearer ws_…`. Tokens gelten 90 Tage, danach verbindet sich die App neu.
+- **Geräte verwalten:** unter **Konto → Geräte** – abmelden oder ein Token für Skripte bzw. die Doku erstellen
+  (wird nur einmal angezeigt).
+- Die API nimmt keine Session-Cookies an; Fehler kommen als `{"code": …, "message": …}`.
+
 ## TMDB-Token
 
 Jeder Benutzer hinterlegt unter **Konto** seinen eigenen kostenlosen TMDB *Read Access Token*:
