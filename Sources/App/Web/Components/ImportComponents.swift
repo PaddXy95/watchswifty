@@ -63,7 +63,7 @@ struct CandidateList: HTML {
                 button(.class("candidate"), .hx.post("/import/mappings/\(mappingID.uuidString)/\(action)"),
                        .hx.vals(#"{"kind":"\#(result.kind.rawValue)","tmdbID":"\#(result.id)"}"#),
                        .hx.target(target), .hx.swap(.outerHTML)) {
-                    Poster(path: result.posterPath, alt: result.name)
+                    Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
                     span {
                         result.name
                         if let year = result.year { " (\(year))" }

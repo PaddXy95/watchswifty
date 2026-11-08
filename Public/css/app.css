@@ -59,7 +59,7 @@ label input, label select { display: block; margin-top: var(--space-1); width: 1
 .card-list { display: grid; gap: var(--space-3); }
 .card { display: flex; gap: var(--space-4); padding: var(--space-3); background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); }
 .card .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
-.poster { width: 92px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: calc(var(--radius) / 2); background: var(--paper-3); flex-shrink: 0; }
+.poster { width: 92px; height: auto; aspect-ratio: 2 / 3; object-fit: cover; border-radius: calc(var(--radius) / 2); background: var(--paper-3); flex-shrink: 0; }
 .poster-placeholder { display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-weight: 700; }
 .poster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-4); }
 .poster-grid .poster { width: 100%; }

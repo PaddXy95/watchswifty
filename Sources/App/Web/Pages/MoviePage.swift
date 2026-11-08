@@ -12,7 +12,7 @@ struct MoviePage: HTML {
     var body: some HTML {
         PageLayout(title: title.name, nav: nav) {
             div(.class("title-header")) {
-                Poster(path: title.posterPath, alt: title.name)
+                Poster(path: title.posterPath, alt: title.name, displayWidth: 140)
                 div {
                     h1 {
                         title.name

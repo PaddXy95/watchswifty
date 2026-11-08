@@ -113,7 +113,7 @@ struct FilmEntryCard: HTML {
                         for result in entry.candidateList {
                             button(.class("candidate"), .hx.post("\(path)/accept"), .hx.vals(#"{"tmdbID":"\#(result.id)"}"#),
                                    .hx.target("closest .film-entry"), .hx.swap(.outerHTML)) {
-                                Poster(path: result.posterPath, alt: result.name)
+                                Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
                                 span { "\(result.name)\(result.year.map { " (\($0))" } ?? "") · Übernehmen" }
                             }
                         }

@@ -38,7 +38,7 @@ struct LibraryPage: HTML {
                     div(.class("library-item")) {
                         a(.href("/\(item.title.kind)/\(item.title.tmdbID)"),
                           .custom(name: "hx-indicator", value: "closest .library-item, #page-loader")) {
-                            Poster(path: item.title.posterPath, alt: item.title.name)
+                            Poster(path: item.title.posterPath, alt: item.title.name, displayWidth: 200)
                             div { item.title.name }
                         }
                         if let rating = item.rating { span(.class("rating")) { "★ \(rating)" } }
