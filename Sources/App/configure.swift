@@ -50,6 +50,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(CreateAppSettings())
     app.migrations.add(CreateFilmListEntry())
     app.migrations.add(AddMappingCandidatesAt())
+    app.migrations.add(CreateAPIToken())
 
     try routes(app)
     try await app.autoMigrate()
