@@ -106,3 +106,18 @@ Datum wie „Mo., 1. Jan. 2024“, Bewertung in Sternen (0,5–5) und „Detail�
   Disney+, AppleTV+, WowTV → WOW, Gekauft, Kino; Unbekanntes (YouTube, Geliehen) → Sonstiges.
 - [Vorschlag] Erneuter Import legt keine doppelten Sichtungen an (gleicher Film, Datum ±1 Tag bzw. schon eine ohne
   Datum). Unlesbare/zukünftige Daten → Sichtung ohne Datum.
+
+## Nachtrag: TMDB-Bedingungen (Cache höchstens 6 Monate, Attribution) [entschieden]
+TMDB API Terms: keine TMDB-Daten länger als 6 Monate zwischenspeichern; TMDB-Logo und Hinweis „… nicht von TMDB
+unterstützt …“ sind Pflicht.
+- **Frist 60 Tage** [entschieden]: Täglich wird jeder Titel, dessen letzter TMDB-Abgleich älter als 60 Tage ist, neu
+  geholt (höchstens 200 pro Tag, älteste zuerst).
+- **Token** [entschieden]: immer der Token eines Benutzers, der den Titel nutzt (Sichtung, Bibliothek/Beobachten,
+  Netflix-Zuordnung, Filmliste) – nie der Token eines Unbeteiligten.
+- [Vorschlag] Titel, die niemand nutzt, werden nach 60 Tagen gelöscht. Hat kein Nutzer des Titels einen Token, werden
+  nach 6 Monaten Klappentexte, IMDb-ID und Laufzeiten geleert (Name, Folgen und Sendedaten bleiben für den Verlauf).
+- [Vorschlag] Gespeicherte Vorschlagslisten (Netflix „Zu prüfen“, Filmliste) werden nach 60 Tagen verworfen; man
+  sucht dann neu.
+- **Footer rechts** [entschieden]: statt „GitHub“ das offizielle TMDB-Logo (kleiner als der Markenname, Link zu
+  themoviedb.org) mit dem Hinweis „Diese Anwendung verwendet TMDB und die TMDB-APIs, ist aber nicht von TMDB
+  unterstützt, zertifiziert oder anderweitig genehmigt.“
