@@ -15,7 +15,7 @@ struct StatsTests {
     }
 
     func stats(_ app: Application, _ user: User, ratingYear: Int? = nil) async throws -> Stats {
-        try await StatsService(db: app.db, today: "2026-11-07").stats(userID: user.requireID(), ratingYear: ratingYear)
+        try await StatsService(db: app.db, today: "2026-11-07").stats(userID: user.requireID(), year: ratingYear)
     }
 
     @Test func statsTotals() async throws {
@@ -159,11 +159,11 @@ struct StatsTests {
                 #expect(body.contains("3 Std."))   // total: 120 + 60 minutes
             }
             try await app.testing().test(.GET, "/stats?year=2026", headers: headers) { res async in
-                #expect(res.body.string.contains(#"<a href="/stats?year=2026#bewertung" class="active""#))
+                #expect(res.body.string.contains(#"<a href="/stats?year=2026" class="active""#))
             }
             try await app.testing().test(.GET, "/stats?year=abc", headers: headers) { res async in
                 #expect(res.status == .ok)
-                #expect(res.body.string.contains(#"<a href="/stats#bewertung" class="active""#))
+                #expect(res.body.string.contains(#"<a href="/stats" class="active" aria-current="true">Alle Jahre"#))
             }
         }
     }
@@ -175,6 +175,125 @@ struct StatsTests {
             try await app.testing().test(.GET, "/stats", headers: headers) { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains("Noch nichts gesehen"))
+            }
+        }
+    }
+}
+
+@Suite("StatsDashboard")
+struct StatsDashboardTests {
+    func watch(_ app: Application, _ user: User, _ title: Title, _ episode: Episode? = nil, on date: String?,
+               service: StreamingService? = nil) async throws {
+        try await Watch(userID: user.requireID(), titleID: title.requireID(), episodeID: episode?.requireID(), watchedOn: date,
+                        service: service, origin: .manual).save(on: app.db)
+    }
+
+    func stats(_ app: Application, _ user: User, year: Int?) async throws -> Stats {
+        try await StatsService(db: app.db, today: "2026-11-07").stats(userID: user.requireID(), year: year)
+    }
+
+    /// 2025: movie (100 min). 2026: series episodes in Jan (2×45) and Mar (45), movie in Mar (120), one undated movie.
+    func seed(_ app: Application, _ user: User) async throws {
+        let old = try await seedMovie(app, tmdbID: 1, name: "Alt", runtime: 100)
+        let new = try await seedMovie(app, tmdbID: 2, name: "Neu", runtime: 120)
+        let undated = try await seedMovie(app, tmdbID: 3, name: "Ohne", runtime: 90)
+        let show = try await seedSeries(app, tmdbID: 4, name: "Dark", seasons: [1: 3], runtime: 45)
+        try await watch(app, user, old, on: "2025-05-05", service: .netflix)
+        try await watch(app, user, show, try await episode(app, show, 1, 1), on: "2026-01-10", service: .netflix)
+        try await watch(app, user, show, try await episode(app, show, 1, 2), on: "2026-01-11", service: .netflix)
+        try await watch(app, user, show, try await episode(app, show, 1, 3), on: "2026-03-01", service: .primeVideo)
+        try await watch(app, user, new, on: "2026-03-02", service: .cinema)
+        try await watch(app, user, undated, on: nil)
+    }
+
+    @Test func periodAndChartForYear() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            let result = try await stats(app, user, year: 2026)
+            #expect(result.year == 2026)
+            #expect(result.period == PeriodStats(movies: 1, series: 1, episodes: 3, minutes: 255, unknownRuntime: 0))
+            #expect(result.chart.count == 11)   // Jan … Nov (today 2026-11-07)
+            #expect(result.chart[0] == ChartBar(label: "Jan", seriesMinutes: 90, movieMinutes: 0, episodes: 2, movies: 0))
+            #expect(result.chart[2] == ChartBar(label: "Mär", seriesMinutes: 45, movieMinutes: 120, episodes: 1, movies: 1))
+        }
+    }
+
+    @Test func chartPerYearForAllYears() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            let result = try await stats(app, user, year: nil)
+            #expect(result.year == nil)
+            #expect(result.period.movies == 3)   // undated counts in „Alle Jahre“
+            #expect(result.chart.map(\.label) == ["2025", "2026"])
+            #expect(result.chart[0].movieMinutes == 100)
+            #expect(result.chart[1].seriesMinutes == 135)
+            #expect(result.previous == nil)
+        }
+    }
+
+    @Test func servicesShareByMinutes() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            let services = try await stats(app, user, year: 2026).services
+            #expect(services == [ServiceShare(service: .cinema, minutes: 120), ServiceShare(service: .netflix, minutes: 90),
+                                 ServiceShare(service: .primeVideo, minutes: 45)])
+            let all = try await stats(app, user, year: nil).services
+            #expect(all.contains(ServiceShare(service: nil, minutes: 90)))   // undated movie without service
+        }
+    }
+
+    @Test func topSeriesByTime() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            let other = try await seedSeries(app, tmdbID: 5, name: "Kurz", seasons: [1: 1], runtime: 20)
+            try await watch(app, user, other, try await episode(app, other, 1, 1), on: "2026-02-01")
+            try await WatchService(db: app.db).setRating(userID: user.requireID(), titleID: try #require(try await Title.query(on: app.db).filter(\.$tmdbID == 4).first()).requireID(), rating: 9)
+            let top = try await stats(app, user, year: 2026).topSeries
+            #expect(top.map(\.name) == ["Dark", "Kurz"])
+            #expect(top.first == TopSeries(tmdbID: 4, name: "Dark", posterPath: nil, episodes: 3, minutes: 135, rating: 9))
+            #expect(try await stats(app, user, year: 2025).topSeries.isEmpty)
+        }
+    }
+
+    @Test func previousYearDelta() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            #expect(try await stats(app, user, year: 2026).previous?.minutes == 100)
+            #expect(try await stats(app, user, year: 2025).previous == nil)
+        }
+    }
+
+    @Test func formatDeltaExamples() {
+        #expect(formatDelta(118, 100) == "+18 %")
+        #expect(formatDelta(94, 100) == "−6 %")
+        #expect(formatDelta(100, 100) == "±0 %")
+        #expect(formatDelta(5, 0) == nil)
+    }
+
+    @Test func statsPageShowsDashboard() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seed(app, user)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/stats?year=2026", headers: headers) { res async in
+                let body = res.body.string
+                #expect(res.status == .ok)
+                #expect(body.contains(#"<a href="/stats?year=2026" class="active""#))
+                #expect(body.contains(#"<a href="/stats""#))
+                #expect(body.contains("Zeit pro Monat"))
+                #expect(body.contains("<svg"))
+                #expect(body.contains("<title>Mär: 2 Std. 45 Min."))
+                #expect(body.contains("Dienste"))
+                #expect(body.contains("Kino"))
+                #expect(body.contains("Meistgesehen"))
+                #expect(body.contains("Dark"))
+                #expect(body.contains("+155 %"))   // 255 vs 100 minutes
+                #expect(body.contains("Alle Zahlen"))
             }
         }
     }

@@ -739,12 +739,15 @@ paths:
     get:
       operationId: getStats
       tags: [Statistik]
-      summary: Filme, Serien, Folgen und Zeit – insgesamt, pro Jahr/Monat und nach Bewertung
+      summary: Filme, Serien, Folgen und Zeit – Zeitraum mit Diagramm, Diensten, Meistgesehen und Bewertungen
+      description: >-
+        `year` wählt den Zeitraum für `period`, `previous`, `chart`, `services`, `topSeries` und `ratings`.
+        `total`, `undated` und `years` umfassen immer alles.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: year
           in: query
-          description: Grenzt nur die Aufteilung nach Bewertung auf ein Jahr ein.
+          description: Zeitraum auf ein Jahr eingrenzen (fehlt = alle Jahre).
           schema:
             type: integer
       responses:
@@ -1816,10 +1819,73 @@ components:
           type: integer
         minutes:
           type: integer
+    ChartBar:
+      type: object
+      description: Ein Monat des gewählten Jahres oder ein Jahr (bei allen Jahren).
+      required: [label, seriesMinutes, movieMinutes, episodes, movies]
+      properties:
+        label:
+          type: string
+          description: '"Jan" … "Dez" oder die Jahreszahl'
+        seriesMinutes:
+          type: integer
+        movieMinutes:
+          type: integer
+        episodes:
+          type: integer
+        movies:
+          type: integer
+    ServiceShare:
+      type: object
+      required: [minutes]
+      properties:
+        service:
+          $ref: "#/components/schemas/Service"
+        minutes:
+          type: integer
+          description: Fehlt `service`, sind es Sichtungen ohne Dienst.
+    TopSeries:
+      type: object
+      required: [tmdbId, name, episodes, minutes]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        episodes:
+          type: integer
+        minutes:
+          type: integer
+        rating:
+          type: integer
     Stats:
       type: object
-      required: [total, undated, years, ratings, missingRuntimeTitles]
+      required: [period, chart, services, topSeries, total, undated, years, ratings, missingRuntimeTitles]
       properties:
+        year:
+          type: integer
+          description: Gewähltes Jahr; fehlt = alle Jahre.
+        period:
+          $ref: "#/components/schemas/Period"
+        previous:
+          $ref: "#/components/schemas/Period"
+        chart:
+          type: array
+          description: Monate des Jahres (bis heute) bzw. ein Eintrag pro Jahr, aufsteigend; ohne Datum fehlt hier.
+          items:
+            $ref: "#/components/schemas/ChartBar"
+        services:
+          type: array
+          description: Zeit je Dienst, größte zuerst.
+          items:
+            $ref: "#/components/schemas/ServiceShare"
+        topSeries:
+          type: array
+          description: Bis zu 5 Serien nach Zeit.
+          items:
+            $ref: "#/components/schemas/TopSeries"
         total:
           $ref: "#/components/schemas/Period"
         undated:

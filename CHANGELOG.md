@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.2.5] – 2026-11-08
+
+### Neu
+- **Statistik übersichtlicher:** Zeitraum oben wählen (alle Jahre oder ein Jahr) – Kennzahlen mit Veränderung zum
+  Vorjahr, Diagramm „Zeit pro Monat“ (Serien und Filme gestapelt, Werte beim Drüberfahren), Anteil je Dienst,
+  „Meistgesehen“ (Top-5-Serien) und Bewertungen als Diagramm. Die bisherigen Tabellen liegen unter „Alle Zahlen“.
+  Die App-API liefert dieselben Felder (`GET /api/v1/stats?year=` filtert jetzt alles).
+
+### Schneller
+- Poster werden in passender Größe, verzögert und asynchron geladen.
+- „Weiterschauen“ öffnet deutlich schneller.
+
+### Behoben
+- App-API: keine Tokens, Cookies oder Passwörter mehr in Fehler-Logs; fehlerhafte Anfragen ergeben 4xx statt 500;
+  Größenlimits für Anfragen; riesige Seitenzahlen bringen den Server nicht mehr zum Absturz.
+
 ## [0.2.4] – 2026-11-08
 
 ### Neu

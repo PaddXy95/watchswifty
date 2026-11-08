@@ -72,6 +72,31 @@ struct APILibraryStatsTests {
         }
     }
 
+    @Test func apiStatsYearFiltersEverything() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let token = try await apiToken(app, user)
+            let movie = try await seedMovie(app, tmdbID: 1, runtime: 100)
+            let show = try await seedSeries(app, tmdbID: 2, name: "Dark", seasons: [1: 1], runtime: 45)
+            let ws = WatchService(db: app.db)
+            _ = try await ws.markMovie(userID: user.requireID(), titleID: movie.requireID(), day: "2025-05-05", service: .netflix)
+            _ = try await ws.markEpisode(userID: user.requireID(), episodeID: episode(app, show, 1, 1).requireID(), day: "2026-01-10", service: .netflix)
+            struct Dashboard: Codable {
+                struct Bar: Codable { let label: String; let seriesMinutes: Int; let movieMinutes: Int }
+                struct Share: Codable { let service: String?; let minutes: Int }
+                struct Top: Codable { let tmdbId: Int; let name: String; let minutes: Int }
+                let year: Int?; let period: PeriodBody; let previous: PeriodBody?; let chart: [Bar]; let services: [Share]; let topSeries: [Top]
+            }
+            let body = try #require(try await get(Dashboard.self, app, token, "/api/v1/stats?year=2026"))
+            #expect(body.year == 2026)
+            #expect(body.period.minutes == 45)
+            #expect(body.previous?.minutes == 100)
+            #expect(body.chart.first?.seriesMinutes == 45)
+            #expect(body.services.first?.service == "netflix")
+            #expect(body.topSeries.map(\.name) == ["Dark"])
+        }
+    }
+
     @Test func statsYearFilter() async throws {
         try await withTestApp { app in
             let user = try await createUser(app, "pat")

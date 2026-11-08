@@ -7,9 +7,9 @@ struct StatsController {
     }
 
     func stats(req: Request) async throws -> HTMLResponse {
-        let ratingYear = try? req.query.get(Int.self, at: "year")
+        let year = try? req.query.get(Int.self, at: "year")
         let stats = try await StatsService(db: req.db, today: req.application.appConfig.today())
-            .stats(userID: try req.userID, ratingYear: ratingYear)
-        return HTMLResponse(StatsPage(navContext: try req.nav(.stats), stats: stats, ratingYear: ratingYear))
+            .stats(userID: try req.userID, year: year)
+        return HTMLResponse(StatsPage(navContext: try req.nav(.stats), stats: stats))
     }
 }

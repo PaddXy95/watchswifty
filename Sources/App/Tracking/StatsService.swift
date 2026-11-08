@@ -33,12 +33,47 @@ struct RatingStats: Equatable, Sendable {
     var minutes = 0
 }
 
+/// One column of „Zeit pro Monat“ (a month of the selected year, or a year for „Alle Jahre“).
+struct ChartBar: Equatable, Sendable {
+    let label: String
+    var seriesMinutes = 0
+    var movieMinutes = 0
+    var episodes = 0
+    var movies = 0
+}
+
+/// Watch time on one service (nil = no service given).
+struct ServiceShare: Equatable, Sendable {
+    let service: StreamingService?
+    let minutes: Int
+}
+
+struct TopSeries: Equatable, Sendable {
+    let tmdbID: Int
+    let name: String
+    let posterPath: String?
+    let episodes: Int
+    let minutes: Int
+    let rating: Int?
+}
+
 struct Stats: Sendable {
+    /// Selected year, nil = all years.
+    var year: Int? = nil
+    /// The selected range (all years include undated viewings).
+    var period = PeriodStats()
+    /// The year before the selected one, only when it has viewings.
+    var previous: PeriodStats? = nil
+    var chart: [ChartBar] = []
+    /// By minutes, largest first.
+    var services: [ServiceShare] = []
+    /// At most 5 series, by minutes.
+    var topSeries: [TopSeries] = []
     let total: PeriodStats
     let undated: PeriodStats
     /// Newest first.
     let years: [YearStats]
-    /// Ratings 10 … 1, then unrated.
+    /// Ratings 10 … 1, then unrated (for the selected range).
     let ratings: [RatingStats]
     /// Watched titles whose runtimes are not loaded from TMDB yet.
     let missingRuntimeTitles: Int
@@ -55,6 +90,7 @@ struct StatsService {
         let minutes: Int?
         let year: Int?
         let month: Int?
+        let service: StreamingService?
     }
 
     private struct Tally {
@@ -79,7 +115,11 @@ struct StatsService {
         }
     }
 
-    func stats(userID: UUID, ratingYear: Int?) async throws -> Stats {
+    static let monthLabels = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
+
+    /// `year` (nil = all years) selects the range for period, chart, services, ratings and top series; the yearly table
+    /// (`years`, `undated`, `total`) always covers everything.
+    func stats(userID: UUID, year selectedYear: Int?) async throws -> Stats {
         let watches = try await Watch.query(on: db).filter(\.$user.$id == userID).all()
         let titleIDs = Array(Set(watches.map(\.$title.id)))
         let titles = titleIDs.isEmpty ? [] : try await Title.query(on: db).filter(\.$id ~~ titleIDs).all()
@@ -104,7 +144,8 @@ struct StatsService {
                 return nil
             }
             let (year, month) = Self.yearMonth(watch.watchedOn)
-            return Viewing(titleID: watch.$title.id, isEpisode: watch.$episode.id != nil, minutes: minutes, year: year, month: month)
+            return Viewing(titleID: watch.$title.id, isEpisode: watch.$episode.id != nil, minutes: minutes, year: year, month: month,
+                           service: watch.streamingService)
         }
 
         var total = Tally(), undated = Tally()
@@ -119,8 +160,18 @@ struct StatsService {
             } else {
                 undated.add(viewing)
             }
-            if ratingYear == nil || viewing.year == ratingYear {
-                byRating[ratingByTitle[viewing.titleID] ?? nil, default: Tally()].add(viewing)
+        }
+        let inRange = viewings.filter { selectedYear == nil || $0.year == selectedYear }
+        var period = Tally()
+        var serviceMinutes: [StreamingService?: Int] = [:]
+        var seriesTally: [UUID: (episodes: Int, minutes: Int)] = [:]
+        for viewing in inRange {
+            period.add(viewing)
+            byRating[ratingByTitle[viewing.titleID] ?? nil, default: Tally()].add(viewing)
+            if let minutes = viewing.minutes { serviceMinutes[viewing.service, default: 0] += minutes }
+            if viewing.isEpisode {
+                let current = seriesTally[viewing.titleID] ?? (0, 0)
+                seriesTally[viewing.titleID] = (current.episodes + 1, current.minutes + (viewing.minutes ?? 0))
             }
         }
 
@@ -135,8 +186,45 @@ struct StatsService {
             let stats = byRating[rating]?.stats ?? PeriodStats()
             return RatingStats(rating: rating, movies: stats.movies, series: stats.series, minutes: stats.minutes)
         }
-        return Stats(total: total.stats, undated: undated.stats, years: years, ratings: ratings,
-                     missingRuntimeTitles: titles.filter { $0.runtime == nil }.count)
+        var result = Stats(total: total.stats, undated: undated.stats, years: years, ratings: ratings,
+                           missingRuntimeTitles: titles.filter { $0.runtime == nil }.count)
+        result.year = selectedYear
+        result.period = period.stats
+        if let selectedYear, let previous = byYear[selectedYear - 1] { result.previous = previous.stats }
+        result.chart = Self.chart(inRange, year: selectedYear, years: byYear.keys.sorted(), monthCount: selectedYear.map { year in
+            years.first { $0.year == year }?.months.count ?? (year == currentYear ? currentMonth ?? 12 : 12)
+        })
+        result.services = serviceMinutes.filter { $0.value > 0 }.map { ServiceShare(service: $0.key, minutes: $0.value) }
+            .sorted { ($0.minutes, $0.service?.label ?? "") > ($1.minutes, $1.service?.label ?? "") }
+        result.topSeries = seriesTally.compactMap { titleID, tally -> TopSeries? in
+            guard let title = titleByID[titleID] else { return nil }
+            return TopSeries(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, episodes: tally.episodes,
+                             minutes: tally.minutes, rating: ratingByTitle[titleID] ?? nil)
+        }.sorted { ($0.minutes, $0.episodes, $1.name) > ($1.minutes, $1.episodes, $0.name) }.prefix(5).map { $0 }
+        return result
+    }
+
+    /// Months of the selected year (up to `monthCount`) or one bar per year; undated viewings have no bar.
+    private static func chart(_ viewings: [Viewing], year: Int?, years: [Int], monthCount: Int?) -> [ChartBar] {
+        var bars: [ChartBar]
+        if year != nil {
+            bars = (0..<(monthCount ?? 12)).map { ChartBar(label: monthLabels[$0]) }
+        } else {
+            bars = years.map { ChartBar(label: String($0)) }
+        }
+        for viewing in viewings {
+            guard let viewingYear = viewing.year, let month = viewing.month else { continue }
+            let index = year != nil ? month - 1 : years.firstIndex(of: viewingYear)
+            guard let index, bars.indices.contains(index) else { continue }
+            if viewing.isEpisode {
+                bars[index].episodes += 1
+                bars[index].seriesMinutes += viewing.minutes ?? 0
+            } else {
+                bars[index].movies += 1
+                bars[index].movieMinutes += viewing.minutes ?? 0
+            }
+        }
+        return bars
     }
 
     /// `2026-11-07` → (2026, 11); anything else → (nil, nil).
@@ -145,6 +233,14 @@ struct StatsService {
               let month = Int(date.dropFirst(5).prefix(2)), (1...12).contains(month) else { return (nil, nil) }
         return (year, month)
     }
+}
+
+/// Change against the previous year: „+18 %“, „−6 %“, „±0 %“; nil without a previous value.
+func formatDelta(_ current: Int, _ previous: Int) -> String? {
+    guard previous > 0 else { return nil }
+    let percent = Int((Double(current - previous) / Double(previous) * 100).rounded())
+    if percent == 0 { return "±0 %" }
+    return percent > 0 ? "+\(percent) %" : "−\(-percent) %"
 }
 
 /// `45 Min.`, `3 Std. 20 Min.` (under 10 h), `1.240 Std.`
