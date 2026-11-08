@@ -31,7 +31,7 @@ struct RenderingTests {
 
     @Test func brandShowsTheIcon() {
         let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: false, active: .history)) { p { "x" } }.render()
-        #expect(html.contains(#"<img class="brand-icon" src="/favicon.svg" alt="" width="28" height="28">WatchSwifty</a>"#))
+        #expect(html.contains(#"<img class="brand-icon" src="/favicon.svg" alt="" width="32" height="32">WatchSwifty</a>"#))
     }
 
     @Test func iconFilesServed() async throws {

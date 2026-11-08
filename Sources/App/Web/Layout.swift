@@ -82,7 +82,7 @@ struct SiteNav: HTML {
     var body: some HTML {
         header(.class("site-header")) {
             a(.class("brand"), .href("/"), .hx.boost(true)) {
-                img(.class("brand-icon"), .src("/favicon.svg"), .alt(""), .width(28), .height(28))
+                img(.class("brand-icon"), .src("/favicon.svg"), .alt(""), .width(32), .height(32))
                 "WatchSwifty"
             }
             // Burger menu on phones: a CSS-only checkbox toggle (no JavaScript).
