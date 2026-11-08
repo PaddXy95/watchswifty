@@ -12,6 +12,11 @@ Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Ele
 
 Repository: https://github.com/PaddXy95/watchswifty
 
+Film- und Seriendaten stammen von [TMDB](https://www.themoviedb.org). Diese Anwendung verwendet TMDB und die
+TMDB-APIs, ist aber nicht von TMDB unterstützt, zertifiziert oder anderweitig genehmigt. Gemäß den TMDB-Bedingungen
+werden zwischengespeicherte Daten spätestens nach 60 Tagen mit dem Token eines Benutzers, der den Titel nutzt, neu
+geholt; nicht mehr genutzte Titel werden gelöscht.
+
 ---
 
 ## Schnellstart mit Docker Compose

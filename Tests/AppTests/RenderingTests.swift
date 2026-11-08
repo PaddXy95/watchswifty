@@ -56,7 +56,6 @@ struct RenderingTests {
             #expect(html.contains("Built with"))
             #expect(html.contains(#"href="https://www.swift.org""#))
             #expect(html.contains(#"href="https://vapor.codes""#))
-            #expect(html.contains(#"href="https://github.com/PaddXy95/watchswifty""#))
             #expect(html.contains("❤️"))
         }
     }

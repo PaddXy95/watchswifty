@@ -75,6 +75,10 @@ struct DailyRefreshLifecycle: LifecycleHandler {
             while !Task.isCancelled {
                 let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
                 if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
+                let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
+                if !maintenance.isEmpty {
+                    logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")
+                }
                 do {
                     let due = try await seriesDueForRefresh(on: db)
                     var requeued = 0

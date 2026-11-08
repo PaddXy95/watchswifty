@@ -1,3 +1,4 @@
+import Foundation
 import Fluent
 
 struct CreateNetflixImport: AsyncMigration {
@@ -16,6 +17,18 @@ struct CreateNetflixImport: AsyncMigration {
 
     func revert(on database: any Database) async throws {
         try await database.schema(NetflixImport.schema).delete()
+    }
+}
+
+/// Age of the stored candidate lists (TMDB terms, UI round task 30); existing lists count from now.
+struct AddMappingCandidatesAt: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(NetflixMapping.schema).field("candidates_at", .datetime).update()
+        try await NetflixMapping.query(on: database).filter(\.$candidates != nil).set(\.$candidatesAt, to: Date()).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(NetflixMapping.schema).deleteField("candidates_at").update()
     }
 }
 

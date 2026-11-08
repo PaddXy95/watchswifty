@@ -13,6 +13,8 @@ final class NetflixMapping: Model, @unchecked Sendable {
     @Field(key: "status") var status: String
     /// JSON-encoded `[TMDBSearchResult]` shown under „Zu prüfen“.
     @OptionalField(key: "candidates") var candidates: String?
+    /// When the candidates were fetched (TMDB data may not be kept for long, see `CatalogMaintenance`).
+    @OptionalField(key: "candidates_at") var candidatesAt: Date?
 
     init() {}
 
@@ -28,6 +30,9 @@ final class NetflixMapping: Model, @unchecked Sendable {
 
     var candidateResults: [TMDBSearchResult] {
         get { candidates.flatMap { try? JSONDecoder().decode([TMDBSearchResult].self, from: Data($0.utf8)) } ?? [] }
-        set { candidates = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } }
+        set {
+            candidates = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) }
+            candidatesAt = Date()
+        }
     }
 }

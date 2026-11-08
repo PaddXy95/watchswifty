@@ -25,8 +25,16 @@ struct SiteFooter: HTML {
                 a(.href("https://vapor.codes"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "Vapor" }
                 " with ❤️"
             }
-            a(.class("github"), .href("https://github.com/PaddXy95/watchswifty"), .target(.blank),
-              .custom(name: "rel", value: "noopener noreferrer")) { "GitHub" }
+            // Required by TMDB's API terms: logo (less prominent than our name) and the notice.
+            div(.class("tmdb-attribution")) {
+                a(.href("https://www.themoviedb.org"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) {
+                    img(.src("/img/tmdb-logo.svg"), .alt("TMDB"), .class("tmdb-logo"))
+                }
+                span {
+                    "Diese Anwendung verwendet TMDB und die TMDB-APIs, ist aber nicht von TMDB unterstützt, zertifiziert oder "
+                    "anderweitig genehmigt."
+                }
+            }
         }
     }
 }

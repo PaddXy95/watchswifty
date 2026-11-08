@@ -27,7 +27,7 @@ struct ErrorPagesTests {
                 #expect(res.status == .notFound)
                 #expect(res.headers.first(name: .contentType)?.hasPrefix("text/html") == true)
                 #expect(res.body.string.contains("Nicht gefunden"))
-                #expect(res.body.string.contains("watchswifty"))
+                #expect(res.body.string.contains("· WatchSwifty</title>"))   // rendered in the app layout
             }
         }
     }
