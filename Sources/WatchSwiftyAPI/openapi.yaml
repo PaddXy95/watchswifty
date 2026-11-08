@@ -14,6 +14,7 @@ tags:
   - name: Suche
   - name: Serien
   - name: Filme
+  - name: Verlauf
 paths:
   /v1/version:
     get:
@@ -622,6 +623,83 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
+  /v1/history:
+    get:
+      operationId: getHistory
+      tags: [Verlauf]
+      summary: Datierte Sichtungen, neueste zuerst
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        "200":
+          description: Eine Seite des Verlaufs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/watches/{id}:
+    put:
+      operationId: updateWatch
+      tags: [Verlauf]
+      summary: Datum und Dienst einer Sichtung ändern (ersetzt beide)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchEdit"
+      responses:
+        "200":
+          description: Geänderte Sichtung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: deleteWatch
+      tags: [Verlauf]
+      summary: Sichtung löschen
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Gelöscht
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     TmdbID:
@@ -844,6 +922,61 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WatchSummary"
+    HistoryItem:
+      type: object
+      required: [id, kind, tmdbId, title, origin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+        title:
+          type: string
+        episode:
+          $ref: "#/components/schemas/EpisodeRef"
+        day:
+          type: string
+        service:
+          $ref: "#/components/schemas/Service"
+        origin:
+          type: string
+          enum: [manual, import]
+    EpisodeRef:
+      type: object
+      required: [season, number, name]
+      properties:
+        season:
+          type: integer
+        number:
+          type: integer
+        name:
+          type: string
+    HistoryPage:
+      type: object
+      required: [items, total, page, perPage]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryItem"
+        total:
+          type: integer
+        page:
+          type: integer
+        perPage:
+          type: integer
+    WatchEdit:
+      type: object
+      properties:
+        day:
+          type: string
+          description: Tag `yyyy-MM-dd`; fehlt er, ist die Sichtung danach ohne Datum.
+        service:
+          $ref: "#/components/schemas/Service"
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]

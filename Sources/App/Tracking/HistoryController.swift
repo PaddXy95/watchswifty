@@ -14,14 +14,9 @@ struct HistoryController {
 
     func history(req: Request) async throws -> HTMLResponse {
         let page = max(1, (try? req.query.get(Int.self, at: "page")) ?? 1)
-        let watches = try await req.watches.watchesQuery(userID: try req.userID)
-            .filter(\.$watchedOn != nil)
-            .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending)
-            .offset((page - 1) * Self.pageSize).limit(Self.pageSize + 1)
-            .with(\.$title).with(\.$episode)
-            .all()
-        let rows = HistoryRows(rows: watches.prefix(Self.pageSize).map { ($0, $0.title, $0.episode) },
-                               nextPage: watches.count > Self.pageSize ? page + 1 : nil, today: req.watches.today())
+        let result = try await req.history.page(userID: try req.userID, page: page, perPage: Self.pageSize)
+        let rows = HistoryRows(rows: result.entries.map { ($0, $0.title, $0.episode) },
+                               nextPage: page * Self.pageSize < result.total ? page + 1 : nil, today: req.watches.today())
         if page > 1 && req.isHTMX { return HTMLResponse(rows) }
         return HTMLResponse(HistoryPage(nav: try req.nav(.history), rows: rows))
     }
@@ -38,10 +33,7 @@ struct HistoryController {
                 service = nil
             }
             let day = input.day.flatMap { $0.isEmpty ? nil : $0 }
-            try await req.watches.editWatch(userID: try req.userID, watchID: id, day: day, service: service)
-            guard let watch = try await Watch.query(on: req.db).filter(\.$id == id).with(\.$title).with(\.$episode).first() else {
-                throw TrackingError.notFound
-            }
+            let watch = try await req.history.edit(userID: try req.userID, watchID: id, day: day, service: service)
             return HTMLResponse(HistoryRow(watch: watch, title: watch.title, episode: watch.episode, today: req.watches.today()))
         }
     }
