@@ -20,7 +20,8 @@ struct AuthController {
     func loginPage(req: Request) async throws -> Response {
         let returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
         if req.auth.has(User.self) { return req.redirect(to: returnTo ?? "/", redirectType: .normal) }
-        return try await HTMLResponse(LoginPage(error: nil, username: "", returnTo: returnTo)).encodeResponse(for: req)
+        return try await HTMLResponse(LoginPage(error: nil, username: "", returnTo: returnTo,
+                                                forgotPasswordLink: try await mailConfigured(req))).encodeResponse(for: req)
     }
 
     func login(req: Request) async throws -> Response {
@@ -38,8 +39,13 @@ struct AuthController {
             return req.redirect(to: returnTo ?? "/", redirectType: .normal)
         }
         try await Task.sleep(for: req.application.appConfig.loginFailureDelay)
-        return try await HTMLResponse(LoginPage(error: Self.failureMessage, username: input.username, returnTo: returnTo))
+        return try await HTMLResponse(LoginPage(error: Self.failureMessage, username: input.username, returnTo: returnTo,
+                                                forgotPasswordLink: try await mailConfigured(req)))
             .encodeResponse(for: req)
+    }
+
+    private func mailConfigured(_ req: Request) async throws -> Bool {
+        try await req.mailSettings.state().settings != nil
     }
 
     func logout(req: Request) async throws -> Response {

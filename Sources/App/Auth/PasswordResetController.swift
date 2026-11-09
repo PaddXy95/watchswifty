@@ -14,10 +14,27 @@ struct PasswordResetController {
     /// The token is in the URL: keep it out of Referer headers and caches.
     static let headers: HTTPHeaders = ["Referrer-Policy": "no-referrer", "Cache-Control": "no-store"]
 
+    struct ForgotInput: Content { var username: String }
+
     func register(on routes: any RoutesBuilder) {
         let sessioned = routes.grouped(User.sessionAuthenticator())
         sessioned.get("reset-password", use: show)
         sessioned.post("reset-password", use: submit)
+        sessioned.get("forgot-password", use: forgotPage)
+        sessioned.post("forgot-password", use: forgot)
+    }
+
+    func forgotPage(req: Request) async throws -> HTMLResponse {
+        HTMLResponse(ForgotPasswordPage(mailEnabled: try await req.mailSettings.state().settings != nil))
+    }
+
+    /// Answers at once and identically for every username; the mail goes out in the background.
+    func forgot(req: Request) async throws -> HTMLResponse {
+        let username = try req.content.decode(ForgotInput.self).username
+        guard try await req.mailSettings.state().settings != nil else { return HTMLResponse(ForgotPasswordPage(mailEnabled: false)) }
+        let service = req.forgotPassword
+        req.application.backgroundTasks.run { await service.handle(username: username) }
+        return HTMLResponse(ForgotPasswordPage(mailEnabled: true, sent: true))
     }
 
     func show(req: Request) async throws -> HTMLResponse {

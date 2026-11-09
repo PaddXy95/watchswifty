@@ -5,6 +5,8 @@ struct LoginPage: HTML {
     let username: String
     /// Where to continue after signing in (only the app login, see `isSafeReturnTo`).
     var returnTo: String? = nil
+    /// Mail is set up, so „Passwort vergessen?“ can help.
+    var forgotPasswordLink = false
 
     var body: some HTML {
         PageLayout(title: "Anmelden", nav: nil) {
@@ -26,6 +28,9 @@ struct LoginPage: HTML {
                               .custom(name: "autocomplete", value: "current-password"))
                     }
                     button(.type(.submit), .class("primary")) { "Anmelden" }
+                }
+                if forgotPasswordLink {
+                    p { a(.href("/forgot-password")) { "Passwort vergessen?" } }
                 }
             }
         }
