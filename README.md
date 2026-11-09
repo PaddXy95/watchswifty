@@ -2,6 +2,12 @@
 
 # WatchSwifty
 
+[![CI/CD](https://github.com/PaddXy95/watchswifty/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/PaddXy95/watchswifty/actions/workflows/docker.yml)
+[![Release](https://img.shields.io/github/v/release/PaddXy95/watchswifty?sort=semver)](https://github.com/PaddXy95/watchswifty/releases)
+
+[![Swift](https://img.shields.io/badge/Swift-1F2937?style=for-the-badge&logo=swift&logoColor=F97316)](https://www.swift.org)
+[![Vapor](https://img.shields.io/badge/Vapor-1F2937?style=for-the-badge&logo=vapor&logoColor=3B82F6)](https://vapor.codes)
+
 Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Elementary + htmx).
 
 - **Weiterschauen:** eine Karte pro Serie mit der nächsten Folge (Serien der letzten 3 Monate)
