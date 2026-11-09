@@ -8,6 +8,7 @@ func routes(_ app: Application) throws {
     app.get("api") { _ in HTMLResponse(APIDocsPage()) }
     APIAuthorizeController().register(on: app)
     AuthController().register(on: app)
+    PasswordResetController().register(on: app)
 
     let protected = app.grouped(User.sessionAuthenticator(), AuthRedirectMiddleware())
     HomeController().register(on: protected)

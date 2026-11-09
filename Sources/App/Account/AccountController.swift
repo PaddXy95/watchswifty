@@ -32,7 +32,9 @@ struct AccountController {
     }
 
     func show(req: Request) async throws -> HTMLResponse {
-        try await page(req)
+        // After accepting an invitation (see PasswordResetController).
+        let welcome = (try? req.query.get(String.self, at: "welcome")) == "1"
+        return try await page(req, notice: welcome ? "Willkommen – trag hier deinen TMDB-Token ein." : nil)
     }
 
     func changePassword(req: Request) async throws -> HTMLResponse {

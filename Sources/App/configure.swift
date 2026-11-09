@@ -58,6 +58,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddMappingCandidatesAt())
     app.migrations.add(CreateAPIToken())
     app.migrations.add(AddMailConfig())
+    app.migrations.add(CreatePasswordToken())
 
     try routes(app)
     try await app.autoMigrate()
