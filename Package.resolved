@@ -1,5 +1,5 @@
 {
-  "originHash" : "79a87358b99c1fa1f937d49f2e117d8c4beddad8c49b0de6962065a215f046f3",
+  "originHash" : "7229f02062535d7f082e426869be0ed9273d7a99e7cc764f264b7e96b1c067e3",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -359,6 +359,15 @@
       "state" : {
         "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
         "version" : "1.8.1"
+      }
+    },
+    {
+      "identity" : "swiftysmtpclient",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PaddXy95/SwiftySMTPClient.git",
+      "state" : {
+        "revision" : "d8e58549c03b7430d6735236ae20974e8747ddbb",
+        "version" : "0.1.0"
       }
     },
     {

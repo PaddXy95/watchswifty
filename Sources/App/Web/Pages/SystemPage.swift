@@ -32,11 +32,15 @@ struct SystemPage: HTML {
     let current: AppVersion
     let state: UpdateState
     let notice: String?
+    var error: String? = nil
+    var mail: MailSettingsState = .notConfigured
+    var mailForm = MailFormValues(baseURL: "")
+    var testRecipient: String? = nil
 
     var body: some HTML {
         PageLayout(title: "System", nav: nav) {
             h1 { "System" }
-            Messages(error: nil, notice: notice)
+            Messages(error: error, notice: notice)
             section {
                 h2 { "Version" }
                 p { "Installiert: \(current.label)" }
@@ -61,6 +65,7 @@ struct SystemPage: HTML {
                 }
                 UpdateResult(current: current, state: state)
             }
+            MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
         }
     }
 }
@@ -99,6 +104,131 @@ struct UpdateResult: HTML {
                 }
             } else {
                 p(.class("muted")) { "Noch nicht geprüft." }
+            }
+        }
+    }
+}
+
+/// Values shown in the mail form: the stored settings, the admin's last (rejected) input, or a blank form.
+/// Never contains the password.
+struct MailFormValues {
+    var host = ""
+    var port = ""
+    var encryption = MailEncryption.starttls.rawValue
+    var username = ""
+    var fromAddress = ""
+    var fromName = ""
+    var caFile = ""
+    var baseURL = ""
+
+    init(baseURL: String) {
+        self.baseURL = baseURL
+    }
+
+    init(_ settings: MailSettings) {
+        host = settings.host
+        port = settings.port.map(String.init) ?? ""
+        encryption = settings.encryption.rawValue
+        username = settings.username ?? ""
+        fromAddress = settings.fromAddress
+        fromName = settings.fromName
+        caFile = settings.caFile ?? ""
+        baseURL = settings.baseURL
+    }
+
+    init(_ input: MailSettingsInput) {
+        host = input.host
+        port = input.port ?? ""
+        encryption = input.encryption
+        username = input.username ?? ""
+        fromAddress = input.fromAddress
+        fromName = input.fromName ?? ""
+        caFile = input.caFile ?? ""
+        baseURL = input.baseURL
+    }
+}
+
+/// System → E-Mail: SMTP settings, test mail, delete.
+struct MailSection: HTML {
+    let state: MailSettingsState
+    let values: MailFormValues
+    let testRecipient: String?
+
+    private var hasPassword: Bool { state.settings?.password != nil }
+
+    var body: some HTML {
+        section(.class("mail-settings")) {
+            h2 { "E-Mail" }
+            p(.class("muted")) {
+                "Optional: Damit verschickt WatchSwifty Einladungen und Links für „Passwort vergessen“. Die Einstellungen "
+                "werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). Beispiel für SwiftyRelay und andere Anbieter: "
+                "README, Abschnitt „E-Mail (optional)“."
+            }
+            switch state {
+            case .notConfigured: p { "Nicht eingerichtet." }
+            case .unreadable: p(.class("error")) { "E-Mail-Einstellungen nicht lesbar – bitte neu eintragen." }
+            case .configured: p(.class("notice")) { "Eingerichtet." }
+            }
+            form(.method(.post), .action("/admin/system/mail")) {
+                label {
+                    "Server"
+                    input(.type(.text), .name("host"), .value(values.host), .required, .custom(name: "autocomplete", value: "off"),
+                          .custom(name: "placeholder", value: "z. B. swifty-relay oder smtp.example.com"))
+                }
+                label {
+                    "Port (leer = Standard: 587 STARTTLS, 465 SSL/TLS, 25 ohne)"
+                    input(.type(.text), .name("port"), .value(values.port), .custom(name: "inputmode", value: "numeric"))
+                }
+                label {
+                    "Verschlüsselung"
+                    select(.name("encryption")) {
+                        for encryption in MailEncryption.allCases {
+                            option(.value(encryption.rawValue)) { encryption.label }
+                                .attributes(.selected, when: encryption.rawValue == values.encryption)
+                        }
+                    }
+                }
+                label {
+                    "Benutzer (leer = ohne Anmeldung)"
+                    input(.type(.text), .name("username"), .value(values.username), .custom(name: "autocomplete", value: "off"))
+                }
+                label {
+                    "Passwort"
+                    input(.type(.password), .name("password"), .custom(name: "autocomplete", value: "new-password"),
+                          .custom(name: "placeholder", value: hasPassword ? "gespeichert – leer lassen zum Behalten" : ""))
+                }
+                p(.class("muted")) { "Ändern sich Server, Port, Verschlüsselung oder Benutzer, muss das Passwort neu eingegeben werden." }
+                label {
+                    "Absender-Adresse"
+                    input(.type(.email), .name("fromAddress"), .value(values.fromAddress), .required)
+                }
+                label {
+                    "Absender-Name (leer = WatchSwifty)"
+                    input(.type(.text), .name("fromName"), .value(values.fromName))
+                }
+                label {
+                    "CA-Datei (optional, Pfad im Container; leer = System-Zertifikate)"
+                    input(.type(.text), .name("caFile"), .value(values.caFile),
+                          .custom(name: "placeholder", value: "/certs/swifty-relay/ca/ca-bundle.pem"))
+                }
+                label {
+                    "Adresse von WatchSwifty (für Links in Mails)"
+                    input(.type(.url), .name("baseURL"), .value(values.baseURL), .required,
+                          .custom(name: "placeholder", value: "https://watch.example.lan"))
+                }
+                button(.type(.submit), .class("primary")) { "Speichern" }
+            }
+            if state.settings != nil {
+                form(.method(.post), .action("/admin/system/mail/test"), .class("inline-form")) {
+                    input(.type(.email), .name("to"), .value(testRecipient ?? ""), .required,
+                          .custom(name: "placeholder", value: "Empfänger"), .custom(name: "aria-label", value: "Empfänger der Testmail"))
+                    button(.type(.submit)) { "Testmail senden" }
+                }
+            }
+            if state != .notConfigured {
+                form(.method(.post), .action("/admin/system/mail/delete"), .class("inline-form")) {
+                    button(.type(.submit)) { "E-Mail-Einstellungen löschen" }
+                }
             }
         }
     }

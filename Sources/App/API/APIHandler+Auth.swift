@@ -43,6 +43,7 @@ extension APIHandler {
         } else {
             token = .init(state: stored.isEmpty ? Components.Schemas.TMDBTokenState.statePayload.none : .unreadable)
         }
-        return .init(username: user.username, isAdmin: user.isAdmin, hasPassword: true, tmdbToken: token)
+        return .init(username: user.username, isAdmin: user.isAdmin, hasPassword: user.hasPassword, tmdbToken: token,
+                     email: user.emailState(request.application.tokenCipher).address)
     }
 }

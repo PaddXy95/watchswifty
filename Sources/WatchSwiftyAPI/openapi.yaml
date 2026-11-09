@@ -784,6 +784,35 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           $ref: "#/components/responses/Unprocessable"
+  /v1/me/email:
+    put:
+      operationId: setEmail
+      tags: [Konto]
+      summary: Eigene E-Mail-Adresse setzen oder mit leerem Wert entfernen (aktuelles Passwort nötig, wird verschlüsselt gespeichert)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailChange"
+      responses:
+        "200":
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Konto ohne Passwort (`noPassword`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
   /v1/me/tmdb-token:
     put:
       operationId: setTMDBToken
@@ -1315,7 +1344,36 @@ paths:
               $ref: "#/components/schemas/NewUser"
       responses:
         "201":
-          description: Angelegt
+          description: Angelegt (bei einer Einladung auch dann, wenn die Mail scheiterte – siehe `inviteMailError`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Ungültige Angaben (`validation`) oder Einladung ohne eingerichtete Mail (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/admin/users/{id}/invite:
+    post:
+      operationId: resendInvite
+      tags: [Admin]
+      summary: Einladung erneut senden (neuer Link, der alte gilt nicht mehr)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gesendet
           content:
             application/json:
               schema:
@@ -1324,8 +1382,16 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "422":
-          $ref: "#/components/responses/Unprocessable"
+          description: Konto hat schon ein Passwort, keine lesbare Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/MailFailed"
   /v1/admin/users/{id}/password:
     put:
       operationId: resetUserPassword
@@ -1471,6 +1537,86 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/admin/mail:
+    get:
+      operationId: getMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen (nur Admins; das SMTP-Passwort wird nie ausgegeben)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Einstellungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: setMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen speichern (verschlüsselt). Ohne `password` bleibt das gespeicherte – außer Server, Port, Verschlüsselung oder Benutzer ändern sich.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MailSettingsUpdate"
+      responses:
+        "200":
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: deleteMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen löschen (Mail aus)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Gelöscht
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/admin/mail/test:
+    post:
+      operationId: sendTestMail
+      tags: [Admin]
+      summary: Testmail mit den gespeicherten Einstellungen senden
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestMail"
+      responses:
+        "204":
+          description: Vom Mailserver angenommen
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Ungültige Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/MailFailed"
 components:
   parameters:
     TmdbID:
@@ -1492,6 +1638,12 @@ components:
       schema:
         type: integer
   responses:
+    MailFailed:
+      description: Der Mailserver hat nicht angenommen oder war nicht erreichbar (`mailFailed`, Meldung mit Ursache)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Forbidden:
       description: Nur für Admins (`forbidden`)
       content:
@@ -2126,7 +2278,7 @@ components:
           type: string
     UserSummary:
       type: object
-      required: [id, username, isAdmin, hasTMDBToken]
+      required: [id, username, isAdmin, hasTMDBToken, invitePending]
       properties:
         id:
           type: string
@@ -2140,15 +2292,36 @@ components:
         createdAt:
           type: string
           format: date-time
+        emailHint:
+          type: string
+          description: E-Mail-Adresse nur maskiert, z. B. `p•••@example.org` (fehlt ohne lesbare Adresse)
+        invitePending:
+          type: boolean
+          description: Konto ohne Passwort, dessen Einladung noch gilt
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          description: Ablauf der offenen Einladung
+    CreatedUser:
+      allOf:
+        - $ref: "#/components/schemas/UserSummary"
+        - type: object
+          properties:
+            inviteMailError:
+              type: string
+              description: Konto angelegt, aber die Einladung ging nicht raus (Ursache); erneut senden über POST /v1/admin/users/{id}/invite
     NewUser:
       type: object
-      required: [username, password]
+      required: [username]
+      description: Mit `password` ein normales Konto; ohne Passwort, aber mit `email` eine Einladung per Mail (Mail muss eingerichtet sein).
       properties:
         username:
           type: string
         password:
           type: string
           minLength: 8
+        email:
+          type: string
         isAdmin:
           type: boolean
     AdminPassword:
@@ -2196,6 +2369,65 @@ components:
       properties:
         enabled:
           type: boolean
+    MailEncryption:
+      type: string
+      enum: [starttls, ssl, plain]
+    MailSettings:
+      type: object
+      required: [configured, unreadable, hasPassword]
+      properties:
+        configured:
+          type: boolean
+        unreadable:
+          type: boolean
+          description: Gespeichert, aber mit dem aktuellen TOKEN_KEY nicht lesbar – neu eintragen.
+        host:
+          type: string
+        port:
+          type: integer
+        encryption:
+          $ref: "#/components/schemas/MailEncryption"
+        username:
+          type: string
+        hasPassword:
+          type: boolean
+        fromAddress:
+          type: string
+        fromName:
+          type: string
+        caFile:
+          type: string
+        baseUrl:
+          type: string
+          description: Adresse von WatchSwifty für Links in Mails
+    MailSettingsUpdate:
+      type: object
+      required: [host, encryption, fromAddress, baseUrl]
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        encryption:
+          $ref: "#/components/schemas/MailEncryption"
+        username:
+          type: string
+        password:
+          type: string
+        fromAddress:
+          type: string
+        fromName:
+          type: string
+        caFile:
+          type: string
+        baseUrl:
+          type: string
+    TestMail:
+      type: object
+      required: [to]
+      properties:
+        to:
+          type: string
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
@@ -2404,6 +2636,18 @@ components:
           description: Konto hat ein Passwort (ohne Authentik immer `true`).
         tmdbToken:
           $ref: "#/components/schemas/TMDBTokenState"
+        email:
+          type: string
+          description: Eigene E-Mail-Adresse (fehlt, wenn keine hinterlegt oder nicht lesbar ist)
+    EmailChange:
+      type: object
+      required: [email, currentPassword]
+      properties:
+        email:
+          type: string
+          description: Leer entfernt die Adresse
+        currentPassword:
+          type: string
     TMDBTokenState:
       type: object
       required: [state]

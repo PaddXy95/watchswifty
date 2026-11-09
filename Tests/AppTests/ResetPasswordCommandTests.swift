@@ -1,5 +1,6 @@
 @testable import App
 import ConsoleKit
+import Fluent
 import Testing
 import VaporTesting
 
@@ -95,5 +96,20 @@ struct BackgroundJobsOnlyWhenServingTests {
         #expect(!servesHTTP(arguments: ["App", "reset-password", "pat"]))
         #expect(!servesHTTP(arguments: ["App", "migrate"]))
         #expect(!servesHTTP(arguments: ["App", "routes"]))
+    }
+}
+
+@Suite("ResetPasswordCommandInvite")
+struct ResetPasswordCommandInviteTests {
+    @Test func commandEndsOpenLinks() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat")
+            _ = try await PasswordTokenService(db: app.db).issue(userID: pat.requireID(), purpose: .reset)
+            let console = ScriptedConsole(answers: ["newpassword1", "newpassword1"])
+            var context = CommandContext(console: console, input: CommandInput(arguments: ["App", "reset-password", "pat"]))
+            context.application = app
+            try await app.asyncCommands.group().run(using: &context)
+            #expect(try await PasswordToken.query(on: app.db).count() == 0)
+        }
     }
 }

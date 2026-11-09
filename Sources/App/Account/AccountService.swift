@@ -11,12 +11,30 @@ struct AccountService {
     let worker: MatchingWorker
 
     func changePassword(user: User, current: String, new: String) async throws {
+        guard user.hasPassword else { throw APIError.noPassword }
         guard try await hasher.verify(current, created: user.passwordHash) else {
             throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
         }
         if let error = AccountValidation.passwordError(new) { throw APIError.validation(error) }
         user.passwordHash = try await hasher.hash(new)
         try await user.save(on: db)
+    }
+
+    /// Sets (or with an empty value removes) the user's own address. Needs the current password, so a hijacked session
+    /// cannot redirect „Passwort vergessen“ to another inbox; open reset links end.
+    func setEmail(user: User, email raw: String, currentPassword: String) async throws {
+        guard user.hasPassword else { throw APIError.noPassword }
+        guard try await hasher.verify(currentPassword, created: user.passwordHash) else {
+            throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
+        }
+        if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            user.email = nil
+        } else {
+            guard let address = EmailAddress.normalize(raw) else { throw APIError.validation(EmailAddress.invalidMessage) }
+            user.email = try cipher.seal(address)
+        }
+        try await user.save(on: db)
+        try await PasswordTokenService(db: db).deleteReset(userID: user.requireID())
     }
 
     /// Stores the user's TMDB token (encrypted) after TMDB accepted it, then lets the Netflix matching continue.

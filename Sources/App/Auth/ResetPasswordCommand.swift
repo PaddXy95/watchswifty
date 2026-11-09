@@ -31,6 +31,7 @@ struct ResetPasswordCommand: AsyncCommand {
         }
         user.passwordHash = try await app.password.async.hash(password)
         try await user.save(on: app.db)
+        try await PasswordTokenService(db: app.db).deleteAll(userID: user.requireID())
         context.console.print("Passwort für \(username) geändert.")
     }
 }

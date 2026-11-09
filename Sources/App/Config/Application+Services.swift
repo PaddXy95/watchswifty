@@ -73,3 +73,37 @@ extension Application {
         set { storage[MatchingWorkerKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct MailSenderKey: StorageKey { typealias Value = any MailSender }
+    private struct BackgroundTasksKey: StorageKey { typealias Value = BackgroundTasks }
+
+    var mailSender: any MailSender {
+        get {
+            guard let sender = storage[MailSenderKey.self] else { fatalError("Mail sender not configured") }
+            return sender
+        }
+        set { storage[MailSenderKey.self] = newValue }
+    }
+
+    var backgroundTasks: BackgroundTasks {
+        get {
+            guard let tasks = storage[BackgroundTasksKey.self] else { fatalError("Background tasks not configured") }
+            return tasks
+        }
+        set { storage[BackgroundTasksKey.self] = newValue }
+    }
+}
+
+extension Application {
+    private struct DummyPasswordHashKey: StorageKey { typealias Value = String }
+
+    /// Bcrypt hash (same cost as real ones) the login checks for unknown users and accounts without a password.
+    var dummyPasswordHash: String {
+        get {
+            guard let hash = storage[DummyPasswordHashKey.self] else { fatalError("Dummy password hash not configured") }
+            return hash
+        }
+        set { storage[DummyPasswordHashKey.self] = newValue }
+    }
+}

@@ -18,6 +18,14 @@ struct APIError: Error, Sendable, Equatable {
     static let noPassword = APIError(status: .conflict, code: "noPassword", message: "Dieses Konto hat kein Passwort.")
     static let payloadTooLarge = APIError(status: .payloadTooLarge, code: "payloadTooLarge", message: "Die Datei ist zu groß.")
 
+    static func mailNotConfigured(_ message: String = MailError.notConfigured.message) -> APIError {
+        APIError(status: .unprocessableEntity, code: "mailNotConfigured", message: message)
+    }
+
+    static func mailFailed(_ message: String) -> APIError {
+        APIError(status: .badGateway, code: "mailFailed", message: message)
+    }
+
     static func validation(_ message: String) -> APIError {
         APIError(status: .unprocessableEntity, code: "validation", message: message)
     }
@@ -27,6 +35,8 @@ struct APIError: Error, Sendable, Equatable {
         switch error {
         case let error as APIError:
             return error
+        case let error as MailError:
+            return error == .notConfigured ? .mailNotConfigured() : .mailFailed(error.message)
         case let error as ServerError:
             let inner = from(error.underlyingError, path: path)
             // Request problems found by the generated code (content type, missing body, Accept) keep their 4xx status.

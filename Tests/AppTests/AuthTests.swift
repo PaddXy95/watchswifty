@@ -1,5 +1,6 @@
 @testable import App
 import Fluent
+import NIOConcurrencyHelpers
 import Testing
 import VaporTesting
 
@@ -167,6 +168,58 @@ struct BoostedAuthTests {
         try await withTestApp { app in
             try await app.testing().test(.GET, "/tv/1", headers: ["HX-Request": "true", "HX-Boosted": "true"]) { res async in
                 #expect(res.headers.first(name: "HX-Redirect") == "/login")
+            }
+        }
+    }
+}
+
+/// Bcrypt that counts `verify` calls (to prove every failed login costs the same).
+final class CountingHasher: PasswordHasher, @unchecked Sendable {
+    private let calls = NIOLockedValueBox(0)
+    var verifyCalls: Int { calls.withLockedValue { $0 } }
+
+    func hash<Password: DataProtocol>(_ password: Password) throws -> [UInt8] {
+        Array(try Bcrypt.hash(String(decoding: password, as: UTF8.self), cost: 4).utf8)
+    }
+
+    func verify<Password: DataProtocol, Digest: DataProtocol>(_ password: Password, created digest: Digest) throws -> Bool {
+        calls.withLockedValue { $0 += 1 }
+        return try Bcrypt.verify(String(decoding: Array(password), as: UTF8.self), created: String(decoding: Array(digest), as: UTF8.self))
+    }
+}
+
+@Suite("LoginTiming")
+struct LoginTimingTests {
+    @Test func everyFailedLoginRunsBcrypt() async throws {
+        try await withTestApp { app in
+            let invited = User(username: "neu", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await invited.save(on: app.db)
+            let counting = CountingHasher()
+            app.passwords.use { _ in counting }
+            var expected = 0
+            for (user, pass) in [("admin", "wrong-password"), ("nobody", "whatever123"), ("neu", "whatever123"), ("neu", "!")] {
+                try await app.testing().test(.POST, "/login", headers: .sameOrigin, beforeRequest: { req in
+                    try req.content.encode(LoginForm(username: user, password: pass), as: .urlEncodedForm)
+                }, afterResponse: { res async in
+                    #expect(res.status == .ok, "\(user)")
+                    #expect(res.body.string.contains(AuthController.failureMessage))
+                    #expect(res.headers.first(name: .setCookie) == nil)
+                })
+                expected += 1
+                #expect(counting.verifyCalls == expected, "\(user) should run bcrypt once")
+            }
+            #expect(!invited.hasPassword)
+        }
+    }
+
+    @Test func changePasswordWithoutPassword() async throws {
+        try await withTestApp { app in
+            let invited = User(username: "neu", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await invited.save(on: app.db)
+            let account = AccountService(db: app.db, hasher: app.password.async, tmdbProvider: app.tmdbProvider,
+                                         cipher: app.tokenCipher, worker: app.matchingWorker)
+            await #expect(throws: APIError.noPassword) {
+                try await account.changePassword(user: invited, current: "!", new: "password123")
             }
         }
     }

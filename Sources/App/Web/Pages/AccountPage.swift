@@ -14,6 +14,8 @@ struct AccountPage: HTML {
     var devices: [APIToken] = []
     /// A token created just now (shown only once).
     var newToken: String? = nil
+    var email: EmailState = .none
+    var mailConfigured = false
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -100,6 +102,28 @@ struct AccountPage: HTML {
                 input(.type(.text), .name("name"), .required, .custom(name: "maxlength", value: "60"),
                       .custom(name: "placeholder", value: "Name, z. B. Skript"), .custom(name: "aria-label", value: "Name des Tokens"))
                 button(.type(.submit)) { "Token erstellen" }
+            }
+
+            h2 { "E-Mail-Adresse" }
+            p(.class("muted")) { "Für „Passwort vergessen“. Nur du siehst sie vollständig." }
+            if !mailConfigured {
+                p(.class("muted")) { "Der Admin hat den Mail-Versand noch nicht eingerichtet – „Passwort vergessen“ funktioniert erst danach." }
+            }
+            switch email {
+            case .none: p { "Keine Adresse hinterlegt." }
+            case .unreadable: p(.class("error")) { "Adresse nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
+            case .address(let address): p { "Hinterlegt: \(address)" }
+            }
+            form(.method(.post), .action("/account/email")) {
+                label {
+                    "E-Mail-Adresse (leer lassen zum Entfernen)"
+                    input(.type(.email), .name("email"), .value(email.address ?? ""), .custom(name: "autocomplete", value: "email"))
+                }
+                label {
+                    "Aktuelles Passwort"
+                    input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
+                }
+                button(.type(.submit)) { "Adresse speichern" }
             }
 
             h2 { "Passwort ändern" }

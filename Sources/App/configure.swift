@@ -3,7 +3,7 @@ import FluentSQLiteDriver
 import Vapor
 
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
-               releaseFetcher: (any ReleaseFetcher)? = nil) async throws {
+               releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil) async throws {
     app.appConfig = config
     app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
                                                                databasePath: config.databasePath, logger: app.logger))
@@ -11,7 +11,10 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.releaseFetcher = releaseFetcher ?? LiveReleaseFetcher(client: app.client, userAgent: "WatchSwifty/\(config.appVersion.version)")
     app.updateStatus = UpdateStatus()
     app.authCodes = AuthCodeStore()
+    app.mailSender = mailSender ?? LiveMailSender()
+    app.backgroundTasks = BackgroundTasks()
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
+    app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
     app.middleware = Middlewares()
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
@@ -54,6 +57,9 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(CreateFilmListEntry())
     app.migrations.add(AddMappingCandidatesAt())
     app.migrations.add(CreateAPIToken())
+    app.migrations.add(AddMailConfig())
+    app.migrations.add(CreatePasswordToken())
+    app.migrations.add(AddUserEmail())
 
     try routes(app)
     try await app.autoMigrate()

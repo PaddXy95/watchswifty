@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [0.3.0] – 2026-11-09
+
+### Neu
+- **E-Mail (optional):** SMTP-Versand, eingerichtet als Admin unter **System → E-Mail** und verschlüsselt gespeichert;
+  mit „Testmail senden“. Funktioniert mit [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay) (CA-Datei aus dessen
+  Volume) und normalen Anbietern.
+- **Einladungen:** Der Admin legt ein Konto mit Benutzername und E-Mail-Adresse an, die Person setzt ihr Passwort über
+  den Link selbst (7 Tage gültig, erneut senden möglich). Admins sehen Adressen nur gekürzt.
+- **Passwort vergessen** auf der Anmeldeseite: Link per Mail an die unter **Konto** hinterlegte Adresse (1 Stunde gültig).
+- **Konto:** eigene E-Mail-Adresse hinterlegen (verschlüsselt gespeichert, Ändern nur mit aktuellem Passwort).
+- App-API: Mail-Einstellungen, Einladungen und die eigene Adresse (`/api/v1/admin/mail`, `/api/v1/admin/users/{id}/invite`,
+  `/api/v1/me/email`).
+
+### Sicherer
+- Die Anmeldung verrät über die Antwortzeit nicht mehr, ob es einen Benutzernamen gibt.
+
 ## [0.2.6] – 2026-11-08
 
 ### Neu
