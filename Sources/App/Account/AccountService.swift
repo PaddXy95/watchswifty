@@ -11,6 +11,7 @@ struct AccountService {
     let worker: MatchingWorker
 
     func changePassword(user: User, current: String, new: String) async throws {
+        guard user.hasPassword else { throw APIError.noPassword }
         guard try await hasher.verify(current, created: user.passwordHash) else {
             throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
         }

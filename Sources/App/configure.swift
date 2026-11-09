@@ -14,6 +14,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.mailSender = mailSender ?? LiveMailSender()
     app.backgroundTasks = BackgroundTasks()
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
+    app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
     app.middleware = Middlewares()
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))

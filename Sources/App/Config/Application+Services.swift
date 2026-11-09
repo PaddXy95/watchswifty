@@ -94,3 +94,16 @@ extension Application {
         set { storage[BackgroundTasksKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct DummyPasswordHashKey: StorageKey { typealias Value = String }
+
+    /// Bcrypt hash (same cost as real ones) the login checks for unknown users and accounts without a password.
+    var dummyPasswordHash: String {
+        get {
+            guard let hash = storage[DummyPasswordHashKey.self] else { fatalError("Dummy password hash not configured") }
+            return hash
+        }
+        set { storage[DummyPasswordHashKey.self] = newValue }
+    }
+}

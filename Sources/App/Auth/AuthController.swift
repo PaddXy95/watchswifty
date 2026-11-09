@@ -27,8 +27,12 @@ struct AuthController {
         let input = try req.content.decode(LoginInput.self)
         let returnTo = input.returnTo.flatMap { isSafeReturnTo($0) ? $0 : nil }
         let username = User.normalize(input.username)
-        if let user = try await User.query(on: req.db).filter(\.$username == username).first(),
-           try await req.password.async.verify(input.password, created: user.passwordHash) {
+        let user = try await User.query(on: req.db).filter(\.$username == username).first()
+        // Unknown users and accounts without a password are checked against a dummy hash, so the response time does
+        // not reveal which usernames exist.
+        let hash = user.flatMap { $0.hasPassword ? $0.passwordHash : nil } ?? req.application.dummyPasswordHash
+        let matches = try await req.password.async.verify(input.password, created: hash)
+        if let user, user.hasPassword, matches {
             req.auth.login(user)
             req.session.authenticate(user)
             return req.redirect(to: returnTo ?? "/", redirectType: .normal)

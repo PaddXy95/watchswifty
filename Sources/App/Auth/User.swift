@@ -22,6 +22,11 @@ final class User: Model, @unchecked Sendable {
         self.isAdmin = isAdmin
     }
 
+    /// Stored for accounts without a password (pending invitation); never matches any password.
+    static let noPasswordHash = "!"
+
+    var hasPassword: Bool { passwordHash != Self.noPasswordHash }
+
     /// Usernames are stored trimmed and lowercased; login is case-insensitive.
     static func normalize(_ username: String) -> String {
         username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
