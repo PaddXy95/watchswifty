@@ -73,3 +73,24 @@ extension Application {
         set { storage[MatchingWorkerKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct MailSenderKey: StorageKey { typealias Value = any MailSender }
+    private struct BackgroundTasksKey: StorageKey { typealias Value = BackgroundTasks }
+
+    var mailSender: any MailSender {
+        get {
+            guard let sender = storage[MailSenderKey.self] else { fatalError("Mail sender not configured") }
+            return sender
+        }
+        set { storage[MailSenderKey.self] = newValue }
+    }
+
+    var backgroundTasks: BackgroundTasks {
+        get {
+            guard let tasks = storage[BackgroundTasksKey.self] else { fatalError("Background tasks not configured") }
+            return tasks
+        }
+        set { storage[BackgroundTasksKey.self] = newValue }
+    }
+}

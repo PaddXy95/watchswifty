@@ -4,11 +4,12 @@ import Testing
 import VaporTesting
 
 func withTestApp(config: AppConfig = .testing, tmdb: FakeTMDBClient = FakeTMDBClient(),
-                 releases: FakeReleaseFetcher = FakeReleaseFetcher(),
+                 releases: FakeReleaseFetcher = FakeReleaseFetcher(), mail: FakeMailSender = FakeMailSender(),
                  _ test: (Application) async throws -> Void) async throws {
     let app = try await Application.make(.testing)
     do {
-        try await configure(app, config: config, tmdbProvider: TMDBProvider { _ in tmdb }, releaseFetcher: releases)
+        try await configure(app, config: config, tmdbProvider: TMDBProvider { _ in tmdb }, releaseFetcher: releases,
+                            mailSender: mail)
         try await test(app)
     } catch {
         try await app.asyncShutdown()

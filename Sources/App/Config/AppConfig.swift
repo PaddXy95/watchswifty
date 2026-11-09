@@ -31,6 +31,8 @@ struct AppConfig: Sendable {
     var tokenKeyFile: String? = nil
     /// Version of this build (compared with the latest GitHub release).
     var appVersion: AppVersion = .current
+    /// Longest wait for one mail sent while the request waits (invitation, test mail).
+    var mailDeadline: Duration = .seconds(30)
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
