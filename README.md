@@ -16,7 +16,8 @@ Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Ele
   private Kommentare zu Serie, Staffel und Film
 - **Verlauf** und **Bibliothek**, Klappentext und Links zu TMDB, IMDb, Rotten Tomatoes, SeriesGraph
 - **Statistik:** gesehene Filme, Serien, Folgen und verbrachte Zeit – insgesamt, pro Jahr/Monat und nach Bewertung
-- **Mehrere Benutzer** mit getrennten Daten; der Admin legt Konten an
+- **Mehrere Benutzer** mit getrennten Daten; der Admin legt Konten an oder lädt per Mail ein
+- **E-Mail (optional):** Einladungen und „Passwort vergessen“ über einen SMTP-Server, z. B. [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
 
 Repository: https://github.com/PaddXy95/watchswifty
 
@@ -50,7 +51,10 @@ Benutzer gibt; danach werden sie ignoriert. Weitere Konten legt der Admin unter 
 
 ### Passwort vergessen
 
-Wer sich nicht mehr anmelden kann – auch der einzige Admin –, setzt das Passwort auf dem Server neu:
+Ist [E-Mail](#e-mail-optional) eingerichtet und unter **Konto** eine Adresse hinterlegt, geht es ohne Admin: auf der
+Anmeldeseite „Passwort vergessen?“ wählen, Benutzernamen eingeben, den Link aus der Mail öffnen (gilt eine Stunde).
+
+Ohne Mail – oder wenn sich niemand mehr anmelden kann, auch der einzige Admin – setzt man das Passwort auf dem Server neu:
 
 ```bash
 docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <benutzername>
@@ -198,6 +202,41 @@ SQLite-Backup enthält sie damit nicht lesbar. Der Schlüssel kommt aus:
 Schlüssel getrennt von den Daten aufbewahren. Geht er verloren oder ändert er sich, sind die gespeicherten
 Tokens nicht mehr lesbar: jeder trägt seinen Token unter **Konto** neu ein, alle anderen Daten bleiben erhalten.
 Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
+
+## E-Mail (optional)
+
+Mit eingerichteter Mail lädt der Admin neue Personen per Mail ein (sie legen ihr Passwort selbst fest, der Link gilt
+7 Tage), und jeder kann sein Passwort über „Passwort vergessen?“ selbst zurücksetzen. Ohne Mail funktioniert alles
+wie bisher.
+
+**Einrichten:** als Admin unter **System → E-Mail** die Daten des SMTP-Servers eintragen, speichern und
+„Testmail senden“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`, wie die TMDB-Tokens); das Passwort
+wird nie wieder angezeigt. Ändern sich Server, Port, Verschlüsselung oder Benutzer, muss das Passwort neu eingegeben
+werden. Umgebungsvariablen braucht es dafür nicht.
+
+**Adresse von WatchSwifty** ist die Adresse, unter der Browser die App erreichen (hinter einem Reverse-Proxy dessen
+https-Adresse, z. B. `https://watch.example.lan`). Links in Mails werden nur daraus gebaut.
+
+**Mit [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay):** in der `docker-compose.yml` die auskommentierten
+Zeilen für `swifty-relay` aktivieren (Netzwerk und Volume `swifty-relay-certs`; SwiftyRelay muss vorher einmal
+gelaufen sein), dann:
+
+| Feld | Wert |
+|---|---|
+| Server | `swifty-relay` |
+| Port | `2525` |
+| Verschlüsselung | STARTTLS |
+| Benutzer | `watchswifty` (App-Name im Relay) |
+| Passwort | `SMTP_IN_PASSWORD` des Relays |
+| CA-Datei | `/certs/swifty-relay/ca/ca-bundle.pem` |
+
+SwiftyRelay ersetzt den Absender durch seine eigene Adresse; „Absender-Name“ wirkt dort nicht.
+
+**Anderer Anbieter** (z. B. Mailbox, Gmail mit App-Passwort): Server des Anbieters, Port `587` mit STARTTLS (oder
+`465` mit SSL/TLS), Benutzer und Passwort des Postfachs, CA-Datei leer lassen.
+
+Jeder trägt seine eigene Adresse unter **Konto** ein (Ändern nur mit aktuellem Passwort). Admins sehen fremde
+Adressen nur gekürzt, z. B. `p•••@example.org`.
 
 ## Netflix-Verlauf importieren
 

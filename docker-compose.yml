@@ -19,8 +19,20 @@ services:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     volumes:
       - watchswifty-data:/data
+      # Optional – Mail über SwiftyRelay (README, „E-Mail (optional)“): CA des Relays read-only einbinden.
+      # - swifty-relay-certs:/certs/swifty-relay:ro
+    # Optional – Mail über SwiftyRelay: ins Docker-Netz des Relays (SwiftyRelay muss vorher einmal gestartet sein).
+    # networks: [default, swifty-relay]
 
 volumes:
   watchswifty-data:
     # Fester Name, damit `docker run -v watchswifty-data:/data …` (Backup im README) dasselbe Volume trifft.
     name: watchswifty-data
+  # Optional – Mail über SwiftyRelay:
+  # swifty-relay-certs:
+  #   external: true
+
+# Optional – Mail über SwiftyRelay:
+# networks:
+#   swifty-relay:
+#     external: true
