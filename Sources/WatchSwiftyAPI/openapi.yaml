@@ -1471,6 +1471,86 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/admin/mail:
+    get:
+      operationId: getMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen (nur Admins; das SMTP-Passwort wird nie ausgegeben)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Einstellungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: setMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen speichern (verschlüsselt). Ohne `password` bleibt das gespeicherte – außer Server, Port, Verschlüsselung oder Benutzer ändern sich.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MailSettingsUpdate"
+      responses:
+        "200":
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: deleteMailSettings
+      tags: [Admin]
+      summary: E-Mail-Einstellungen löschen (Mail aus)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Gelöscht
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/admin/mail/test:
+    post:
+      operationId: sendTestMail
+      tags: [Admin]
+      summary: Testmail mit den gespeicherten Einstellungen senden
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestMail"
+      responses:
+        "204":
+          description: Vom Mailserver angenommen
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Ungültige Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/MailFailed"
 components:
   parameters:
     TmdbID:
@@ -1492,6 +1572,12 @@ components:
       schema:
         type: integer
   responses:
+    MailFailed:
+      description: Der Mailserver hat nicht angenommen oder war nicht erreichbar (`mailFailed`, Meldung mit Ursache)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Forbidden:
       description: Nur für Admins (`forbidden`)
       content:
@@ -2196,6 +2282,65 @@ components:
       properties:
         enabled:
           type: boolean
+    MailEncryption:
+      type: string
+      enum: [starttls, ssl, plain]
+    MailSettings:
+      type: object
+      required: [configured, unreadable, hasPassword]
+      properties:
+        configured:
+          type: boolean
+        unreadable:
+          type: boolean
+          description: Gespeichert, aber mit dem aktuellen TOKEN_KEY nicht lesbar – neu eintragen.
+        host:
+          type: string
+        port:
+          type: integer
+        encryption:
+          $ref: "#/components/schemas/MailEncryption"
+        username:
+          type: string
+        hasPassword:
+          type: boolean
+        fromAddress:
+          type: string
+        fromName:
+          type: string
+        caFile:
+          type: string
+        baseUrl:
+          type: string
+          description: Adresse von WatchSwifty für Links in Mails
+    MailSettingsUpdate:
+      type: object
+      required: [host, encryption, fromAddress, baseUrl]
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        encryption:
+          $ref: "#/components/schemas/MailEncryption"
+        username:
+          type: string
+        password:
+          type: string
+        fromAddress:
+          type: string
+        fromName:
+          type: string
+        caFile:
+          type: string
+        baseUrl:
+          type: string
+    TestMail:
+      type: object
+      required: [to]
+      properties:
+        to:
+          type: string
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]

@@ -78,3 +78,42 @@ extension APIHandler {
                                         updateAvailable: settings.latestVersion.flatMap { isNewerVersion($0, than: version.version) }))
     }
 }
+
+extension APIHandler {
+    func getMailSettings(_ input: Operations.getMailSettings.Input) async throws -> Operations.getMailSettings.Output {
+        _ = try APIContext.requireAdmin()
+        return .ok(.init(body: .json(Self.mailSettings(try await APIContext.request().mailSettings.state()))))
+    }
+
+    func setMailSettings(_ input: Operations.setMailSettings.Input) async throws -> Operations.setMailSettings.Output {
+        _ = try APIContext.requireAdmin()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        let service = try APIContext.request().mailSettings
+        try await service.save(MailSettingsInput(
+            host: body.host, port: body.port.map(String.init), encryption: body.encryption.rawValue, username: body.username,
+            password: body.password, fromAddress: body.fromAddress, fromName: body.fromName, caFile: body.caFile, baseURL: body.baseUrl))
+        return .ok(.init(body: .json(Self.mailSettings(try await service.state()))))
+    }
+
+    func deleteMailSettings(_ input: Operations.deleteMailSettings.Input) async throws -> Operations.deleteMailSettings.Output {
+        _ = try APIContext.requireAdmin()
+        try await APIContext.request().mailSettings.delete()
+        return .noContent(.init())
+    }
+
+    func sendTestMail(_ input: Operations.sendTestMail.Input) async throws -> Operations.sendTestMail.Output {
+        _ = try APIContext.requireAdmin()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        try await APIContext.request().mail.sendTest(to: body.to)
+        return .noContent(.init())
+    }
+
+    /// Never includes the password itself.
+    static func mailSettings(_ state: MailSettingsState) -> Components.Schemas.MailSettings {
+        let settings = state.settings
+        return .init(configured: settings != nil, unreadable: state == .unreadable, host: settings?.host, port: settings?.port,
+                     encryption: settings.flatMap { Components.Schemas.MailEncryption(rawValue: $0.encryption.rawValue) },
+                     username: settings?.username, hasPassword: settings?.password != nil, fromAddress: settings?.fromAddress,
+                     fromName: settings?.fromName, caFile: settings?.caFile, baseUrl: settings?.baseURL)
+    }
+}
