@@ -5,10 +5,12 @@ struct AccountController {
     struct ChangeInput: Content { var currentPassword: String; var newPassword: String }
     struct TokenInput: Content { var token: String }
     struct DeviceInput: Content { var name: String }
+    struct EmailInput: Content { var email: String; var currentPassword: String }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
         protected.post("account", "password", use: changePassword)
+        protected.post("account", "email", use: setEmail)
         protected.post("account", "tmdb-token", use: saveToken)
         protected.post("account", "tmdb-token", "remove", use: removeToken)
         protected.post("account", "devices", use: createDeviceToken)
@@ -47,6 +49,17 @@ struct AccountController {
         return try await page(req, notice: "Passwort geändert.")
     }
 
+    func setEmail(req: Request) async throws -> HTMLResponse {
+        let input = try req.content.decode(EmailInput.self)
+        do {
+            try await req.account.setEmail(user: try req.currentUser, email: input.email, currentPassword: input.currentPassword)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
+        }
+        let removed = input.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return try await page(req, notice: removed ? "E-Mail-Adresse entfernt." : "E-Mail-Adresse gespeichert.")
+    }
+
     /// Stores the user's TMDB token after TMDB accepted it.
     func saveToken(req: Request) async throws -> HTMLResponse {
         let token = try req.content.decode(TokenInput.self).token
@@ -70,8 +83,10 @@ struct AccountController {
         let unreadable = suffix == nil && !(stored ?? "").isEmpty
         let followed = try await NewEpisodesService(db: req.db).followedSeries(userID: try req.userID, today: req.watches.today())
         let devices = try await APITokenService(db: req.db).list(userID: try req.userID)
+        let mailConfigured = try await req.mailSettings.state().settings != nil
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
-                                                        newToken: newToken))
+                                                        newToken: newToken, email: try req.currentUser.emailState(req.application.tokenCipher),
+                                                        mailConfigured: mailConfigured))
     }
 }

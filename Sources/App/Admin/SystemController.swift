@@ -67,9 +67,10 @@ struct SystemController {
         let settings = try await req.application.updates.settings()
         let mail = try await req.mailSettings.state()
         let form = mailForm ?? mail.settings.map(MailFormValues.init) ?? MailFormValues(baseURL: Self.requestOrigin(req))
+        let ownAddress = try req.currentUser.emailState(req.application.tokenCipher).address
         return HTMLResponse(status: status, SystemPage(nav: try req.nav(.system), current: req.application.appConfig.appVersion,
                                                        state: UpdateState(settings), notice: notice, error: error, mail: mail,
-                                                       mailForm: form, testRecipient: testRecipient))
+                                                       mailForm: form, testRecipient: testRecipient ?? ownAddress))
     }
 
     /// Suggestion for „Adresse von WatchSwifty“ (only pre-fills the form; links use the stored value only).

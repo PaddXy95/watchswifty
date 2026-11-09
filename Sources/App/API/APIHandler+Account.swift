@@ -25,6 +25,14 @@ extension APIHandler {
         return .noContent(.init())
     }
 
+    func setEmail(_ input: Operations.setEmail.Input) async throws -> Operations.setEmail.Output {
+        let user = try APIContext.requireUser()
+        let request = try APIContext.request()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        try await request.account.setEmail(user: user, email: body.email, currentPassword: body.currentPassword)
+        return .ok(.init(body: .json(Self.me(user, request: request))))
+    }
+
     func setTMDBToken(_ input: Operations.setTMDBToken.Input) async throws -> Operations.setTMDBToken.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()

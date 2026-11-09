@@ -784,6 +784,35 @@ paths:
                 $ref: "#/components/schemas/Error"
         "422":
           $ref: "#/components/responses/Unprocessable"
+  /v1/me/email:
+    put:
+      operationId: setEmail
+      tags: [Konto]
+      summary: Eigene E-Mail-Adresse setzen oder mit leerem Wert entfernen (aktuelles Passwort nötig, wird verschlüsselt gespeichert)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailChange"
+      responses:
+        "200":
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Konto ohne Passwort (`noPassword`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
   /v1/me/tmdb-token:
     put:
       operationId: setTMDBToken
@@ -2549,6 +2578,18 @@ components:
           description: Konto hat ein Passwort (ohne Authentik immer `true`).
         tmdbToken:
           $ref: "#/components/schemas/TMDBTokenState"
+        email:
+          type: string
+          description: Eigene E-Mail-Adresse (fehlt, wenn keine hinterlegt oder nicht lesbar ist)
+    EmailChange:
+      type: object
+      required: [email, currentPassword]
+      properties:
+        email:
+          type: string
+          description: Leer entfernt die Adresse
+        currentPassword:
+          type: string
     TMDBTokenState:
       type: object
       required: [state]
