@@ -8,7 +8,7 @@ struct ResetForm: Content { var token: String; var password: String; var passwor
 
 @Suite("PasswordReset")
 struct PasswordResetTests {
-    static let invalidText = "Der Link ist ungültig oder abgelaufen. Fordere unter „Passwort vergessen“ einen neuen an."
+    static let invalidText = "Der Link ist ungültig oder abgelaufen. Fordere unter „Passwort vergessen“ einen neuen an – bei einer Einladung wende dich an deinen Admin."
     static let expiredInviteText = "Die Einladung ist abgelaufen – bitte wende dich an deinen Admin."
 
     func tokens(_ app: Application) -> PasswordTokenService { PasswordTokenService(db: app.db) }
@@ -47,13 +47,39 @@ struct PasswordResetTests {
         }
     }
 
+    /// `strict-origin` keeps the token out of Referer headers. Never `no-referrer`: with it browsers send
+    /// `Origin: null` on the form POST, and the Origin check rejects every password change with 403.
     @Test func pageHeaders() async throws {
         try await withTestApp { app in
             let pat = try await createUser(app, "pat")
             let token = try await tokens(app).issue(userID: pat.requireID(), purpose: .reset)
             try await app.testing().test(.GET, "/reset-password?token=\(token)") { res async in
-                #expect(res.headers.first(name: "Referrer-Policy") == "no-referrer")
+                #expect(res.headers.first(name: "Referrer-Policy") == "strict-origin")
                 #expect(res.headers.first(name: .cacheControl) == "no-store")
+            }
+            try await post(app, token: token, repeat: "anderes-passwort") { res in
+                #expect(res.headers.first(name: "Referrer-Policy") == "strict-origin")
+            }
+        }
+    }
+
+    @Test func invalidPageLinksToForgotPassword() async throws {
+        try await withTestApp { app in
+            try await app.testing().test(.GET, "/reset-password?token=nonsense") { res async in
+                #expect(res.body.string.contains("href=\"/forgot-password\""))
+            }
+        }
+    }
+
+    @Test func expiredInviteSurvivesCleanup() async throws {
+        try await withTestApp { app in
+            let neu = User(username: "neu", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await neu.save(on: app.db)
+            let invite = try await tokens(app).issue(userID: neu.requireID(), purpose: .invite,
+                                                     now: Date().addingTimeInterval(-8 * 86_400))
+            try await tokens(app).deleteExpired()
+            try await app.testing().test(.GET, "/reset-password?token=\(invite)") { res async in
+                #expect(res.body.string.contains(Self.expiredInviteText))
             }
         }
     }
@@ -173,8 +199,9 @@ struct PasswordResetTests {
             _ = try await tokens(app).issue(userID: pat.requireID(), purpose: .reset, now: past)
             _ = try await tokens(app).issue(userID: neu.requireID(), purpose: .invite, now: past)
             _ = try await tokens(app).issue(userID: neu.requireID(), purpose: .reset)
-            #expect(try await tokens(app).deleteExpired() == 2)
-            #expect(try await PasswordToken.query(on: app.db).count() == 1)
+            // Expired invitations stay (one per user at most), so the link can still say „wende dich an deinen Admin“.
+            #expect(try await tokens(app).deleteExpired() == 1)
+            #expect(try await PasswordToken.query(on: app.db).count() == 2)
         }
     }
 }

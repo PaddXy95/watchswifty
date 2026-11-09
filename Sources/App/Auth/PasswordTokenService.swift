@@ -9,7 +9,7 @@ enum PasswordLinkProblem: Error, Equatable {
 
     var message: String {
         switch self {
-        case .invalid: "Der Link ist ungültig oder abgelaufen. Fordere unter „Passwort vergessen“ einen neuen an."
+        case .invalid: "Der Link ist ungültig oder abgelaufen. Fordere unter „Passwort vergessen“ einen neuen an – bei einer Einladung wende dich an deinen Admin."
         case .expiredInvite: "Die Einladung ist abgelaufen – bitte wende dich an deinen Admin."
         }
     }
@@ -67,11 +67,13 @@ struct PasswordTokenService {
         try await PasswordToken.query(on: db).filter(\.$user.$id == userID).filter(\.$purpose == PasswordTokenPurpose.reset.rawValue).delete()
     }
 
+    /// Removes expired reset links. Expired invitations stay (at most one per account; they go when a password is
+    /// set, the invitation is resent or the account is deleted), so their link can still point to the admin.
     @discardableResult
     func deleteExpired(now: Date = .now) async throws -> Int {
-        let expired = PasswordToken.query(on: db).filter(\.$expiresAt <= now)
-        let count = try await expired.count()
-        try await PasswordToken.query(on: db).filter(\.$expiresAt <= now).delete()
+        let reset = PasswordTokenPurpose.reset.rawValue
+        let count = try await PasswordToken.query(on: db).filter(\.$purpose == reset).filter(\.$expiresAt <= now).count()
+        try await PasswordToken.query(on: db).filter(\.$purpose == reset).filter(\.$expiresAt <= now).delete()
         return count
     }
 }

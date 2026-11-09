@@ -156,12 +156,15 @@ Neuer Abschnitt auf der Seite **System** (nur Admins), Felder:
 - Token: 32 Byte Zufall, Base64URL, nur im Link; gespeichert wird nur der Hash.
 - Gültigkeit: **Reset 1 Stunde, Einladung 7 Tage.** Ein neuer Token derselben Art für denselben Benutzer ersetzt
   den alten (löscht ihn). Nach Benutzung wird der Token gelöscht; ein erfolgreiches Setzen löscht **alle** Tokens
-  des Benutzers. Abgelaufene Tokens räumt der vorhandene tägliche Job mit auf (oder beim nächsten Zugriff).
+  des Benutzers. Abgelaufene **Reset**-Tokens räumt der vorhandene tägliche Job auf; abgelaufene Einladungen bleiben
+  (höchstens eine pro Konto), damit ihr Link weiter auf den Admin verweisen kann.
 - Link: `<Adresse von WatchSwifty>/reset-password?token=…` (für beide Arten dieselbe Seite).
 - **Seite `GET /reset-password`:** prüft den Token nur lesend und zeigt das Formular (neues Passwort zweimal);
-  ungültig/abgelaufen → freundliche Meldung mit Link zu „Passwort vergessen“ bzw. „wende dich an deinen Admin“
-  (Einladung). Ein GET verbraucht den Token nie (Mail-Scanner rufen Links vorab auf).
-  `Referrer-Policy: no-referrer` und `Cache-Control: no-store` auf dieser Seite.
+  ungültig/abgelaufen → freundliche Meldung mit Link zu „Passwort vergessen“; der Text nennt für Einladungen den
+  Admin, eine erkennbar abgelaufene Einladung bekommt „wende dich an deinen Admin“. Ein GET verbraucht den Token nie (Mail-Scanner rufen Links vorab auf).
+  `Referrer-Policy: strict-origin` und `Cache-Control: no-store` auf dieser Seite. *(Korrektur nach Review:
+  ursprünglich `no-referrer` – damit senden Browser beim Formular-POST `Origin: null`, und der Origin-Check lehnt
+  jedes Passwort-Setzen mit 403 ab. `strict-origin` schickt als Referer nur die Origin, der Token bleibt draußen.)*
 - **`POST /reset-password`** (Token im Formular): Passwort-Regeln wie überall (`AccountValidation`), beide Felder
   gleich; setzt den Hash, löscht die Tokens, meldet den Benutzer an (Sitzung) und leitet weiter: Reset → `/`,
   Einladung → `/account` mit Hinweis „Willkommen – trag hier deinen TMDB-Token ein“.

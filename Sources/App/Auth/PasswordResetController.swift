@@ -11,8 +11,9 @@ struct PasswordResetController {
     }
 
     static let mismatchMessage = "Die Passwörter stimmen nicht überein."
-    /// The token is in the URL: keep it out of Referer headers and caches.
-    static let headers: HTTPHeaders = ["Referrer-Policy": "no-referrer", "Cache-Control": "no-store"]
+    /// The token is in the URL: keep it out of Referer headers (only the origin is sent) and caches. Not `no-referrer`:
+    /// with it browsers send `Origin: null` on the form POST, which the Origin check rejects.
+    static let headers: HTTPHeaders = ["Referrer-Policy": "strict-origin", "Cache-Control": "no-store"]
 
     struct ForgotInput: Content { var username: String }
 

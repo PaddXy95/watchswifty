@@ -35,7 +35,11 @@ struct ResetPasswordPage: HTML {
                     }
                 } else {
                     p(.class("error"), .custom(name: "role", value: "alert")) { problem ?? "" }
-                    p { a(.href("/login")) { "Zur Anmeldung" } }
+                    p {
+                        a(.href("/forgot-password")) { "Passwort vergessen" }
+                        " · "
+                        a(.href("/login")) { "Zur Anmeldung" }
+                    }
                 }
             }
         }
