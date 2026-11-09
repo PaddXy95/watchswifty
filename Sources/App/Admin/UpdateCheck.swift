@@ -88,6 +88,8 @@ final class AppSettings: Model, @unchecked Sendable {
     @OptionalField(key: "latest_version") var latestVersion: String?
     @OptionalField(key: "latest_url") var latestURL: String?
     @OptionalField(key: "check_error") var checkError: String?
+    /// Mail settings (`MailSettings` as JSON, sealed with the server key); nil = mail not set up.
+    @OptionalField(key: "mail_config") var mailConfig: String?
 
     init() {
         self.updateCheck = false
@@ -108,6 +110,16 @@ struct CreateAppSettings: AsyncMigration {
 
     func revert(on database: any Database) async throws {
         try await database.schema(AppSettings.schema).delete()
+    }
+}
+
+struct AddMailConfig: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(AppSettings.schema).field("mail_config", .string).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(AppSettings.schema).deleteField("mail_config").update()
     }
 }
 
