@@ -11,10 +11,21 @@ extension APIHandler {
     }
 
     func createUser(_ input: Operations.createUser.Input) async throws -> Operations.createUser.Output {
-        _ = try APIContext.requireAdmin()
+        let admin = try APIContext.requireAdmin()
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
-        let user = try await APIContext.request().userAdmin.create(username: body.username, password: body.password, isAdmin: body.isAdmin ?? false)
-        return .created(.init(body: .json(Self.userSummary(user))))
+        let service = try APIContext.request().userAdmin
+        let created = try await service.create(username: body.username, password: body.password, email: body.email,
+                                               isAdmin: body.isAdmin ?? false, inviter: admin)
+        let summary = Self.userSummary(try await service.row(for: created.user))
+        return .created(.init(body: .json(.init(value1: summary, value2: .init(inviteMailError: created.inviteMailError)))))
+    }
+
+    func resendInvite(_ input: Operations.resendInvite.Input) async throws -> Operations.resendInvite.Output {
+        let admin = try APIContext.requireAdmin()
+        guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
+        let service = try APIContext.request().userAdmin
+        let user = try await service.resendInvite(id: id, inviter: admin)
+        return .ok(.init(body: .json(Self.userSummary(try await service.row(for: user)))))
     }
 
     func resetUserPassword(_ input: Operations.resetUserPassword.Input) async throws -> Operations.resetUserPassword.Output {
@@ -29,8 +40,9 @@ extension APIHandler {
         let admin = try APIContext.requireAdmin()
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
-        let user = try await APIContext.request().userAdmin.setAdmin(id: id, isAdmin: body.isAdmin, actingUserID: admin.requireID())
-        return .ok(.init(body: .json(Self.userSummary(user))))
+        let service = try APIContext.request().userAdmin
+        let user = try await service.setAdmin(id: id, isAdmin: body.isAdmin, actingUserID: admin.requireID())
+        return .ok(.init(body: .json(Self.userSummary(try await service.row(for: user)))))
     }
 
     func deleteUser(_ input: Operations.deleteUser.Input) async throws -> Operations.deleteUser.Output {
@@ -40,9 +52,14 @@ extension APIHandler {
         return .noContent(.init())
     }
 
-    static func userSummary(_ user: User) -> Components.Schemas.UserSummary {
-        .init(id: user.id?.uuidString ?? "", username: user.username, isAdmin: user.isAdmin,
-              hasTMDBToken: !(user.tmdbToken ?? "").isEmpty, createdAt: user.createdAt)
+    /// The address only as a mask; never the full address of another user.
+    static func userSummary(_ row: AdminUserRow) -> Components.Schemas.UserSummary {
+        let user = row.user
+        var expires: Date?
+        if case .pending(let date) = row.invite { expires = date }
+        return .init(id: user.id?.uuidString ?? "", username: user.username, isAdmin: user.isAdmin,
+                     hasTMDBToken: !(user.tmdbToken ?? "").isEmpty, createdAt: user.createdAt, emailHint: row.emailHint,
+                     invitePending: expires != nil, inviteExpiresAt: expires)
     }
 
     func getSystem(_ input: Operations.getSystem.Input) async throws -> Operations.getSystem.Output {

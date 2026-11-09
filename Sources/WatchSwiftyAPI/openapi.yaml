@@ -1344,7 +1344,36 @@ paths:
               $ref: "#/components/schemas/NewUser"
       responses:
         "201":
-          description: Angelegt
+          description: Angelegt (bei einer Einladung auch dann, wenn die Mail scheiterte – siehe `inviteMailError`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Ungültige Angaben (`validation`) oder Einladung ohne eingerichtete Mail (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/admin/users/{id}/invite:
+    post:
+      operationId: resendInvite
+      tags: [Admin]
+      summary: Einladung erneut senden (neuer Link, der alte gilt nicht mehr)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gesendet
           content:
             application/json:
               schema:
@@ -1353,8 +1382,16 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "422":
-          $ref: "#/components/responses/Unprocessable"
+          description: Konto hat schon ein Passwort, keine lesbare Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/MailFailed"
   /v1/admin/users/{id}/password:
     put:
       operationId: resetUserPassword
@@ -2241,7 +2278,7 @@ components:
           type: string
     UserSummary:
       type: object
-      required: [id, username, isAdmin, hasTMDBToken]
+      required: [id, username, isAdmin, hasTMDBToken, invitePending]
       properties:
         id:
           type: string
@@ -2255,15 +2292,36 @@ components:
         createdAt:
           type: string
           format: date-time
+        emailHint:
+          type: string
+          description: E-Mail-Adresse nur maskiert, z. B. `p•••@example.org` (fehlt ohne lesbare Adresse)
+        invitePending:
+          type: boolean
+          description: Konto ohne Passwort, dessen Einladung noch gilt
+        inviteExpiresAt:
+          type: string
+          format: date-time
+          description: Ablauf der offenen Einladung
+    CreatedUser:
+      allOf:
+        - $ref: "#/components/schemas/UserSummary"
+        - type: object
+          properties:
+            inviteMailError:
+              type: string
+              description: Konto angelegt, aber die Einladung ging nicht raus (Ursache); erneut senden über POST /v1/admin/users/{id}/invite
     NewUser:
       type: object
-      required: [username, password]
+      required: [username]
+      description: Mit `password` ein normales Konto; ohne Passwort, aber mit `email` eine Einladung per Mail (Mail muss eingerichtet sein).
       properties:
         username:
           type: string
         password:
           type: string
           minLength: 8
+        email:
+          type: string
         isAdmin:
           type: boolean
     AdminPassword:

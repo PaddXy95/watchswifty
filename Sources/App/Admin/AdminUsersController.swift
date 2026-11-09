@@ -2,7 +2,7 @@ import Fluent
 import Vapor
 
 struct AdminUsersController {
-    struct CreateInput: Content { var username: String; var password: String; var isAdmin: Bool? }
+    struct CreateInput: Content { var username: String; var password: String?; var email: String?; var isAdmin: Bool? }
     struct PasswordInput: Content { var password: String }
     struct AdminInput: Content { var isAdmin: Bool? }
 
@@ -11,6 +11,7 @@ struct AdminUsersController {
         admin.get(use: list)
         admin.post(use: create)
         admin.post(":userID", "password", use: resetPassword)
+        admin.post(":userID", "invite", use: resendInvite)
         admin.post(":userID", "admin", use: setAdmin)
         admin.delete(":userID", use: delete)
     }
@@ -21,12 +22,37 @@ struct AdminUsersController {
 
     func create(req: Request) async throws -> Response {
         let input = try req.content.decode(CreateInput.self)
+        let created: (user: User, inviteMailError: String?)
         do {
-            _ = try await req.userAdmin.create(username: input.username, password: input.password, isAdmin: input.isAdmin ?? false)
+            created = try await req.userAdmin.create(username: input.username, password: input.password, email: input.email,
+                                                     isAdmin: input.isAdmin ?? false, inviter: try req.currentUser)
         } catch let error as APIError {
             return try await page(req, status: error.status, error: error.message).encodeResponse(for: req)
         }
-        return req.redirect(to: "/admin/users", redirectType: .normal)
+        guard !created.user.hasPassword else { return req.redirect(to: "/admin/users", redirectType: .normal) }
+        if let mailError = created.inviteMailError {
+            return try await page(req, status: .badGateway,
+                                  error: "Konto angelegt, aber die Einladung konnte nicht gesendet werden: \(mailError)").encodeResponse(for: req)
+        }
+        return try await page(req, status: .ok, notice: Self.sentNotice(created.user, req)).encodeResponse(for: req)
+    }
+
+    func resendInvite(req: Request) async throws -> HTMLResponse {
+        let user: User
+        do {
+            user = try await req.userAdmin.resendInvite(id: try targetID(req), inviter: try req.currentUser)
+        } catch let error as APIError where error.status != .notFound {
+            return try await page(req, status: error.status, error: error.message)
+        } catch let error as MailError {
+            let apiError = APIError.from(error)
+            return try await page(req, status: apiError.status, error: apiError.message)
+        }
+        return try await page(req, status: .ok, notice: Self.sentNotice(user, req))
+    }
+
+    private static func sentNotice(_ user: User, _ req: Request) -> String {
+        let hint = user.emailState(req.application.tokenCipher).address.map(EmailAddress.mask) ?? ""
+        return "Einladung an \(hint) gesendet."
     }
 
     func resetPassword(req: Request) async throws -> Response {
@@ -65,7 +91,8 @@ struct AdminUsersController {
 
     private func page(_ req: Request, status: HTTPStatus, error: String? = nil, notice: String? = nil) async throws -> HTMLResponse {
         let users = try await req.userAdmin.list()
-        return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users,
+        let mailConfigured = try await req.mailSettings.state().settings != nil
+        return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users, mailConfigured: mailConfigured,
                                                            currentUserID: try req.userID, error: error, notice: notice))
     }
 }

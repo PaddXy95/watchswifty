@@ -156,7 +156,7 @@ struct PasswordResetTests {
             let neu = User(username: "neu", passwordHash: User.noPasswordHash, isAdmin: false)
             try await neu.save(on: app.db)
             let token = try await tokens(app).issue(userID: neu.requireID(), purpose: .invite)
-            try await UserAdminService(db: app.db, hasher: app.password.async).delete(id: neu.requireID(), actingUserID: admin.requireID())
+            try await app.userAdmin.delete(id: neu.requireID(), actingUserID: admin.requireID())
             #expect(try await PasswordToken.query(on: app.db).count() == 0)
             try await app.testing().test(.GET, "/reset-password?token=\(token)") { res async in
                 #expect(res.status == .ok)
