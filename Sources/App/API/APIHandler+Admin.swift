@@ -162,7 +162,8 @@ extension APIHandler {
         return .init(configured: settings != nil, unreadable: state == .unreadable, displayName: settings?.displayName,
                      issuer: settings?.issuer, clientId: settings?.clientID, hasClientSecret: settings != nil,
                      baseUrl: settings?.baseURL, redirectUrl: settings?.redirectURL, passwordLogin: login.passwordLogin,
-                     passwordLoginForced: login.passwordLoginForced, checkError: checkError)
+                     passwordLoginForced: login.passwordLoginForced, passwordLoginStored: settings?.passwordLogin,
+                     checkError: checkError)
     }
 
     func getMailSettings(_ input: Operations.getMailSettings.Input) async throws -> Operations.getMailSettings.Output {

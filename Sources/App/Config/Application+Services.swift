@@ -109,7 +109,6 @@ extension Application {
 }
 
 extension Application {
-    private struct OIDCProviderKey: StorageKey { typealias Value = any OIDCProvider }
     private struct OIDCIdentityLockKey: StorageKey { typealias Value = AsyncMutex }
     private struct OIDCUsedStatesKey: StorageKey { typealias Value = OIDCUsedStates }
 
@@ -120,12 +119,6 @@ extension Application {
             return states
         }
         set { storage[OIDCUsedStatesKey.self] = newValue }
-    }
-
-    /// The OpenID Connect provider; nil while OIDC is not configured.
-    var oidcProvider: (any OIDCProvider)? {
-        get { storage[OIDCProviderKey.self] }
-        set { storage[OIDCProviderKey.self] = newValue }
     }
 
     /// Serializes creating and linking OIDC accounts (first admin, unique identities).

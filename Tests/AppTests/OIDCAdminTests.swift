@@ -49,7 +49,8 @@ struct OIDCAdminTests {
             let page = try await browserGet(app, "/admin/users", headers: try await login(app, "admin", password: "adminpass123"))
             #expect(page.body.contains("1 von 3 Konten mit SSO verknüpft"))
             #expect(page.body.contains("Admin verknüpft: nein"))
-            #expect(page.body.contains("Erst wenn alle verknüpft sind (mindestens ein Admin), PASSWORD_LOGIN=false setzen."))
+            #expect(page.body.contains("Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."))
+            #expect(!page.body.contains("PASSWORD_LOGIN=false"))
         }
     }
 

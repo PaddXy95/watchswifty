@@ -10,6 +10,7 @@ private struct OIDCSettingsBody: Decodable {
     let hasClientSecret: Bool
     let passwordLogin: Bool
     let passwordLoginForced: Bool
+    let passwordLoginStored: Bool?
     let displayName: String?
     let issuer: String?
     let clientId: String?
@@ -143,6 +144,21 @@ struct APIOIDCSettingsTests {
             let token = try await apiToken(app, try await createUser(app, "anna"))
             try await app.testing().test(.GET, "/api/v1/admin/oidc", headers: .bearer(token)) { res async in
                 #expect(res.status == .forbidden)
+            }
+        }
+    }
+
+    @Test func forcedReportsStoredValue() async throws {
+        var config = AppConfig.testingOIDC
+        config.passwordLogin = false
+        config.passwordLoginForced = true
+        try await withTestApp(config: config) { app in
+            let (_, token) = try await admin(app)
+            try await app.testing().test(.GET, "/api/v1/admin/oidc", headers: .bearer(token)) { res async throws in
+                let body = try res.content.decode(OIDCSettingsBody.self)
+                #expect(body.passwordLogin)
+                #expect(body.passwordLoginForced)
+                #expect(body.passwordLoginStored == false)
             }
         }
     }

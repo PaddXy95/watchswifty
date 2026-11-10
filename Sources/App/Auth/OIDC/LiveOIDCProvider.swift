@@ -79,7 +79,7 @@ actor LiveOIDCProvider: OIDCProvider {
             return cached.value
         }
         guard let url = URL(string: OIDCConfig.trimmed(config.issuer) + "/.well-known/openid-configuration") else {
-            throw OIDCError.misconfigured(logReason: "OIDC_ISSUER ist keine URL")
+            throw OIDCError.misconfigured(logReason: "Der eingetragene Issuer ist keine URL")
         }
         let (status, body) = try await transport.get(url)
         guard status == 200 else {
@@ -94,7 +94,7 @@ actor LiveOIDCProvider: OIDCProvider {
         }
         guard OIDCConfig.trimmed(discovery.issuer) == OIDCConfig.trimmed(config.issuer) else {
             throw OIDCError.misconfigured(
-                logReason: "Discovery nennt einen anderen Issuer (\(discovery.issuer)) als OIDC_ISSUER (\(config.issuer))")
+                logReason: "Discovery nennt einen anderen Issuer (\(discovery.issuer)) als eingetragen (\(config.issuer))")
         }
         if let algs = discovery.idTokenSigningAlgValuesSupported, !algs.isEmpty,
            algs.allSatisfy({ !OIDCTokenValidator.allowedAlgorithms.contains($0) }) {

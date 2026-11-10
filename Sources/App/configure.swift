@@ -87,6 +87,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
                                                       passwordLogin: config.passwordLogin))
     }
     await app.loginSettings.reload(db: app.db, cipher: app.tokenCipher, forced: config.passwordLoginForced, logger: app.logger)
+    for hint in config.environmentHints { app.logger.notice("\(hint)") }
     if config.passwordLoginForced {
         app.logger.notice("PASSWORD_LOGIN=true: Passwort-Login ist erzwungen (Notschalter).")
     }

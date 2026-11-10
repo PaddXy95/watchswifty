@@ -7,7 +7,7 @@ func bootstrapAdmin(config: AppConfig, login: LoginSettings, db: any Database, l
     if let oidc = login.oidc {
         let readiness = try await OIDCLoginService.readiness(db: db, oidc: oidc)
         if !login.passwordLogin, config.adminPassword != nil, readiness.total == 0 {
-            logger.notice("ADMIN_USERNAME/ADMIN_PASSWORD werden ignoriert, weil PASSWORD_LOGIN=false gesetzt ist.")
+            logger.notice("ADMIN_USERNAME/ADMIN_PASSWORD werden ignoriert, weil der Passwort-Login unter System abgeschaltet ist.")
         }
         let creates = login.passwordLogin && readiness.total == 0 && config.adminUsername != nil && config.adminPassword != nil
         if !creates {

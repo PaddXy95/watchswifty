@@ -13,7 +13,7 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
   Notschalter `PASSWORD_LOGIN=true`, Notausgang `link-oidc`, Adresswechsel des Providers mit `oidc-move-issuer`.
 - **App-API:** `Me` und `UserSummary` melden `ssoLinked`, `Me` zusätzlich `passwordLogin`; neuer Endpunkt
   `POST /v1/admin/users/{id}/sso-link`, SSO-Einstellungen unter `/v1/admin/oidc` (inkl. Test und Passwort-Login-Schalter);
-  neue Fehlercodes `passwordLoginDisabled` und `emailFromProvider`.
+  neue Fehlercodes `passwordLoginDisabled`, `emailFromProvider` und `oidcCheckFailed`.
 - **Mail bei neuem Gerät:** Verbindet sich eine App mit einem Konto, geht eine Mail an die unter **Konto** hinterlegte
   Adresse – mit Gerätename, Zeitpunkt und Link zum Abmelden (nur mit eingerichteter E-Mail).
 

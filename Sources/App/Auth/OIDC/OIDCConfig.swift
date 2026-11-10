@@ -7,7 +7,7 @@ struct OIDCConfig: Sendable, Equatable {
     var clientSecret: String
     /// Where the provider sends the browser back; its origin is the canonical address of every OIDC flow.
     var redirectURL: URL
-    /// Shown in buttons and messages (`OIDC_NAME`, default „SSO“).
+    /// Shown in buttons and messages (default „SSO“).
     var displayName: String = "SSO"
 
     /// `scheme://host[:port]` of the redirect URL, normalized like the CSRF check's origins.

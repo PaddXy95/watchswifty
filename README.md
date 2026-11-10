@@ -280,8 +280,8 @@ Secret wird nie wieder angezeigt und muss neu eingegeben werden, wenn sich Issue
 Umgebungsvariablen braucht es dafür nicht.
 
 Alle Anmeldungen über den Provider laufen über die eingetragene Adresse. Hinter einem Reverse-Proxy muss dieser den
-**Host-Header samt Port** (oder `X-Forwarded-Host`/`X-Forwarded-Port`) weitergeben – `PUBLIC_ORIGIN` allein reicht für
-SSO nicht (WatchSwifty warnt im Log, wenn die Adresse nicht ankommt). WatchSwifty muss den Provider unter der
+**Host-Header samt Port** (oder `X-Forwarded-Host`/`X-Forwarded-Port`) weitergeben; sonst funktioniert es zwar auch,
+aber WatchSwifty schreibt bei jeder SSO-Anmeldung eine Warnung ins Log. WatchSwifty muss den Provider unter der
 Issuer-Adresse erreichen (öffentlich vertrauenswürdiges Zertifikat); die App startet aber auch, wenn er gerade nicht
 erreichbar ist.
 
@@ -296,12 +296,11 @@ erreichbar ist.
 
 **Erster Login:** Meldet sich jemand zum ersten Mal über den Provider an, fragt WatchSwifty nach, ob ein neues Konto
 angelegt werden soll (Name vorbelegt) – wer schon ein Konto hat, verknüpft stattdessen (siehe Umstieg). Über SSO
-angelegte Konten haben kein Passwort; ihre E-Mail-Adresse kommt vom Provider. Gibt es noch gar keinen Benutzer, wird
-der erste Login Admin.
+angelegte Konten haben kein Passwort; ihre E-Mail-Adresse kommt vom Provider.
 
 ### Umstieg einer bestehenden Installation
 
-1. OIDC wie oben einrichten, **Passwort-Login an lassen**, neu starten.
+1. OIDC wie oben unter **System** einrichten, **Passwort-Login an lassen** (kein Neustart nötig).
 2. Jeder meldet sich wie gewohnt an und klickt unter **Konto** auf „Mit SSO verknüpfen“. Wer sein Passwort nicht
    mehr weiß: „Passwort vergessen?“ oder ein **Verknüpfungslink** vom Admin (Benutzer-Seite, per Mail oder zum
    Weitergeben, 7 Tage gültig). Offene Einladungen lassen sich direkt über SSO annehmen.

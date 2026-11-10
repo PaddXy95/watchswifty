@@ -7,9 +7,9 @@ struct LoginPage: HTML {
     var returnTo: String? = nil
     /// Mail is set up, so „Passwort vergessen?“ can help.
     var forgotPasswordLink = false
-    /// `OIDC_NAME` when OIDC is configured: shows „Mit … anmelden“.
+    /// SSO display name when OIDC is configured: shows „Mit … anmelden“.
     var ssoName: String? = nil
-    /// `PASSWORD_LOGIN`: without it only the OIDC button is shown.
+    /// Password login switch (System): without it only the OIDC button is shown.
     var passwordLogin = true
 
     private var ssoHref: String {

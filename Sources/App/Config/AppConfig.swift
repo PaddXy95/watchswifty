@@ -39,6 +39,8 @@ struct AppConfig: Sendable {
     var passwordLogin: Bool = true
     /// `PASSWORD_LOGIN=true`: emergency switch that keeps the password login on (settings live under System).
     var passwordLoginForced: Bool = false
+    /// Variables that are set but no longer read (logged at startup).
+    var environmentHints: [String] = []
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
@@ -61,6 +63,14 @@ struct AppConfig: Sendable {
             tokenKeyFile: value("TOKEN_KEY_FILE")
         )
         config.passwordLoginForced = value("PASSWORD_LOGIN")?.lowercased() == "true"
+        if let raw = value("PASSWORD_LOGIN"), !config.passwordLoginForced {
+            config.environmentHints.append(
+                "PASSWORD_LOGIN=\(raw) wird ignoriert – nur PASSWORD_LOGIN=true wirkt (Notschalter); den Passwort-Login unter System abschalten.")
+        }
+        for name in ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_CLIENT_SECRET_FILE", "OIDC_REDIRECT_URL", "OIDC_NAME"]
+        where value(name) != nil {
+            config.environmentHints.append("\(name) wird ignoriert – SSO wird unter System → Anmeldung über OIDC (SSO) eingerichtet.")
+        }
         return config
     }
 

@@ -342,6 +342,13 @@ struct OIDCSection: HTML, Sendable {
                     h3 { "Passwort-Login" }
                     if passwordLoginForced {
                         p(.class("notice")) { "Per PASSWORD_LOGIN=true erzwungen – der Passwort-Login bleibt an, bis die Variable entfernt ist." }
+                        if state.settings?.passwordLogin == false {
+                            p { "Gespeichert: aus – gilt wieder, sobald die Variable entfernt ist." }
+                            form(.method(.post), .action("/admin/system/password-login"), .class("inline-form")) {
+                                input(.type(.hidden), .name("enabled"), .value("true"))
+                                button(.type(.submit)) { "Passwort-Login dauerhaft einschalten" }
+                            }
+                        }
                     } else if passwordLogin {
                         p(.class("muted")) {
                             "Erst abschalten, wenn alle Konten verknüpft sind (Benutzer-Seite) – dein eigenes muss verknüpft sein. "

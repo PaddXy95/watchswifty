@@ -2491,6 +2491,9 @@ components:
         passwordLoginForced:
           type: boolean
           description: Per `PASSWORD_LOGIN=true` erzwungen (Notschalter)
+        passwordLoginStored:
+          type: boolean
+          description: Gespeicherter Schalter (gilt wieder, sobald der Notschalter entfernt ist); fehlt ohne SSO-Einstellungen
         checkError:
           type: string
           description: Nur nach dem Speichern – warum die Prüfung der Verbindung fehlschlug

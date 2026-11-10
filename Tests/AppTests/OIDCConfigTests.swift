@@ -29,6 +29,15 @@ struct OIDCConfigTests {
         #expect(!config.passwordLoginForced)
     }
 
+    @Test func ignoredVariablesAreReported() throws {
+        let config = try AppConfig.fromEnvironment(["PASSWORD_LOGIN": "false", "OIDC_ISSUER": "https://id.example.de"])
+        #expect(config.environmentHints == [
+            "PASSWORD_LOGIN=false wird ignoriert – nur PASSWORD_LOGIN=true wirkt (Notschalter); den Passwort-Login unter System abschalten.",
+            "OIDC_ISSUER wird ignoriert – SSO wird unter System → Anmeldung über OIDC (SSO) eingerichtet.",
+        ])
+        #expect(try AppConfig.fromEnvironment(["PASSWORD_LOGIN": "true"]).environmentHints.isEmpty)
+    }
+
     @Test func passwordLoginTrueIsTheEmergencySwitch() throws {
         #expect(try AppConfig.fromEnvironment(["PASSWORD_LOGIN": "true"]).passwordLoginForced)
         #expect(try AppConfig.fromEnvironment(["PASSWORD_LOGIN": "TRUE"]).passwordLoginForced)

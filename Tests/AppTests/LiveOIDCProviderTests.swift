@@ -59,7 +59,7 @@ struct LiveOIDCProviderTests {
     @Test func discoveryIssuerMismatchFails() async throws {
         let transport = FakeOIDCTransport()
         transport.set(FakeOIDCTransport.discoveryURL, json: FakeOIDCTransport.discovery(issuer: "https://other.example"))
-        await #expect(throws: OIDCError.misconfigured(logReason: "Discovery nennt einen anderen Issuer (https://other.example) als OIDC_ISSUER (https://id.example.test)")) {
+        await #expect(throws: OIDCError.misconfigured(logReason: "Discovery nennt einen anderen Issuer (https://other.example) als eingetragen (https://id.example.test)")) {
             _ = try await provider(transport).authorizationURL(state: "s", nonce: "n", codeChallenge: "c")
         }
     }

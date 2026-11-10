@@ -7,7 +7,7 @@ struct ResetPasswordPage: HTML {
     let purpose: PasswordTokenPurpose
     let problem: String?
     let error: String?
-    /// `OIDC_NAME`: invitations can also be accepted through the provider.
+    /// SSO display name: invitations can also be accepted through the provider.
     var ssoName: String? = nil
     var passwordLogin = true
 

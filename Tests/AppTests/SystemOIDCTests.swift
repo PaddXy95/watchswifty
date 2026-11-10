@@ -120,11 +120,19 @@ struct SystemOIDCTests {
 
     @Test func forcedShownAndLocked() async throws {
         var config = AppConfig.testingOIDC
+        config.passwordLogin = false   // stored: off – the emergency switch overrides it
         config.passwordLoginForced = true
         try await withTestApp(config: config) { app in
-            let page = try await browserGet(app, "/admin/system", headers: try await admin(app))
+            let headers = try await admin(app)
+            let page = try await browserGet(app, "/admin/system", headers: headers)
             #expect(page.body.contains("Per PASSWORD_LOGIN=true erzwungen"))
+            #expect(page.body.contains("Gespeichert: aus – gilt wieder, sobald die Variable entfernt ist."))
             #expect(!page.body.contains("Passwort-Login abschalten"))
+            #expect(page.body.contains("Passwort-Login dauerhaft einschalten"))
+            let on = try await browserPost(app, "/admin/system/password-login", form: ["enabled": "true"], headers: headers)
+            #expect(on.body.contains("Passwort-Login eingeschaltet."))
+            #expect(try await app.oidcSettings.state().settings?.passwordLogin == true)
+            #expect(!on.body.contains("Gespeichert: aus"))
         }
     }
 

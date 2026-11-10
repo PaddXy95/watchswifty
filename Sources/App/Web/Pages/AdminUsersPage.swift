@@ -9,7 +9,7 @@ struct AdminUsersPage: HTML {
     let currentUserID: UUID
     let error: String?
     let notice: String?
-    /// `OIDC_NAME` when OIDC is configured.
+    /// SSO display name when OIDC is configured.
     var ssoName: String? = nil
     /// A link just created for passing on (shown only in this response).
     var ssoLink: AdminSSOLink? = nil
@@ -24,7 +24,7 @@ struct AdminUsersPage: HTML {
                 p(.class("muted")) {
                     "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
                     if passwordLogin {
-                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), PASSWORD_LOGIN=false setzen."
+                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."
                     }
                 }
             }

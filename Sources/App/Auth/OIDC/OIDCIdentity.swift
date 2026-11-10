@@ -20,7 +20,7 @@ enum OIDCError: Error, Equatable {
     /// The token names a key the current JWKS does not contain (the provider may have rotated keys).
     case unknownKey(kid: String?)
 
-    /// Message for the login page (spec „Fehlerfälle“); `name` is `OIDC_NAME`.
+    /// Message for the login page (spec „Fehlerfälle“); `name` is the SSO display name.
     func message(name: String) -> String {
         switch self {
         case .unreachable: "\(name) ist gerade nicht erreichbar."
