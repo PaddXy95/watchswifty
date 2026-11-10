@@ -1,4 +1,5 @@
 @testable import App
+import ConsoleKit
 import Fluent
 import Foundation
 import Testing
@@ -134,5 +135,101 @@ struct OIDCMigrationTests {
         // Not linked: never.
         #expect(!user.isSSOAccount(nil, passwordLogin: false))
         #expect(!user.emailFromProvider(nil))
+    }
+
+    // MARK: - Issuer move (Task 14)
+
+    private func linked(_ app: Application, _ name: String, subject: String, issuer: String) async throws -> User {
+        let user = try await createUser(app, name)
+        user.oidcIssuer = issuer
+        user.oidcSubject = subject
+        try await user.save(on: app.db)
+        return user
+    }
+
+    private func service(_ app: Application) throws -> OIDCLoginService {
+        OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: AppConfig.testingOIDC.oidc!, passwordLogin: true,
+                         lock: app.oidcIdentityLock)
+    }
+
+    @Test func moveIssuerRewritesAll() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let anna = try await linked(app, "anna", subject: "s1", issuer: "https://old.example/app/")
+            let bert = try await linked(app, "bert", subject: "s2", issuer: "https://old.example/app")
+            let other = try await linked(app, "carl", subject: "s3", issuer: "https://elsewhere.example")
+            let moved = try await service(app).moveIssuer(from: "https://old.example/app", to: "https://id.example.test")
+            #expect(moved == 2)
+            #expect(try await User.find(anna.id, on: app.db)?.oidcIssuer == "https://id.example.test")
+            #expect(try await User.find(bert.id, on: app.db)?.oidcIssuer == "https://id.example.test")
+            #expect(try await User.find(other.id, on: app.db)?.oidcIssuer == "https://elsewhere.example")
+            #expect(try await User.find(anna.id, on: app.db)?.isLinked(AppConfig.testingOIDC.oidc) == true)
+        }
+    }
+
+    @Test func moveIssuerConflictChangesNothing() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let anna = try await linked(app, "anna", subject: "s1", issuer: "https://old.example")
+            _ = try await linked(app, "bert", subject: "s2", issuer: "https://old.example")
+            _ = try await linked(app, "carl", subject: "s1", issuer: "https://id.example.test")
+            await #expect(throws: APIError.self) {
+                _ = try await service(app).moveIssuer(from: "https://old.example", to: "https://id.example.test")
+            }
+            #expect(try await User.find(anna.id, on: app.db)?.oidcIssuer == "https://old.example")
+            #expect(try await User.query(on: app.db).filter(\.$oidcIssuer == "https://old.example").count() == 2)
+        }
+    }
+
+    @Test func moveIssuerUnknownOldIsNoop() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let moved = try await service(app).moveIssuer(from: "https://nothing.example", to: "https://id.example.test")
+            #expect(moved == 0)
+        }
+    }
+
+    private func runMove(_ app: Application, _ arguments: [String]) async throws -> ScriptedConsole {
+        let console = ScriptedConsole(answers: [])
+        var context = CommandContext(console: console, input: CommandInput(arguments: ["App", "oidc-move-issuer"] + arguments))
+        context.application = app
+        try await app.asyncCommands.group().run(using: &context)
+        return console
+    }
+
+    @Test func moveIssuerCommand() async throws {
+        let fake = FakeOIDCProvider()
+        fake.issuer = "https://id.example.test/"
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            _ = try await linked(app, "anna", subject: "s1", issuer: "https://old.example")
+            let console = try await runMove(app, ["https://old.example", "https://id.example.test"])
+            #expect(console.printed.contains("1 Konto auf https://id.example.test umgestellt."))
+            #expect(console.printed.contains("Achtung: Die Discovery nennt den Issuer https://id.example.test/"))
+        }
+    }
+
+    @Test func moveIssuerCommandWithoutOIDCFails() async throws {
+        try await withTestApp { app in
+            await #expect(throws: CommandFailure.self) { _ = try await runMove(app, ["https://a.example", "https://b.example"]) }
+        }
+    }
+
+    @Test func reenablingOIDCRestoresLinks() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp { app in
+            let user = User(username: "anna", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await user.save(on: app.db)
+            user.oidcIssuer = OIDCTestKeys.issuer
+            user.oidcSubject = "sub-1"
+            try await user.save(on: app.db)
+            #expect(!user.isLinked(app.appConfig.oidc))
+            #expect(try await app.userAdmin.row(for: user).invite == .expired)
+        }
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = User(username: "anna", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await user.save(on: app.db)
+            user.oidcIssuer = OIDCTestKeys.issuer
+            user.oidcSubject = "sub-1"
+            try await user.save(on: app.db)
+            let flow = try await oidcFlow(app, fake)
+            #expect(flow.location == "/")
+        }
     }
 }

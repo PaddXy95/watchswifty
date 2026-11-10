@@ -58,6 +58,28 @@ struct OIDCLoginService {
         }
     }
 
+    /// Rewrites the issuer of every account linked with `from` (trailing slash ignored) to `to`, in one transaction.
+    /// Throws without changing anything when that would create duplicate identities.
+    func moveIssuer(from: String, to: String) async throws -> Int {
+        try await lock.withLock {
+            try await db.transaction { db in
+                let all = try await User.query(on: db).filter(\.$oidcIssuer != nil).all()
+                let moving = all.filter { $0.oidcIssuer.map(OIDCConfig.trimmed) == OIDCConfig.trimmed(from) }
+                let targetSubjects = Set(all.filter { $0.oidcIssuer.map(OIDCConfig.trimmed) == OIDCConfig.trimmed(to) }
+                    .compactMap(\.oidcSubject))
+                if let clash = moving.first(where: { $0.oidcSubject.map(targetSubjects.contains) ?? false }) {
+                    throw APIError.validation(
+                        "Abbruch: „\(clash.username)“ hätte dieselbe Identität wie ein Konto, das schon mit \(to) verknüpft ist – nichts geändert.")
+                }
+                for user in moving {
+                    user.oidcIssuer = to
+                    try await user.save(on: db)
+                }
+                return moving.count
+            }
+        }
+    }
+
     /// Linked accounts without password take the provider's address on every sign-in (missing or invalid: unchanged).
     func syncEmail(_ user: User, from identity: OIDCIdentity) async throws {
         guard user.emailFromProvider(oidc), let address = identity.email.flatMap(EmailAddress.normalize),

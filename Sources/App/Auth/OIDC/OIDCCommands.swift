@@ -26,6 +26,46 @@ struct LinkOIDCCommand: AsyncCommand {
     }
 }
 
+/// `App oidc-move-issuer <alt> <neu>`: the provider's address changed (new domain, renamed slug) but the `sub` values
+/// stayed the same – moves every link to the new issuer.
+struct MoveOIDCIssuerCommand: AsyncCommand {
+    struct Signature: CommandSignature {
+        @Argument(name: "alt", help: "Bisheriger Issuer")
+        var from: String
+        @Argument(name: "neu", help: "Neuer Issuer (genau wie in der Discovery)")
+        var to: String
+    }
+
+    var help: String { "Schreibt die OIDC-Verknüpfungen aller Konten von einem Issuer auf einen neuen um." }
+
+    func run(using context: CommandContext, signature: Signature) async throws {
+        let app = context.application
+        guard let oidc = app.appConfig.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
+        if let provider = app.oidcProvider {
+            if let discovered = try? await provider.discoveredIssuer() {
+                if discovered != signature.to {
+                    context.console.print("Achtung: Die Discovery nennt den Issuer \(discovered) – nicht \(signature.to). Anmeldungen klappen nur, wenn beides genau übereinstimmt.")
+                }
+            } else {
+                context.console.print("Hinweis: Discovery nicht erreichbar – der neue Issuer wurde nicht geprüft.")
+            }
+        }
+        let service = OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: oidc, passwordLogin: app.appConfig.passwordLogin,
+                                       lock: app.oidcIdentityLock)
+        let moved: Int
+        do {
+            moved = try await service.moveIssuer(from: signature.from, to: signature.to)
+        } catch let error as APIError {
+            throw CommandFailure(error.message)
+        }
+        if moved == 0 {
+            context.console.print("Keine Konten mit Issuer \(signature.from) gefunden.")
+        } else {
+            context.console.print("\(moved) \(moved == 1 ? "Konto" : "Konten") auf \(signature.to) umgestellt.")
+        }
+    }
+}
+
 enum OIDCCommandText {
     static let notConfigured = "OIDC ist nicht eingerichtet (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET)."
 }

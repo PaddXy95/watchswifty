@@ -45,6 +45,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
 
     app.asyncCommands.use(ResetPasswordCommand(), as: "reset-password")
     app.asyncCommands.use(LinkOIDCCommand(), as: "link-oidc")
+    app.asyncCommands.use(MoveOIDCIssuerCommand(), as: "oidc-move-issuer")
 
     app.migrations.add(CreateUser())
     app.migrations.add(SessionRecord.migration)
