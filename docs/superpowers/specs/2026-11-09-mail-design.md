@@ -248,3 +248,12 @@ ausführen.
 - Wert für „kein Passwort“ und wie der Login ihn erkennt (Anforderung: kein 500, gleiches Verhalten wie falsches
   Passwort).
 - Quoted-printable vs. Base64 für den Text (7-Bit-sicher ist fest).
+
+## Nachtrag (2026-11-10): Einladungen und Verknüpfungslinks mit OIDC
+
+Siehe `2026-11-07-oidc-login-design.md` („Einladungen“, „Bestehende Konten verknüpfen“):
+- Bei konfiguriertem OIDC nennt die Einladungs-Mail beide Wege (Passwort festlegen oder mit dem Provider verknüpfen),
+  bei `PASSWORD_LOGIN=false` nur den Provider. Die Einladungsseite bietet dann „Mit {OIDC_NAME} verknüpfen“ an.
+- Neue Mail „Konto mit {OIDC_NAME} verknüpfen“ (`MailTexts.ssoLink`): Verknüpfungslink vom Admin, 7 Tage gültig,
+  einmalig; ohne Mail wird der Link einmal auf der Benutzer-Seite angezeigt.
+- Bei `PASSWORD_LOGIN=false` entfallen „Passwort vergessen“ und Reset-Links (404 bzw. „ungültig“).

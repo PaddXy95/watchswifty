@@ -60,7 +60,7 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   the fragment to swap; error responses are swapped too (htmx-config in `Layout`), typically into `#flash`.
 - **App API** (`/api/v1`): handlers must only call the services shared with the web UI, so new behavior goes into
   the service and both front doors get it. Errors are `{"code", "message"}` via `APIError`/`APIErrorMiddleware`.
-- Feature folders: `Auth`, `Account`, `Admin`, `Catalog` (local cache of TMDB titles/episodes), `Tracking`
+- Feature folders: `Auth` (incl. `Auth/OIDC`: OIDC login, see below), `Account`, `Admin`, `Catalog` (local cache of TMDB titles/episodes), `Tracking`
   (watches, ratings, comments, continue watching, history, library, stats), `Import` (Netflix CSV, film list,
   `MatchingWorker`), `Mail`, `TMDB`, `Web`, `API`.
 
@@ -78,6 +78,15 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   `TokenCipher` (key from `TOKEN_KEY` / `TOKEN_KEY_FILE` / generated `token.key`). `req.tmdb` is a client for the
   logged-in user's own token; all users share one TMDB `RateLimiter`.
 
+### OIDC login (SSO)
+Optional, one provider (`OIDC_*`, `PASSWORD_LOGIN`; spec `2026-11-07-oidc-login-design.md`). `LiveOIDCProvider`
+(discovery, JWKS, token exchange over `jwt-kit`) sits behind the `OIDCProvider` protocol; `OIDCController` runs
+`/auth/oidc/*` with an encrypted flow cookie (`OIDCFlowCookie`, no session rows for anonymous starts);
+`OIDCLoginService` holds the account logic (account lookup by issuer + `sub`, confirmed creation, linking under
+`app.oidcIdentityLock`, provider e-mail for accounts without password). Rules depending on the setup go through
+`User.isLinked(_:)`, `isSSOAccount(_:passwordLogin:)` and `emailFromProvider(_:)`. Commands: `link-oidc`,
+`oidc-move-issuer`.
+
 ### TMDB cache rule
 `CatalogMaintenance` enforces the TMDB terms: titles are re-fetched after 60 days with the token of a user who uses
 them, unused titles are deleted, TMDB texts are cleared after 180 days without refresh. `titleUsers(on:)` lists every
@@ -89,6 +98,8 @@ get deleted.
 - Swift Testing (`@Suite`, `@Test`, `#expect`), not XCTest.
 - `withTestApp { app in … }` (`Tests/AppTests/Support/TestApp.swift`) runs the real `configure` with in-memory
   SQLite and `AppConfig.testing` (bcrypt cost 4, no login delay, background jobs off, fixed today).
+- OIDC tests: `withTestApp(config: .testingOIDC, oidc: FakeOIDCProvider())`, `oidcFlow`/`browserGet`/`browserPost`/
+  `newAccountPage`/`linkOIDC` (`Support/OIDCFlow.swift`), `OIDCTestKeys` + `FakeOIDCTransport` for token/provider tests.
 - Helpers: `createUser`, `login` (real login form, returns headers with session cookie + same Origin),
   `HTTPHeaders.sameOrigin` / `.htmx` for state-changing web requests, `apiToken` + `HTTPHeaders.bearer` for the API,
   `seedSeries` / `seedMovie` / `episode` in `Support/Seed.swift`, `FakeTMDBClient` (records `calls`, can inject
