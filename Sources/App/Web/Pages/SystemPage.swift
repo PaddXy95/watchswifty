@@ -36,6 +36,7 @@ struct SystemPage: HTML {
     var mail: MailSettingsState = .notConfigured
     var mailForm = MailFormValues(baseURL: "")
     var testRecipient: String? = nil
+    var oidc: OIDCSection? = nil
 
     var body: some HTML {
         PageLayout(title: "System", nav: nav) {
@@ -68,6 +69,7 @@ struct SystemPage: HTML {
                 UpdateResult(current: current, state: state)
             }
             MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
+            if let oidc { oidc }
         }
     }
 }
@@ -238,6 +240,132 @@ struct MailSection: HTML {
                     p(.class("muted")) { "Danach verschickt WatchSwifty keine Mails mehr – keine Einladungen, kein „Passwort vergessen“." }
                     form(.method(.post), .action("/admin/system/mail/delete"), .class("inline-form")) {
                         button(.type(.submit), .class("danger")) { "E-Mail-Einstellungen löschen" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Values of the SSO form (stored settings, or what was entered when saving failed). Never the secret.
+struct OIDCFormValues: Sendable {
+    var displayName = ""
+    var issuer = ""
+    var clientID = ""
+    var baseURL = ""
+    var hasSecret = false
+
+    init(baseURL: String) {
+        self.baseURL = baseURL
+    }
+
+    init(_ settings: OIDCSettings) {
+        displayName = settings.displayName
+        issuer = settings.issuer
+        clientID = settings.clientID
+        baseURL = settings.baseURL
+        hasSecret = true
+    }
+
+    init(_ input: OIDCSettingsInput) {
+        displayName = input.displayName ?? ""
+        issuer = input.issuer
+        clientID = input.clientID
+        baseURL = input.baseURL
+    }
+}
+
+/// System → Anmeldung über OIDC (SSO): provider settings, connection test, password-login switch, delete.
+struct OIDCSection: HTML, Sendable {
+    let state: OIDCSettingsState
+    let values: OIDCFormValues
+    let passwordLogin: Bool
+    let passwordLoginForced: Bool
+
+    private var name: String { state.settings?.displayName ?? "SSO" }
+    private var redirectURL: String? {
+        MailSettingsService.baseURL(values.baseURL).map { $0 + "/auth/oidc/callback" }
+    }
+
+    var body: some HTML {
+        section(.class("mail-settings")) {
+            h2 { "Anmeldung über OIDC (SSO)" }
+            p(.class("muted")) {
+                "Optional: Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia, Pocket ID …). "
+                "Die Einstellungen werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). Anleitung: README, Abschnitt „Anmeldung über OIDC“."
+            }
+            switch state {
+            case .notConfigured: p { "Nicht eingerichtet." }
+            case .unreadable: p(.class("error")) { "Anmelde-Einstellungen nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
+            case .configured: p(.class("notice")) { "Eingerichtet – auf der Anmeldeseite erscheint „Mit \(name) anmelden“." }
+            }
+            if let redirectURL {
+                p { "Rücksprung-URL für den Provider: "; code { redirectURL } }
+            }
+            form(.method(.post), .action("/admin/system/oidc")) {
+                label {
+                    "Anzeigename (leer = SSO)"
+                    input(.type(.text), .name("displayName"), .value(values.displayName), .custom(name: "maxlength", value: "40"),
+                          .custom(name: "placeholder", value: "z. B. Authentik"))
+                }
+                label {
+                    "Issuer"
+                    input(.type(.url), .name("issuer"), .value(values.issuer), .required, .custom(name: "autocomplete", value: "off"),
+                          .custom(name: "placeholder", value: "https://auth.example.de/application/o/watchswifty/"))
+                }
+                label {
+                    "Client-ID"
+                    input(.type(.text), .name("clientID"), .value(values.clientID), .required, .custom(name: "autocomplete", value: "off"))
+                }
+                label {
+                    "Client-Secret"
+                    input(.type(.password), .name("clientSecret"), .custom(name: "autocomplete", value: "new-password"),
+                          .custom(name: "placeholder", value: values.hasSecret ? "gespeichert – leer lassen zum Behalten" : ""))
+                }
+                p(.class("muted")) { "Ändern sich Issuer oder Client-ID, muss das Secret neu eingegeben werden." }
+                label {
+                    "Adresse von WatchSwifty (Rücksprung-URL = Adresse + /auth/oidc/callback)"
+                    input(.type(.url), .name("baseURL"), .value(values.baseURL), .required,
+                          .custom(name: "placeholder", value: "https://watch.example.lan"))
+                }
+                button(.type(.submit), .class("primary")) { "Speichern" }
+            }
+            if state.settings != nil {
+                div(.class("mail-tool")) {
+                    h3 { "Verbindung testen" }
+                    p(.class("muted")) { "Lädt die Discovery und die Schlüssel des Providers neu." }
+                    form(.method(.post), .action("/admin/system/oidc/test"), .class("inline-form")) {
+                        button(.type(.submit)) { "Verbindung testen" }
+                    }
+                }
+                div(.class("mail-tool")) {
+                    h3 { "Passwort-Login" }
+                    if passwordLoginForced {
+                        p(.class("notice")) { "Per PASSWORD_LOGIN=true erzwungen – der Passwort-Login bleibt an, bis die Variable entfernt ist." }
+                    } else if passwordLogin {
+                        p(.class("muted")) {
+                            "Erst abschalten, wenn alle Konten verknüpft sind (Benutzer-Seite) – dein eigenes muss verknüpft sein. "
+                            "Notfall: PASSWORD_LOGIN=true setzen und neu starten."
+                        }
+                        form(.method(.post), .action("/admin/system/password-login"), .class("inline-form")) {
+                            input(.type(.hidden), .name("enabled"), .value("false"))
+                            button(.type(.submit), .class("danger")) { "Passwort-Login abschalten" }
+                        }
+                    } else {
+                        p { "Passwort-Login ist aus – Anmeldung nur über \(name)." }
+                        form(.method(.post), .action("/admin/system/password-login"), .class("inline-form")) {
+                            input(.type(.hidden), .name("enabled"), .value("true"))
+                            button(.type(.submit)) { "Passwort-Login einschalten" }
+                        }
+                    }
+                }
+            }
+            if state != .notConfigured {
+                div(.class("mail-tool")) {
+                    h3 { "Einstellungen löschen" }
+                    p(.class("muted")) { "Danach gibt es nur noch den Passwort-Login; Verknüpfungen bleiben gespeichert." }
+                    form(.method(.post), .action("/admin/system/oidc/delete"), .class("inline-form")) {
+                        button(.type(.submit), .class("danger")) { "Anmelde-Einstellungen löschen" }
                     }
                 }
             }

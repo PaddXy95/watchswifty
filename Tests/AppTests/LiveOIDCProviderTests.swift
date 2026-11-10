@@ -202,4 +202,16 @@ struct LiveOIDCProviderTests {
         transport.set(FakeOIDCTransport.tokenURL, json: #"{"access_token":"at"}"#)
         await #expect(throws: OIDCError.self) { _ = try await provider(transport).exchange(code: "c", codeVerifier: "v", nonce: "n") }
     }
+
+    @Test func checkLoadsDiscoveryAndKeys() async throws {
+        let pair = try await OIDCTestKeys.es256()
+        let transport = FakeOIDCTransport()
+        transport.set(FakeOIDCTransport.discoveryURL, json: FakeOIDCTransport.discovery())
+        transport.set(FakeOIDCTransport.jwksURL, json: pair.jwks)
+        let provider = provider(transport)
+        let result = try await provider.check()
+        #expect(result == OIDCCheck(issuer: OIDCTestKeys.issuer, keyCount: 1))
+        _ = try await provider.check()
+        #expect(transport.requests(to: FakeOIDCTransport.discoveryURL).count == 2)   // always fresh
+    }
 }

@@ -65,6 +65,13 @@ actor LiveOIDCProvider: OIDCProvider {
         try await discovery().issuer
     }
 
+    func check() async throws -> OIDCCheck {
+        dropDiscovery()
+        let discovery = try await discovery()
+        let keys = try await keys(discovery)
+        return OIDCCheck(issuer: discovery.issuer, keyCount: keys.keyCount)
+    }
+
     // MARK: - Discovery and keys
 
     private func discovery() async throws -> OIDCDiscovery {

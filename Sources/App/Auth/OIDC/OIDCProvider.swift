@@ -11,6 +11,14 @@ protocol OIDCProvider: Sendable {
     func exchange(code: String, codeVerifier: String, nonce: String) async throws -> OIDCIdentity
     /// `issuer` of the current discovery (for `oidc-move-issuer`).
     func discoveredIssuer() async throws -> String
+    /// Loads discovery and keys afresh („Verbindung testen“).
+    func check() async throws -> OIDCCheck
+}
+
+/// Result of „Verbindung testen“.
+struct OIDCCheck: Equatable, Sendable {
+    let issuer: String
+    let keyCount: Int
 }
 
 /// The fields of `.well-known/openid-configuration` WatchSwifty needs.

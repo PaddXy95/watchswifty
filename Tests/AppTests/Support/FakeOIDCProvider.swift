@@ -71,6 +71,11 @@ final class FakeOIDCProvider: OIDCProvider, @unchecked Sendable {
     }
 
     func discoveredIssuer() async throws -> String { issuer }
+
+    func check() async throws -> OIDCCheck {
+        if let error = startError { throw error }
+        return OIDCCheck(issuer: issuer, keyCount: 1)
+    }
 }
 
 /// Identity from the test provider (`https://id.example.test`).

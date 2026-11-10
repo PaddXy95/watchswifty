@@ -29,6 +29,15 @@ enum OIDCError: Error, Equatable {
         }
     }
 
+    /// Text for admins (System page, API): the cause, never a code or token.
+    func adminDescription(name: String) -> String {
+        switch self {
+        case .unreachable: "\(name) ist nicht erreichbar."
+        case .denied: "\(name) hat abgelehnt."
+        default: logDescription
+        }
+    }
+
     /// Text for the log.
     var logDescription: String {
         switch self {

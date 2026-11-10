@@ -6,13 +6,14 @@ import JWTKit
 struct OIDCKeySet: Sendable {
     let keys: JWTKeyCollection
     let keyIDs: Set<String>
+    var keyCount = 0
 
     /// Keys from a JWKS document; keys of other types (e.g. `oct`) are skipped by jwt-kit or rejected later.
     static func from(jwks data: Data) async throws -> OIDCKeySet {
         let jwks = try JSONDecoder().decode(JWKS.self, from: data)
         let keys = JWTKeyCollection()
         try await keys.add(jwks: jwks)
-        return OIDCKeySet(keys: keys, keyIDs: Set(jwks.keys.compactMap { $0.keyIdentifier?.string }))
+        return OIDCKeySet(keys: keys, keyIDs: Set(jwks.keys.compactMap { $0.keyIdentifier?.string }), keyCount: jwks.keys.count)
     }
 }
 
