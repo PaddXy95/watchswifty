@@ -20,6 +20,16 @@ struct OIDCController {
     static let invalidLinkMessage = "Der Verknüpfungslink ist ungültig oder abgelaufen – bitte den Admin um einen neuen bitten."
     /// Session key for intents only a signed-in user can start (`link`, `reauth`); never taken from the URL.
     static let intentKey = "oidc.intent"
+    /// Session key: when the provider last confirmed the signed-in account (seconds since 1970).
+    static let verifiedAtKey = "oidc.verifiedAt"
+    static let reauthWindow: TimeInterval = 300
+
+    /// The provider confirmed the account within the last five minutes.
+    static func isFresh(verifiedAt: String?, now: Date) -> Bool {
+        guard let value = verifiedAt.flatMap(Double.init) else { return false }
+        let age = now.timeIntervalSince1970 - value
+        return age <= reauthWindow && age >= -60
+    }
 
     // MARK: - Start
 
@@ -119,6 +129,16 @@ struct OIDCController {
             try await passwordTokens.deleteAll(userID: user.requireID())
             try await service.syncEmail(user, from: identity)
             return signIn(req, user, redirect: "/account?welcome=1")
+        }
+        if flow.intent == .reauth, let user = req.auth.get(User.self) {
+            guard let owner = try await service.account(for: identity), owner.id == user.id else {
+                return try await page(req, status: .forbidden, error: "Bei \(oidc.displayName) ist ein anderes Konto angemeldet.")
+            }
+            try await service.syncEmail(user, from: identity)
+            req.session.data[Self.verifiedAtKey] = String(Date.now.timeIntervalSince1970)
+            let response = req.redirect(to: flow.returnTo ?? "/", redirectType: .normal)
+            response.cookies[OIDCFlowCookie.name] = OIDCFlowCookie.expired
+            return response
         }
         if flow.intent == .link, let user = req.auth.get(User.self) {
             let response: Response
