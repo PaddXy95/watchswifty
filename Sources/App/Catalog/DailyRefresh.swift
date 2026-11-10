@@ -81,6 +81,9 @@ struct DailyRefreshLifecycle: LifecycleHandler {
                 if let expired = try? await PasswordTokenService(db: db).deleteExpired(), expired > 0 {
                     logger.info("\(expired) abgelaufene Links zum Passwort-Setzen gelöscht")
                 }
+                if let expired = try? await OIDCLinkTokenService(db: db).deleteExpired(), expired > 0 {
+                    logger.info("\(expired) abgelaufene Verknüpfungslinks gelöscht")
+                }
                 let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
                 if !maintenance.isEmpty {
                     logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")
