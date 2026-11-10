@@ -107,6 +107,7 @@ struct OIDCController {
                 return try await page(req, status: .unprocessableEntity, error: error.message)
             }
             _ = try await tokens.consume(token)
+            try await PasswordTokenService(db: req.db).deleteAll(userID: user.requireID())
             return signIn(req, user, redirect: "/account?sso=linked")
         }
         if flow.intent == .invite, let token = flow.inviteToken {
@@ -124,6 +125,7 @@ struct OIDCController {
                 return try await page(req, status: .unprocessableEntity, error: error.message)
             }
             try await passwordTokens.deleteAll(userID: user.requireID())
+            try await OIDCLinkTokenService(db: req.db).deleteAll(userID: user.requireID())
             try await service.syncEmail(user, from: identity)
             return signIn(req, user, redirect: "/account?welcome=1")
         }

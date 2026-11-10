@@ -56,6 +56,10 @@ struct OIDCLinkTokenService {
         return record.$user.id
     }
 
+    func deleteAll(userID: UUID) async throws {
+        try await OIDCLinkToken.query(on: db).filter(\.$user.$id == userID).delete()
+    }
+
     @discardableResult
     func deleteExpired(now: Date = .now) async throws -> Int {
         let count = try await OIDCLinkToken.query(on: db).filter(\.$expiresAt <= now).count()

@@ -9,7 +9,7 @@ import VaporTesting
 struct OIDCLinkTests {
     /// Logged-in user clicks „Mit SSO verknüpfen“ and comes back from the provider.
     private func linkThroughAccountPage(_ app: Application, _ fake: FakeOIDCProvider, headers: HTTPHeaders) async throws -> OIDCFlowResult {
-        let posted = try await browserPost(app, "/account/oidc/link", form: [:], headers: headers)
+        let posted = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "password123"], headers: headers)
         #expect(posted.status == .seeOther)
         #expect(posted.location == "/auth/oidc/start")
         return try await oidcFlow(app, fake, headers: posted.headers)
@@ -106,7 +106,7 @@ struct OIDCLinkTests {
             var headers = try await login(app, "anna")
             headers.replaceOrAdd(name: .host, value: "other.lan:8080")
             headers.replaceOrAdd(name: .origin, value: "http://other.lan:8080")
-            let posted = try await browserPost(app, "/account/oidc/link", form: [:], headers: headers)
+            let posted = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "password123"], headers: headers)
             #expect(posted.status == .seeOther)
             #expect(posted.location == "http://localhost:8080/account?sso=host")
             let page = try await browserGet(app, "/account?sso=host", headers: try await login(app, "anna"))
@@ -327,6 +327,71 @@ struct OIDCLinkTests {
     @Test func linkCommandUnknownUserFails() async throws {
         try await withTestApp(config: .testingOIDC) { app in
             await #expect(throws: CommandFailure("Benutzer „nobody“ gibt es nicht.")) { _ = try await runLinkCommand(app, ["nobody"]) }
+        }
+    }
+
+    // MARK: - Review fixes: no silent re-linking
+
+    @Test func linkNeedsCurrentPassword() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            try await createUser(app, "anna")
+            let headers = try await login(app, "anna")
+            let page = try await browserGet(app, "/account", headers: headers)
+            #expect(page.body.contains("name=\"currentPassword\""))
+            let wrong = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "nope"], headers: headers)
+            #expect(wrong.status == .unprocessableEntity)
+            #expect(wrong.body.contains(AccountValidation.wrongCurrentPasswordMessage))
+        }
+    }
+
+    @Test func alreadyLinkedAccountCannotBeRelinked() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            try await linkOIDC(app, user, subject: "anna-sub")
+            let headers = try await login(app, "anna")
+            let posted = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "password123"], headers: headers)
+            #expect(posted.status == .unprocessableEntity)
+            #expect(posted.body.contains("Das Konto ist schon mit SSO verknüpft."))
+            let service = try OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: #require(AppConfig.testingOIDC.oidc),
+                                               passwordLogin: true, lock: app.oidcIdentityLock)
+            await #expect(throws: APIError.validation("Das Konto ist schon mit SSO verknüpft.")) {
+                try await service.link(user, to: oidcIdentity("attacker"))
+            }
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "anna-sub")
+        }
+    }
+
+    @Test func staleLinkTokenCannotRelink() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            try await linkOIDC(app, user, subject: "anna-sub")
+            fake.identity = oidcIdentity("attacker")
+            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            #expect(result.status == .unprocessableEntity)
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "anna-sub")
+        }
+    }
+
+    @Test func redeemingOneTokenEndsTheOther() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = User(username: "anna", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await user.save(on: app.db)
+            let invite = try await PasswordTokenService(db: app.db).issue(userID: user.requireID(), purpose: .invite)
+            let link = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(link)")
+            #expect(try await PasswordTokenService(db: app.db).lookup(invite) == nil)
+
+            let bert = User(username: "bert", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await bert.save(on: app.db)
+            let invite2 = try await PasswordTokenService(db: app.db).issue(userID: bert.requireID(), purpose: .invite)
+            let link2 = try await OIDCLinkTokenService(db: app.db).issue(userID: bert.requireID(), lifetime: 3600)
+            fake.identity = oidcIdentity("bert-sub")
+            _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?invite=\(invite2)")
+            #expect(try await OIDCLinkTokenService(db: app.db).check(link2) == nil)
         }
     }
 }

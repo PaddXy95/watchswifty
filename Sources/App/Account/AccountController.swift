@@ -6,6 +6,7 @@ struct AccountController {
     struct TokenInput: Content { var token: String }
     struct DeviceInput: Content { var name: String }
     struct EmailInput: Content { var email: String; var currentPassword: String }
+    struct LinkInput: Content { var currentPassword: String? }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
@@ -26,6 +27,18 @@ struct AccountController {
         let browserOrigin = req.headers.first(name: .origin).map(OriginCheckMiddleware.normalizeOrigin)
         guard isCanonical(req, oidc) || browserOrigin == oidc.canonicalOrigin else {
             return req.redirect(to: oidc.canonicalOrigin + "/account?sso=host", redirectType: .normal)
+        }
+        let user = try req.currentUser
+        if user.isLinked(oidc) {
+            return try await page(req, status: .unprocessableEntity, error: OIDCLoginService.alreadyLinked(oidc).message).encodeResponse(for: req)
+        }
+        // Like the e-mail address: a hijacked session must not bind the account to someone else's identity.
+        if user.hasPassword {
+            let entered = (try? req.content.decode(LinkInput.self).currentPassword) ?? ""
+            guard try await req.password.async.verify(entered, created: user.passwordHash) else {
+                return try await page(req, status: .unprocessableEntity, error: AccountValidation.wrongCurrentPasswordMessage)
+                    .encodeResponse(for: req)
+            }
         }
         req.session.data[OIDCController.intentKey] = OIDCIntent.link.rawValue
         return req.redirect(to: "/auth/oidc/start", redirectType: .normal)
@@ -110,7 +123,8 @@ struct AccountController {
         let mailConfigured = try await req.mailSettings.state().settings != nil
         let user = try req.currentUser
         let config = req.application.loginSettings.current
-        let sso = config.oidc.map { AccountSSO(name: $0.displayName, linked: user.isLinked($0), emailFromProvider: user.emailFromProvider($0)) }
+        let sso = config.oidc.map { AccountSSO(name: $0.displayName, linked: user.isLinked($0), emailFromProvider: user.emailFromProvider($0),
+                                               needsPassword: user.hasPassword) }
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),

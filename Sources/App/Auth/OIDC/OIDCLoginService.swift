@@ -47,6 +47,9 @@ struct OIDCLoginService {
                 guard owner.id == user.id else { throw taken }
                 return
             }
+            // A link to the configured provider is never replaced silently (stolen session, stale link token);
+            // `link-oidc` removes it first.
+            if user.isLinked(oidc) { throw Self.alreadyLinked(oidc) }
             user.oidcIssuer = identity.issuer
             user.oidcSubject = identity.subject
             do {
@@ -78,6 +81,10 @@ struct OIDCLoginService {
                 return moving.count
             }
         }
+    }
+
+    static func alreadyLinked(_ oidc: OIDCConfig) -> APIError {
+        APIError.validation("Das Konto ist schon mit \(oidc.displayName) verknüpft.")
     }
 
     /// Linked accounts without password take the provider's address on every sign-in (missing or invalid: unchanged).

@@ -115,6 +115,13 @@ struct AccountPage: HTML {
                 } else {
                     p(.class("muted")) { "Verknüpfe dein Konto, um dich künftig über \(sso.name) anzumelden." }
                     form(.method(.post), .action("/account/oidc/link")) {
+                        if sso.needsPassword {
+                            label {
+                                "Aktuelles Passwort"
+                                input(.type(.password), .name("currentPassword"), .required,
+                                      .custom(name: "autocomplete", value: "current-password"))
+                            }
+                        }
                         button(.type(.submit), .class("primary")) { "Mit \(sso.name) verknüpfen" }
                     }
                 }
@@ -174,6 +181,8 @@ struct AccountSSO: Sendable {
     let name: String
     let linked: Bool
     let emailFromProvider: Bool
+    /// Linking asks for the current password (accounts that have one).
+    var needsPassword = false
 }
 
 /// Step-by-step help for getting a TMDB token (open while none is stored).
