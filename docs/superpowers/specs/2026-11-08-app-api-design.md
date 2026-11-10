@@ -78,16 +78,16 @@ nur HTML-Seiten (htmx) mit Cookie-Login und Origin-Prüfung; maschinenlesbar sin
 ## Anmeldung der App (Geräte-Tokens)
 Ablauf nach RFC 8252 (OAuth für native Apps, Authorization Code + PKCE), aber ohne allgemeines OAuth:
 1. App erzeugt `code_verifier` (PKCE, S256) und `state` und öffnet
-   `GET /api/auth/authorize?redirect_uri=watchswifty://auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`.
+   `GET /api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`.
 2. Ist der Browser nicht angemeldet, erscheint die normale Login-Seite (Passwort bzw. später Authentik) und kehrt
    danach zu diesem Aufruf zurück. Dann zeigt der Server eine Bestätigung: „Die WatchSwifty-App auf
    „{device_name}“ mit deinem Konto verbinden?“ – „Verbinden“ / „Abbrechen“ (POST, durch die Origin-Prüfung).
 3. „Verbinden“ erzeugt einen Einmal-Code (zufällig, 60 s gültig, nur einmal einlösbar, gebunden an Benutzer,
-   `code_challenge`, `redirect_uri`, Gerätename) und leitet auf `watchswifty://auth?code=…&state=…` weiter.
-   „Abbrechen“ leitet auf `watchswifty://auth?error=access_denied&state=…`.
+   `code_challenge`, `redirect_uri`, Gerätename) und leitet auf `dev.patmei.watchswifty:/auth?code=…&state=…` weiter.
+   „Abbrechen“ leitet auf `dev.patmei.watchswifty:/auth?error=access_denied&state=…`.
 4. App: `POST /api/v1/auth/token` mit `code`, `code_verifier`, `redirect_uri` → Antwort
    `{token, expiresAt, device: {id, name, createdAt}, user: {username, isAdmin}}`. Das Token wird nur hier einmal gezeigt.
-- **Erlaubte Rücksprung-Adresse:** nur `watchswifty://auth` (fest im Server); alles andere → Fehlerseite, keine
+- **Erlaubte Rücksprung-Adresse:** nur `dev.patmei.watchswifty:/auth` (fest im Server); alles andere → Fehlerseite, keine
   Weiterleitung.
 - **Token:** `ws_` + 32 zufällige Bytes (Base64URL); gespeichert wird nur der SHA-256-Hash. Tabelle
   `api_tokens`: Benutzer (cascade), Name, Art (Gerät/manuell), Hash (unique), angelegt, läuft ab, zuletzt benutzt

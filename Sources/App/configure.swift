@@ -16,6 +16,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
     app.middleware = Middlewares()
+    app.middleware.use(FrameDenyMiddleware())
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))

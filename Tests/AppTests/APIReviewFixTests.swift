@@ -27,7 +27,7 @@ struct APIReviewFixTests {
     @Test func wrongContentTypeIs4xx() async throws {
         try await withTestApp { app in
             try await app.testing().test(.POST, "/api/v1/auth/token", beforeRequest: { req in
-                req.body = ByteBuffer(string: #"{"code":"x","codeVerifier":"y","redirectUri":"watchswifty://auth"}"#)
+                req.body = ByteBuffer(string: #"{"code":"x","codeVerifier":"y","redirectUri":"dev.patmei.watchswifty:/auth"}"#)
                 req.headers.contentType = .plainText
             }, afterResponse: { res async throws in
                 #expect((400..<500).contains(res.status.code), "got \(res.status.code)")
@@ -48,7 +48,7 @@ struct APIReviewFixTests {
 
     @Test func oversizedJSONBodyIs413() async throws {
         try await withTestApp { app in
-            let huge = #"{"code":""# + String(repeating: "x", count: 2 * 1024 * 1024) + #"","codeVerifier":"y","redirectUri":"watchswifty://auth"}"#
+            let huge = #"{"code":""# + String(repeating: "x", count: 2 * 1024 * 1024) + #"","codeVerifier":"y","redirectUri":"dev.patmei.watchswifty:/auth"}"#
             try await app.testing().test(.POST, "/api/v1/auth/token", beforeRequest: { req in
                 req.body = ByteBuffer(string: huge)
                 req.headers.contentType = .json

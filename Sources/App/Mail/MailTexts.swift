@@ -29,6 +29,29 @@ enum MailTexts {
             """)
     }
 
+    static func newDevice(to: String, username: String, device: String, at date: Date, link: String) -> OutgoingMail {
+        // The app chooses the device name: kept on one line, so it cannot add text of its own to the mail.
+        let breaking = CharacterSet.controlCharacters.union(.newlines)
+        let name = String(String.UnicodeScalarView(device.unicodeScalars.map { breaking.contains($0) ? " " : $0 }))
+        return OutgoingMail(to: to, subject: "WatchSwifty: Neues Gerät verbunden", body: """
+            Hallo \(username),
+
+            mit deinem WatchSwifty-Konto „\(username)“ wurde gerade eine App verbunden:
+
+            Gerät: „\(name)“ (Name, den die App angegeben hat)
+            Zeitpunkt: \(formatDateTime(date)) Uhr
+
+            Warst du das? Dann ist alles in Ordnung.
+
+            Warst du das nicht? Dann melde das Gerät unter „Konto → Geräte“ ab und ändere dein Passwort:
+
+            \(link)
+
+            Viele Grüße
+            WatchSwifty
+            """)
+    }
+
     static func invite(to: String, username: String, inviter: String, link: String, expires: Date) -> OutgoingMail {
         OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
             Hallo,

@@ -160,7 +160,8 @@ struct MailSection: HTML {
         section(.class("mail-settings")) {
             h2 { "E-Mail" }
             p(.class("muted")) {
-                "Optional: Damit verschickt WatchSwifty Einladungen und Links für „Passwort vergessen“. Die Einstellungen "
+                "Optional: Damit verschickt WatchSwifty Einladungen, Links für „Passwort vergessen“ und Hinweise auf neu "
+                "verbundene Geräte. Die Einstellungen "
                 "werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). Beispiel für SwiftyRelay und andere Anbieter: "
                 "README, Abschnitt „E-Mail (optional)“."
             }

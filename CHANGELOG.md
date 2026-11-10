@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Neu
+- **Mail bei neuem Gerät:** Verbindet sich eine App mit einem Konto, geht eine Mail an die unter **Konto** hinterlegte
+  Adresse – mit Gerätename, Zeitpunkt und Link zum Abmelden (nur mit eingerichteter E-Mail).
+
+### Geändert
+- **App-Anmeldung:** Die Rücksprung-Adresse heißt jetzt `dev.patmei.watchswifty:/auth` statt `watchswifty://auth`
+  (Schema nach Reverse-DNS, RFC 8252). Apps müssen sie anpassen, die alte Adresse wird abgelehnt.
+
+### Sicherer
+- Keine Seite lässt sich mehr in fremde Seiten einbetten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). Das
+  schützt vor Clickjacking, auch durch andere Dienste auf demselben Server oder unter derselben Domain.
+- Die API-Doku unter `/api` speichert ein eingefügtes Token nicht mehr im Browser; ein früher gespeichertes wird beim
+  Öffnen gelöscht.
+
 ## [0.3.0] – 2026-11-09
 
 ### Neu

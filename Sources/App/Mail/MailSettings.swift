@@ -39,6 +39,9 @@ struct MailSettings: Codable, Sendable, Equatable {
     func link(token: String) -> String {
         "\(baseURL)/reset-password?token=\(token)"
     }
+
+    /// Konto page, where devices can be signed out.
+    var accountLink: String { "\(baseURL)/account" }
 }
 
 enum MailSettingsState: Equatable, Sendable {
