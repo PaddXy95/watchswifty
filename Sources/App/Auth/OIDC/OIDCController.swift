@@ -9,7 +9,12 @@ struct OIDCController {
         let sessioned = app.grouped(User.sessionAuthenticator()).grouped("auth", "oidc")
         sessioned.get("start", use: start)
         sessioned.get("callback", use: callback)
+        sessioned.get("new-account", use: newAccountPage)
+        sessioned.post("new-account", use: createAccount)
+        sessioned.get("cancel", use: cancel)
     }
+
+    struct NewAccountInput: Content { var username: String }
 
     static let expiredMessage = "Anmeldung abgelaufen – bitte erneut versuchen."
 
@@ -61,6 +66,7 @@ struct OIDCController {
         }
         let service = try req.oidcLogin
         if let user = try await service.account(for: identity) {
+            try await service.syncEmail(user, from: identity)
             return signIn(req, user, redirect: flow.returnTo ?? "/")
         }
         var parked = flow
@@ -68,6 +74,49 @@ struct OIDCController {
         parked.pendingAt = .now
         let response = req.redirect(to: "/auth/oidc/new-account", redirectType: .normal)
         response.cookies[OIDCFlowCookie.name] = try parked.cookie(cipher, secure: oidc.redirectURL.scheme == "https")
+        return response
+    }
+
+    // MARK: - New account
+
+    /// The parked identity, if the cookie is still valid.
+    private func parked(_ req: Request) -> (OIDCFlowCookie, OIDCIdentity)? {
+        guard let flow = OIDCFlowCookie.open(req.cookies[OIDCFlowCookie.name]?.string, cipher: req.application.tokenCipher, now: .now),
+              let identity = flow.pending else { return nil }
+        return (flow, identity)
+    }
+
+    func newAccountPage(req: Request) async throws -> Response {
+        let (oidc, _) = try configured(req)
+        guard let (_, identity) = parked(req) else { return try await page(req, status: .badRequest, error: Self.expiredMessage) }
+        var username = OIDCLoginService.suggestUsername(identity) ?? ""
+        var taken: String?
+        if !username.isEmpty, try await User.query(on: req.db).filter(\.$username == username).first() != nil {
+            taken = username
+            username = ""
+        }
+        return try await HTMLResponse(NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.appConfig.passwordLogin,
+                                                     username: username, takenSuggestion: taken)).encodeResponse(for: req)
+    }
+
+    func createAccount(req: Request) async throws -> Response {
+        let (oidc, _) = try configured(req)
+        guard let (flow, identity) = parked(req) else { return try await page(req, status: .badRequest, error: Self.expiredMessage) }
+        let input = try req.content.decode(NewAccountInput.self)
+        let user: User
+        do {
+            user = try await req.oidcLogin.createAccount(identity, username: input.username)
+        } catch let error as APIError {
+            return try await HTMLResponse(status: error.status,
+                                          NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.appConfig.passwordLogin,
+                                                         username: input.username, error: error.message)).encodeResponse(for: req)
+        }
+        return signIn(req, user, redirect: flow.returnTo ?? "/account?welcome=1")
+    }
+
+    func cancel(req: Request) async throws -> Response {
+        let response = req.redirect(to: "/login", redirectType: .normal)
+        response.cookies[OIDCFlowCookie.name] = OIDCFlowCookie.expired
         return response
     }
 

@@ -62,3 +62,22 @@ func linkOIDC(_ app: Application, _ user: User, subject: String = "sub-1", issue
     user.oidcSubject = subject
     try await user.save(on: app.db)
 }
+
+/// Sends a form POST (same origin unless `headers` say otherwise) and applies the response's cookies.
+func browserPost(_ app: Application, _ path: String, form: [String: String], headers: HTTPHeaders) async throws -> OIDCFlowResult {
+    var result: OIDCFlowResult?
+    try await app.testing().test(.POST, path, headers: headers, beforeRequest: { req in
+        try req.content.encode(form, as: .urlEncodedForm)
+    }, afterResponse: { res async in
+        result = OIDCFlowResult(status: res.status, location: res.headers.first(name: .location), body: res.body.string,
+                                headers: headers.applying(res.headers))
+    })
+    return try #require(result)
+}
+
+/// Runs the flow for `fake.identity` up to the „Neues Konto anlegen“ page and returns the page with the parked cookie.
+func newAccountPage(_ app: Application, _ fake: FakeOIDCProvider, start: String = "/auth/oidc/start") async throws -> OIDCFlowResult {
+    let flow = try await oidcFlow(app, fake, start: start)
+    #expect(flow.location == "/auth/oidc/new-account")
+    return try await browserGet(app, "/auth/oidc/new-account", headers: flow.headers)
+}

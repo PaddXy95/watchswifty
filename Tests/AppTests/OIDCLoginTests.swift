@@ -204,4 +204,237 @@ struct OIDCLoginTests {
             #expect(!(result.headers.first(name: .cookie) ?? "").contains("watchswifty_session"))
         }
     }
+
+    // MARK: - New accounts (Task 6)
+
+    @Test func unknownIdentityAlwaysConfirms() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let before = try await User.query(on: app.db).count()
+            let page = try await newAccountPage(app, fake)
+            #expect(page.status == .ok)
+            #expect(page.body.contains("Mit SSO ist noch kein WatchSwifty-Konto verknüpft."))
+            #expect(page.body.contains("Hast du schon ein Konto?"))
+            #expect(page.body.contains("mit Passwort anmelden"))
+            #expect(page.body.contains("value=\"anna\""))
+            #expect(try await User.query(on: app.db).count() == before)
+        }
+    }
+
+    @Test func hintWithoutPasswordLoginNamesTheAdmin() async throws {
+        let fake = FakeOIDCProvider()
+        var config = AppConfig.testingOIDC
+        config.passwordLogin = false
+        try await withTestApp(config: config, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            #expect(page.body.contains("den Admin um einen Verknüpfungslink bitten"))
+            #expect(!page.body.contains("mit Passwort anmelden"))
+        }
+    }
+
+    @Test func suggestions() {
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: "Anna")) == "anna")
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: nil, email: "p.meier@x.de")) == "p.meier")
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: "ab@idm.example", email: nil, name: nil)) == nil)
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: "patrick@idm.example", email: nil)) == "patrick")
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: "jörg", email: nil)) == "jrg")
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: nil, email: nil, name: "Jörg Müller")) == "jrgmller")
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: String(repeating: "a", count: 40), email: nil))
+            == String(repeating: "a", count: 32))
+        #expect(OIDCLoginService.suggestUsername(oidcIdentity(username: nil, email: nil, name: nil)) == nil)
+    }
+
+    @Test func suggestionFromEmailOnPage() async throws {
+        let fake = FakeOIDCProvider()
+        fake.identity = oidcIdentity(username: nil, email: "p.meier@x.de")
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            #expect(page.body.contains("value=\"p.meier\""))
+        }
+    }
+
+    @Test func nonASCIISuggestionRenders() async throws {
+        let fake = FakeOIDCProvider()
+        fake.identity = oidcIdentity(username: nil, email: nil, name: "Jörg Müller")
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            #expect(page.status == .ok)
+            #expect(page.body.contains("value=\"jrgmller\""))
+        }
+    }
+
+    @Test func takenSuggestionLeavesFieldEmpty() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            try await createUser(app, "anna")
+            let page = try await newAccountPage(app, fake)
+            #expect(!page.body.contains("value=\"anna\""))
+            #expect(page.body.contains("„anna“ ist schon vergeben"))
+        }
+    }
+
+    @Test func confirmCreatesAccountWithoutPassword() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            let created = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "Anna"], headers: page.headers)
+            #expect(created.status == .seeOther)
+            #expect(created.location == "/account?welcome=1")
+            let user = try #require(try await User.query(on: app.db).filter(\.$username == "anna").first())
+            #expect(!user.hasPassword)
+            #expect(!user.isAdmin)
+            #expect(user.oidcIssuer == OIDCTestKeys.issuer)
+            #expect(user.oidcSubject == "sub-1")
+            #expect(user.email?.hasPrefix(TokenCipher.prefix) == true)
+            #expect(user.emailState(app.tokenCipher) == .address("anna@example.org"))
+            let account = try await browserGet(app, "/account", headers: created.headers)
+            #expect(account.status == .ok)
+        }
+    }
+
+    @Test func confirmKeepsReturnTo() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake, start: "/auth/oidc/start?returnTo=%2Fapi%2Fauth%2Fauthorize%3Fx%3D1")
+            let created = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: page.headers)
+            #expect(created.location == "/api/auth/authorize?x=1")
+        }
+    }
+
+    @Test func confirmTakenNameFails() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            try await createUser(app, "anna")
+            let page = try await newAccountPage(app, fake)
+            let taken = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: page.headers)
+            #expect(taken.status == .unprocessableEntity)
+            #expect(taken.body.contains(AccountValidation.duplicateMessage))
+            let invalid = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "a b"], headers: page.headers)
+            #expect(invalid.status == .unprocessableEntity)
+            #expect(invalid.body.contains(AccountValidation.usernameMessage))
+        }
+    }
+
+    @Test func doubleSubmitSignsInOnce() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            let before = try await User.query(on: app.db).count()
+            let first = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: page.headers)
+            let second = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: page.headers)
+            #expect(first.status == .seeOther)
+            #expect(second.status == .seeOther)
+            #expect(try await User.query(on: app.db).count() == before + 1)
+        }
+    }
+
+    @Test func confirmWithoutCookieFails() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let result = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: .sameOrigin)
+            #expect(result.status == .badRequest)
+            #expect(result.body.contains("Anmeldung abgelaufen"))
+            let page = try await browserGet(app, "/auth/oidc/new-account", headers: .sameOrigin)
+            #expect(page.status == .badRequest)
+        }
+    }
+
+    @Test func cancelClearsCookie() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            #expect(page.body.contains("/auth/oidc/cancel"))
+            let cancelled = try await browserGet(app, "/auth/oidc/cancel", headers: page.headers)
+            #expect(cancelled.status == .seeOther)
+            #expect(cancelled.location == "/login")
+            #expect(!(cancelled.headers.first(name: .cookie) ?? "").contains(OIDCFlowCookie.name))
+        }
+    }
+
+    @Test func pendingIdentityExpires() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            var flow = OIDCFlowCookie(state: "st", nonce: "no", verifier: "ve", startedAt: Date().addingTimeInterval(-700), intent: .login)
+            flow.pending = oidcIdentity()
+            flow.pendingAt = Date().addingTimeInterval(-601)
+            let headers = HTTPHeaders.sameOrigin.settingCookie(OIDCFlowCookie.name, try flow.seal(app.tokenCipher))
+            let result = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: headers)
+            #expect(result.status == .badRequest)
+            #expect(result.body.contains("Anmeldung abgelaufen – bitte erneut versuchen."))
+        }
+    }
+
+    @Test func firstAccountBecomesAdminOnlyOnEmptyDatabase() async throws {
+        var config = AppConfig.testingOIDC
+        config.adminUsername = nil
+        config.adminPassword = nil
+        try await withTestApp(config: config) { app in
+            let service = try OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: #require(config.oidc), passwordLogin: true,
+                                               lock: app.oidcIdentityLock)
+            let first = try await service.createAccount(oidcIdentity("s1"), username: "anna")
+            let second = try await service.createAccount(oidcIdentity("s2"), username: "bert")
+            #expect(first.isAdmin)
+            #expect(!second.isAdmin)
+        }
+    }
+
+    @Test func concurrentFirstLoginsCreateOneAdmin() async throws {
+        var config = AppConfig.testingOIDC
+        config.adminUsername = nil
+        config.adminPassword = nil
+        try await withTestApp(config: config) { app in
+            let service = try OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: #require(config.oidc), passwordLogin: true,
+                                               lock: app.oidcIdentityLock)
+            try await withThrowingTaskGroup(of: User.self) { group in
+                for index in 0..<5 {
+                    group.addTask { try await service.createAccount(oidcIdentity("s\(index)"), username: "user\(index)") }
+                }
+                for try await _ in group {}
+            }
+            #expect(try await User.query(on: app.db).filter(\.$isAdmin == true).count() == 1)
+        }
+    }
+
+    @Test func accountWithoutPasswordEmailFollowsProvider() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = User(username: "anna", passwordHash: User.noPasswordHash, isAdmin: false)
+            try await user.save(on: app.db)
+            try await linkOIDC(app, user)
+            fake.identity = oidcIdentity(email: " ANNA@Example.org ")
+            _ = try await oidcFlow(app, fake)
+            #expect(try await User.find(user.id, on: app.db)?.emailState(app.tokenCipher) == .address("ANNA@example.org"))
+            fake.identity = oidcIdentity(email: nil)
+            _ = try await oidcFlow(app, fake)
+            #expect(try await User.find(user.id, on: app.db)?.emailState(app.tokenCipher) == .address("ANNA@example.org"))
+            fake.identity = oidcIdentity(email: "not an address")
+            _ = try await oidcFlow(app, fake)
+            #expect(try await User.find(user.id, on: app.db)?.emailState(app.tokenCipher) == .address("ANNA@example.org"))
+        }
+    }
+
+    @Test func accountWithPasswordEmailNeverOverwritten() async throws {
+        for passwordLogin in [true, false] {
+            let fake = FakeOIDCProvider()
+            var config = AppConfig.testingOIDC
+            config.passwordLogin = passwordLogin
+            try await withTestApp(config: config, oidc: fake) { app in
+                let user = try await createUser(app, "anna")
+                user.email = try app.tokenCipher.seal("manual@example.org")
+                try await user.save(on: app.db)
+                try await linkOIDC(app, user)
+                _ = try await oidcFlow(app, fake)
+                #expect(try await User.find(user.id, on: app.db)?.emailState(app.tokenCipher) == .address("manual@example.org"))
+            }
+        }
+    }
+
+    @Test func passwordLoginForAccountWithoutPasswordStillFails() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let page = try await newAccountPage(app, fake)
+            _ = try await browserPost(app, "/auth/oidc/new-account", form: ["username": "anna"], headers: page.headers)
+            let login = try await browserPost(app, "/login", form: ["username": "anna", "password": User.noPasswordHash],
+                                              headers: .sameOrigin)
+            #expect(login.body.contains(AuthController.failureMessage))
+        }
+    }
 }
