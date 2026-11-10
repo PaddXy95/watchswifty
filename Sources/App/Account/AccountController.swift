@@ -15,6 +15,18 @@ struct AccountController {
         protected.post("account", "tmdb-token", "remove", use: removeToken)
         protected.post("account", "devices", use: createDeviceToken)
         protected.post("account", "devices", ":deviceID", "revoke", use: revokeDevice)
+        protected.post("account", "oidc", "link", use: startLink)
+    }
+
+    /// „Mit … verknüpfen“: remembers the intent in the (signed-in) session and starts the provider flow on the
+    /// canonical address.
+    func startLink(req: Request) async throws -> Response {
+        guard let oidc = req.application.appConfig.oidc else { throw Abort(.notFound) }
+        guard isCanonical(req, oidc) else {
+            return req.redirect(to: oidc.canonicalOrigin + "/account?sso=host", redirectType: .normal)
+        }
+        req.session.data[OIDCController.intentKey] = OIDCIntent.link.rawValue
+        return req.redirect(to: "/auth/oidc/start", redirectType: .normal)
     }
 
     /// Token for scripts or trying out the API docs; shown only in this response.
@@ -36,6 +48,15 @@ struct AccountController {
     func show(req: Request) async throws -> HTMLResponse {
         // After accepting an invitation (see PasswordResetController).
         let welcome = (try? req.query.get(String.self, at: "welcome")) == "1"
+        let name = req.application.appConfig.oidc?.displayName ?? "SSO"
+        switch try? req.query.get(String.self, at: "sso") {
+        case "linked": return try await page(req, notice: "Mit \(name) verknüpft.")
+        case "taken": return try await page(req, error: "Dieses \(name)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
+        case "host":
+            let address = req.application.appConfig.oidc?.canonicalOrigin ?? ""
+            return try await page(req, notice: "Verknüpfen geht nur über \(address) – dort erneut anmelden und klicken.")
+        default: break
+        }
         return try await page(req, notice: welcome ? "Willkommen – trag hier deinen TMDB-Token ein." : nil)
     }
 
@@ -84,9 +105,13 @@ struct AccountController {
         let followed = try await NewEpisodesService(db: req.db).followedSeries(userID: try req.userID, today: req.watches.today())
         let devices = try await APITokenService(db: req.db).list(userID: try req.userID)
         let mailConfigured = try await req.mailSettings.state().settings != nil
+        let user = try req.currentUser
+        let config = req.application.appConfig
+        let sso = config.oidc.map { AccountSSO(name: $0.displayName, linked: user.isLinked($0), emailFromProvider: user.emailFromProvider($0)) }
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
-                                                        newToken: newToken, email: try req.currentUser.emailState(req.application.tokenCipher),
-                                                        mailConfigured: mailConfigured))
+                                                        newToken: newToken, email: user.emailState(req.application.tokenCipher),
+                                                        mailConfigured: mailConfigured, sso: sso,
+                                                        passwordChange: user.hasPassword && config.passwordLogin))
     }
 }

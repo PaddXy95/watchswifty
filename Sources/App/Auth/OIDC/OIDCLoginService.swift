@@ -38,6 +38,26 @@ struct OIDCLoginService {
         }
     }
 
+    /// Links `user` with the identity (replaces a link to another issuer). Fails when the identity belongs to another
+    /// account – also when that happens concurrently (unique index).
+    func link(_ user: User, to identity: OIDCIdentity) async throws {
+        let taken = APIError.validation("Dieses \(oidc.displayName)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
+        try await lock.withLock {
+            if let owner = try await account(for: identity) {
+                guard owner.id == user.id else { throw taken }
+                return
+            }
+            user.oidcIssuer = identity.issuer
+            user.oidcSubject = identity.subject
+            do {
+                try await user.save(on: db)
+            } catch {
+                if try await account(for: identity) != nil { throw taken }
+                throw error
+            }
+        }
+    }
+
     /// Linked accounts without password take the provider's address on every sign-in (missing or invalid: unchanged).
     func syncEmail(_ user: User, from identity: OIDCIdentity) async throws {
         guard user.emailFromProvider(oidc), let address = identity.email.flatMap(EmailAddress.normalize),

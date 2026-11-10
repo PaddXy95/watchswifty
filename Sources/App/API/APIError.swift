@@ -27,6 +27,11 @@ struct APIError: Error, Sendable, Equatable {
         APIError(status: .serviceUnavailable, code: "mailFailed", message: message)
     }
 
+    /// The account's address comes from the OIDC provider (linked account without password).
+    static func emailFromProvider(name: String) -> APIError {
+        APIError(status: .conflict, code: "emailFromProvider", message: "Die Adresse kommt von \(name) – bitte dort ändern.")
+    }
+
     static func validation(_ message: String) -> APIError {
         APIError(status: .unprocessableEntity, code: "validation", message: message)
     }

@@ -17,6 +17,8 @@ struct OIDCController {
     struct NewAccountInput: Content { var username: String }
 
     static let expiredMessage = "Anmeldung abgelaufen – bitte erneut versuchen."
+    /// Session key for intents only a signed-in user can start (`link`, `reauth`); never taken from the URL.
+    static let intentKey = "oidc.intent"
 
     // MARK: - Start
 
@@ -27,8 +29,13 @@ struct OIDCController {
         }
         let returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
         let verifier = Self.randomToken()
+        var intent = OIDCIntent.login
+        if req.auth.has(User.self), req.hasSession, let raw = req.session.data[Self.intentKey] {
+            req.session.data[Self.intentKey] = nil
+            if let stored = OIDCIntent(rawValue: raw), stored == .link || stored == .reauth { intent = stored }
+        }
         let flow = OIDCFlowCookie(state: Self.randomToken(), nonce: Self.randomToken(), verifier: verifier, startedAt: .now,
-                                  intent: .login, returnTo: returnTo)
+                                  intent: intent, returnTo: returnTo)
         let url: URL
         do {
             url = try await provider.authorizationURL(state: flow.state, nonce: flow.nonce, codeChallenge: pkceChallenge(verifier))
@@ -65,6 +72,17 @@ struct OIDCController {
             return try await failure(req, error, returnTo: flow.returnTo)
         }
         let service = try req.oidcLogin
+        if flow.intent == .link, let user = req.auth.get(User.self) {
+            let response: Response
+            do {
+                try await service.link(user, to: identity)
+                response = req.redirect(to: "/account?sso=linked", redirectType: .normal)
+            } catch let error as APIError where error.status == .unprocessableEntity {
+                response = req.redirect(to: "/account?sso=taken", redirectType: .normal)
+            }
+            response.cookies[OIDCFlowCookie.name] = OIDCFlowCookie.expired
+            return response
+        }
         if let user = try await service.account(for: identity) {
             try await service.syncEmail(user, from: identity)
             return signIn(req, user, redirect: flow.returnTo ?? "/")
