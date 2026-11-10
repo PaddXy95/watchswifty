@@ -8,10 +8,12 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 - **Anmeldung über OIDC (SSO):** Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia,
   Pocket ID …) per „Mit SSO anmelden“. Bestehende Konten werden unter **Konto** verknüpft, neue entstehen nach
   Bestätigung beim ersten Login, Einladungen lassen sich über SSO annehmen. Die Benutzer-Seite zeigt, wer schon
-  verknüpft ist, und erzeugt Verknüpfungslinks. Mit `PASSWORD_LOGIN=false` lässt sich der Passwort-Login danach
-  abschalten. Notausgang `link-oidc`, Adresswechsel des Providers mit `oidc-move-issuer`.
+  verknüpft ist, und erzeugt Verknüpfungslinks. Eingerichtet wird alles unter **System → Anmeldung über OIDC (SSO)**
+  (verschlüsselt gespeichert, mit „Verbindung testen“); dort lässt sich der Passwort-Login danach auch abschalten.
+  Notschalter `PASSWORD_LOGIN=true`, Notausgang `link-oidc`, Adresswechsel des Providers mit `oidc-move-issuer`.
 - **App-API:** `Me` und `UserSummary` melden `ssoLinked`, `Me` zusätzlich `passwordLogin`; neuer Endpunkt
-  `POST /v1/admin/users/{id}/sso-link`; neue Fehlercodes `passwordLoginDisabled` und `emailFromProvider`.
+  `POST /v1/admin/users/{id}/sso-link`, SSO-Einstellungen unter `/v1/admin/oidc` (inkl. Test und Passwort-Login-Schalter);
+  neue Fehlercodes `passwordLoginDisabled` und `emailFromProvider`.
 - **Mail bei neuem Gerät:** Verbindet sich eine App mit einem Konto, geht eine Mail an die unter **Konto** hinterlegte
   Adresse – mit Gerätename, Zeitpunkt und Link zum Abmelden (nur mit eingerichteter E-Mail).
 
@@ -28,8 +30,8 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
   ohne Anmeldung raus. Jetzt erscheint ein Hinweis, und nichts wird gespeichert.
 
 ### Sicherer
-- **SSO-Konten und Apps:** Konten, die nur über den Provider hineinkommen, gehen vor dem Verbinden einer App einmal
-  durch den Provider – wer dort gesperrt ist, bekommt kein neues Geräte-Token.
+- **SSO-Konten und Apps:** Konten, die nur über den Provider hineinkommen, gehen vor dem Verbinden einer App und vor
+  einem von Hand erstellten Token einmal durch den Provider – wer dort gesperrt ist, bekommt kein neues Token.
 - Keine Seite lässt sich mehr in fremde Seiten einbetten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). Das
   schützt vor Clickjacking, auch durch andere Dienste auf demselben Server oder unter derselben Domain.
 - Die API-Doku unter `/api` speichert ein eingefügtes Token nicht mehr im Browser; ein früher gespeichertes wird beim

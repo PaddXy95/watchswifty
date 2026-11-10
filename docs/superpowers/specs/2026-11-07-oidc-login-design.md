@@ -337,11 +337,11 @@ Ersetzt die früheren `OIDC_*`-Variablen. Gespeichert als ein verschlüsselter J
 - Bestehende Daten werden nicht verändert; bestehende Sessions und Geräte-Tokens bleiben gültig.
 
 ### Umstieg einer bestehenden Installation (README, Schritt für Schritt)
-1. Provider einrichten, OIDC-Variablen setzen, **Passwort-Login an lassen**, neu starten.
+1. Provider einrichten, unter **System → Anmeldung (SSO)** eintragen, **Passwort-Login an lassen**.
 2. Jeder meldet sich wie gewohnt an und verknüpft unter **Konto**. Wer sein Passwort nicht mehr weiß: „Passwort
    vergessen“ oder Admin-**Verknüpfungslink**. Offene Einladungen können direkt über {name} angenommen werden.
 3. Benutzer-Seite prüfen: Statuskasten „alle verknüpft, Admin verknüpft: ja“.
-4. `PASSWORD_LOGIN=false` setzen, neu starten. Noch nicht verknüpfte Konten: Verknüpfungslink vom Admin. Wer noch
+4. Unter **System** den Passwort-Login abschalten. Noch nicht verknüpfte Konten: Verknüpfungslink vom Admin. Wer noch
    eine Web-Sitzung hat, kann auch selbst unter **Konto** verknüpfen.
 5. Bestehende Geräte-Tokens laufen weiter (bis 90 Tage); beim nächsten Verbinden geht es über {name}.
 
@@ -358,12 +358,12 @@ Statuskasten vor dem Abschalten; Log-Warnung ohne verknüpften Admin; `link-oidc
 - `docker exec -it watchswifty /app/docker-entrypoint.sh oidc-move-issuer <alt> <neu>`: schreibt `oidc_issuer` aller
   Konten mit `<alt>` (Vergleich ohne abschließenden Schrägstrich) auf `<neu>` um, in einer Transaktion; gibt die
   Anzahl aus. Gäbe es dadurch doppelte Paare (Issuer, `sub`) → Abbruch ohne Änderung mit Meldung.
-- Vorher `OIDC_ISSUER` auf die neue Adresse setzen; `<neu>` muss genau der `issuer` der neuen Discovery sein (der
+- Vorher unter **System** den neuen Issuer eintragen; `<neu>` muss genau der `issuer` der neuen Discovery sein (der
   Befehl lädt sie zur Prüfung, wenn erreichbar, und warnt bei Abweichung).
 - Nur für denselben Provider – bei einem echten Wechsel ändern sich die `sub`-Werte, dann neu verknüpfen.
 
 ### Rückweg: OIDC wieder abschalten
-- OIDC-Variablen entfernen (und `PASSWORD_LOGIN` an). Kein Konto gilt dann als verknüpft; Spalten bleiben erhalten.
+- Passwort-Login einschalten und die Anmelde-Einstellungen unter **System** löschen. Kein Konto gilt dann als verknüpft; Spalten bleiben erhalten.
 - Konten mit Passwort: normaler Passwort-Login.
 - Konten ohne Passwort (über SSO angelegt): gelten wieder als Einladung („Einladung abgelaufen“) → Admin „Einladung
   erneut senden“ (mit Mail) oder „Passwort setzen“; ohne Admin-Zugang `reset-password`.

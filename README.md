@@ -272,24 +272,24 @@ Provider (Freigabe der Application für Benutzer bzw. Gruppen). Es gibt genau ei
 `https://<watchswifty>/auth/oidc/callback`, Scopes `openid profile email`, ID-Tokens **asymmetrisch** signieren
 (RS256, ES256, EdDSA …; HS256 wird abgelehnt).
 
-**In WatchSwifty** (`.env`):
+**In WatchSwifty:** als Admin unter **System → Anmeldung über OIDC (SSO)** Anzeigename (z. B. „Authentik“), Issuer,
+Client-ID, Client-Secret und die **Adresse von WatchSwifty** eintragen und speichern. Die Seite zeigt die
+Rücksprung-URL zum Kopieren (Adresse + `/auth/oidc/callback`), prüft die Verbindung gleich mit und hat einen Knopf
+„Verbindung testen“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`) und wirkt sofort, ohne Neustart; das
+Secret wird nie wieder angezeigt und muss neu eingegeben werden, wenn sich Issuer oder Client-ID ändern.
+Umgebungsvariablen braucht es dafür nicht.
 
-```
-OIDC_ISSUER=https://auth.example.de/application/o/watchswifty/
-OIDC_CLIENT_ID=…
-OIDC_CLIENT_SECRET=…
-OIDC_NAME=Authentik
-```
-
-Die Rücksprungadresse wird aus dem ersten Eintrag von `PUBLIC_ORIGIN` gebildet (oder `OIDC_REDIRECT_URL`); alle
-Anmeldungen über den Provider laufen über diese Adresse. WatchSwifty muss den Provider unter der Issuer-Adresse
-erreichen (öffentlich vertrauenswürdiges Zertifikat); die App startet aber auch, wenn er gerade nicht erreichbar ist.
+Alle Anmeldungen über den Provider laufen über die eingetragene Adresse. Hinter einem Reverse-Proxy muss dieser den
+**Host-Header samt Port** (oder `X-Forwarded-Host`/`X-Forwarded-Port`) weitergeben – `PUBLIC_ORIGIN` allein reicht für
+SSO nicht (WatchSwifty warnt im Log, wenn die Adresse nicht ankommt). WatchSwifty muss den Provider unter der
+Issuer-Adresse erreichen (öffentlich vertrauenswürdiges Zertifikat); die App startet aber auch, wenn er gerade nicht
+erreichbar ist.
 
 - **Authentik:** Provider „OAuth2/OpenID“, beim Provider einen **Signing Key** wählen (ohne Key signiert Authentik
-  mit HS256), Subject-Modus auf dem Standard lassen, Application anlegen und freigeben. `OIDC_ISSUER` ist die
+  mit HS256), Subject-Modus auf dem Standard lassen, Application anlegen und freigeben. Issuer ist die
   „OpenID Configuration Issuer“-Adresse des Providers (mit `/application/o/<slug>/`).
-- **Keycloak:** `OIDC_ISSUER=https://kc.example.de/realms/<realm>`, Client mit „Client authentication“ an.
-- **Pocket ID:** OIDC-Client anlegen (nicht „public“); `OIDC_ISSUER` ist die `APP_URL` von Pocket ID (z. B.
+- **Keycloak:** Issuer `https://kc.example.de/realms/<realm>`, Client mit „Client authentication“ an.
+- **Pocket ID:** OIDC-Client anlegen (nicht „public“); Issuer ist die `APP_URL` von Pocket ID (z. B.
   `https://id.example.de`). Die Callback-URL muss https sein (sonst `ALLOW_INSECURE_CALLBACK_URLS=true` in Pocket ID);
   ist dort `INTERNAL_APP_URL` gesetzt, muss WatchSwifty diese interne Adresse erreichen (z. B. gleiches Docker-Netz).
   Mit Gruppenbeschränkung zeigt Pocket ID Nicht-Mitgliedern eine eigene Fehlerseite.
@@ -306,10 +306,14 @@ der erste Login Admin.
    mehr weiß: „Passwort vergessen?“ oder ein **Verknüpfungslink** vom Admin (Benutzer-Seite, per Mail oder zum
    Weitergeben, 7 Tage gültig). Offene Einladungen lassen sich direkt über SSO annehmen.
 3. Auf der Benutzer-Seite prüfen: „x von y Konten verknüpft · Admin verknüpft: ja“.
-4. `PASSWORD_LOGIN=false` setzen und neu starten. Dann gibt es nur noch den SSO-Button; „Passwort vergessen“,
-   Startpasswörter und „Passwort setzen“ entfallen, neue Konten entstehen per Einladung oder beim ersten SSO-Login.
-5. Verbundene Apps laufen weiter (Tokens bis 90 Tage); beim nächsten Verbinden geht es einmal über den Provider, ein
-   dort gesperrter Benutzer bekommt kein neues Token. Eine bestehende Web-Sitzung läuft bis zu 30 Tage weiter.
+4. Unter **System** „Passwort-Login abschalten“ (geht nur, wenn dein eigenes Konto verknüpft ist). Dann gibt es nur
+   noch den SSO-Button; „Passwort vergessen“, Startpasswörter und „Passwort setzen“ entfallen, neue Konten entstehen
+   per Einladung oder beim ersten SSO-Login. **Notschalter:** `PASSWORD_LOGIN=true` in der `.env` setzen und neu
+   starten – dann bleibt der Passwort-Login an, bis die Variable wieder entfernt ist.
+5. Verbundene Apps laufen weiter (Tokens bis 90 Tage); beim nächsten Verbinden – und für ein von Hand erstelltes
+   Token – geht es einmal über den Provider, ein dort gesperrter Benutzer bekommt kein neues Token. Eine bestehende
+   Web-Sitzung bleibt aber angemeldet, solange sie benutzt wird (jede Nutzung verlängert sie um 30 Tage); wer
+   jemanden sofort aussperren will, löscht das Konto unter **Benutzer**.
 
 Hinweis: Setzt ein Admin einem über SSO angelegten Konto später ein Passwort, behält es die vom Provider übernommene
 Adresse – „Passwort vergessen“ ginge dann an sie.
@@ -324,7 +328,8 @@ docker exec -it watchswifty /app/docker-entrypoint.sh link-oidc <benutzername>
 ```
 
 Ändert sich nur die Adresse des Providers (neue Domain, umbenannter Slug), schreibt dieser Befehl alle
-Verknüpfungen um – vorher `OIDC_ISSUER` anpassen, `<neu>` muss genau der Issuer der neuen Discovery sein:
+Verknüpfungen um – vorher unter **System** den neuen Issuer eintragen, `<neu>` muss genau der Issuer der neuen
+Discovery sein:
 
 ```bash
 docker exec -it watchswifty /app/docker-entrypoint.sh oidc-move-issuer <alt> <neu>
@@ -334,7 +339,7 @@ Bei einem **echten Wechsel** des Providers ändern sich die Benutzer-IDs: dann m
 verknüpfen (wie beim Umstieg) oder Verknüpfungslinks verschicken. Eine zufällig gleiche ID beim neuen Provider öffnet
 kein altes Konto.
 
-**Zurück ohne OIDC:** OIDC-Variablen entfernen (Passwort-Login an). Konten mit Passwort melden sich normal an; über
+**Zurück ohne OIDC:** Passwort-Login einschalten und unter **System** „Anmelde-Einstellungen löschen“. Konten mit Passwort melden sich normal an; über
 SSO angelegte Konten gelten wieder als Einladung – „Einladung erneut senden“ oder „Passwort setzen“ auf der
 Benutzer-Seite (bzw. `reset-password`). Schaltet man OIDC später mit demselben Issuer wieder ein, gelten die alten
 Verknüpfungen wieder.
@@ -400,11 +405,7 @@ Ein erneuter Import desselben (oder eines neueren) Exports legt keine Duplikate 
 | `TOKEN_KEY` | empfohlen | Schlüssel für die gespeicherten TMDB-Tokens (Base64, 32 Byte) |
 | `TOKEN_KEY_FILE` | nein | Datei mit dem Schlüssel statt `TOKEN_KEY` (z. B. Docker-Secret) |
 | `PUBLIC_ORIGIN` | nein | Öffentliche Adresse(n) hinter einem Reverse-Proxy, kommagetrennt, z. B. `https://nas.lan:8443` |
-| `OIDC_ISSUER` | für SSO | Issuer des OIDC-Providers ([Anmeldung über OIDC](#anmeldung-über-oidc-sso-optional)) |
-| `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | für SSO | Client-ID und -Secret (`OIDC_CLIENT_SECRET_FILE`: Datei mit dem Secret, z. B. Docker-Secret) |
-| `OIDC_REDIRECT_URL` | nein | Rücksprungadresse; Standard: erster Eintrag von `PUBLIC_ORIGIN` + `/auth/oidc/callback` |
-| `OIDC_NAME` | nein | Name im Button „Mit … anmelden“, Standard `SSO` |
-| `PASSWORD_LOGIN` | nein | `false` schaltet den Passwort-Login ab (nur mit OIDC) |
+| `PASSWORD_LOGIN` | nein | Nur `true`: Notschalter, erzwingt den Passwort-Login (SSO wird unter **System** eingerichtet, siehe [Anmeldung über OIDC](#anmeldung-über-oidc-sso-optional)) |
 | `DATABASE_PATH` | nein | Standard `/data/watchswifty.sqlite` |
 | `HOST` / `PORT` | nein | Standard `0.0.0.0` / `8080` |
 

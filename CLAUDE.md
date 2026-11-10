@@ -79,7 +79,10 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   logged-in user's own token; all users share one TMDB `RateLimiter`.
 
 ### OIDC login (SSO)
-Optional, one provider (`OIDC_*`, `PASSWORD_LOGIN`; spec `2026-11-07-oidc-login-design.md`). `LiveOIDCProvider`
+Optional, one provider, configured under System (`OIDCSettingsService`, sealed in `app_settings.oidc_config`, cached in
+`app.loginSettings`; `PASSWORD_LOGIN=true` is only an emergency switch; spec `2026-11-07-oidc-login-design.md`).
+Read the setup through `req.application.loginSettings.current`, never from `AppConfig` (its `oidc`/`passwordLogin` are
+test seeds). `LiveOIDCProvider`
 (discovery, JWKS, token exchange over `jwt-kit`) sits behind the `OIDCProvider` protocol; `OIDCController` runs
 `/auth/oidc/*` with an encrypted flow cookie (`OIDCFlowCookie`, no session rows for anonymous starts);
 `OIDCLoginService` holds the account logic (account lookup by issuer + `sub`, confirmed creation, linking under
