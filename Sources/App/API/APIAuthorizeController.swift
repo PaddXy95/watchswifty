@@ -3,9 +3,9 @@ import Foundation
 import Vapor
 
 /// Browser part of the app login: the app opens `/api/auth/authorize` in a system browser sheet, the user signs in
-/// (password or later Authentik) and confirms; the app receives a one-time code at `watchswifty://auth`.
+/// (password or later Authentik) and confirms; the app receives a one-time code at `dev.patmei.watchswifty:/auth`.
 struct APIAuthorizeController {
-    static let redirectURI = "watchswifty://auth"
+    static let redirectURI = "dev.patmei.watchswifty:/auth"
 
     struct Params: Content {
         var redirect_uri: String

@@ -164,12 +164,15 @@ WatchSwifty hat eine JSON-API für Apps unter `/api/v1`. Die vollständige Besch
 `http://<server>:8080/api/openapi.yaml`, eine Doku-Seite zum Ausprobieren unter `http://<server>:8080/api`.
 
 - **Anmeldung einer App:** Die App öffnet im System-Browser-Fenster
-  `/api/auth/authorize?redirect_uri=watchswifty://auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
-  (PKCE). Nach Login und „Verbinden“ springt der Browser zu `watchswifty://auth?code=…&state=…`; die App tauscht den
+  `/api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
+  (PKCE). Nach Login und „Verbinden“ springt der Browser zu `dev.patmei.watchswifty:/auth?code=…&state=…`; die App tauscht den
   Code über `POST /api/v1/auth/token` gegen ein Geräte-Token.
 - **Aufrufe:** mit Header `Authorization: Bearer ws_…`. Tokens gelten 90 Tage, danach verbindet sich die App neu.
 - **Geräte verwalten:** unter **Konto → Geräte** – abmelden oder ein Token für Skripte bzw. die Doku erstellen
-  (wird nur einmal angezeigt).
+  (wird nur einmal angezeigt). Ein in der Doku eingefügtes Token merkt sich der Browser nicht, nach dem Neuladen also
+  neu einfügen.
+- **Neues Gerät:** Ist [E-Mail](#e-mail-optional) eingerichtet und unter **Konto** eine Adresse hinterlegt, kommt bei
+  jeder neu verbundenen App eine Mail mit Gerätename, Zeitpunkt und Link zum Abmelden.
 - Die API nimmt keine Session-Cookies an; Fehler kommen als `{"code": …, "message": …}`.
 - **Umfang** (alles wie im Web): Weiterschauen und Hinweise, Suche, Serien und Filme (abhaken, bewerten,
   kommentieren, beobachten, ausblenden), Verlauf, Bibliothek, Statistik, Konto und Geräte, Netflix-Import und
@@ -206,8 +209,8 @@ Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
 ## E-Mail (optional)
 
 Mit eingerichteter Mail lädt der Admin neue Personen per Mail ein (sie legen ihr Passwort selbst fest, der Link gilt
-7 Tage), und jeder kann sein Passwort über „Passwort vergessen?“ selbst zurücksetzen. Ohne Mail funktioniert alles
-wie bisher.
+7 Tage), jeder kann sein Passwort über „Passwort vergessen?“ selbst zurücksetzen, und wer eine Adresse hinterlegt
+hat, erfährt per Mail, wenn sich eine App mit seinem Konto verbindet. Ohne Mail funktioniert alles wie bisher.
 
 **Einrichten:** als Admin unter **System → E-Mail** die Daten des SMTP-Servers eintragen, speichern und
 „Testmail senden“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`, wie die TMDB-Tokens); das Passwort

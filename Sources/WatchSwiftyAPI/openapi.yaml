@@ -39,8 +39,8 @@ paths:
       tags: [Konto]
       summary: Einmal-Code aus dem Browser-Login gegen ein Geräte-Token tauschen
       description: |
-        Ablauf: Die App öffnet `/api/auth/authorize?redirect_uri=watchswifty://auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
-        im System-Browser-Fenster. Nach Anmeldung und „Verbinden“ springt der Browser zu `watchswifty://auth?code=…&state=…`.
+        Ablauf: Die App öffnet `/api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
+        im System-Browser-Fenster. Nach Anmeldung und „Verbinden“ springt der Browser zu `dev.patmei.watchswifty:/auth?code=…&state=…`.
         Den Code (60 s gültig, einmal einlösbar) hier mit dem PKCE-`codeVerifier` einlösen.
       requestBody:
         required: true
@@ -2579,7 +2579,7 @@ components:
           type: string
         redirectUri:
           type: string
-          description: Muss `watchswifty://auth` sein.
+          description: Muss `dev.patmei.watchswifty:/auth` sein.
     TokenGrant:
       type: object
       required: [token, expiresAt, device, user]

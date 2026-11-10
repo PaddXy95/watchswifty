@@ -5,7 +5,7 @@ import Testing
 import VaporTesting
 
 struct AuthorizeForm: Content {
-    var redirect_uri = "watchswifty://auth"
+    var redirect_uri = "dev.patmei.watchswifty:/auth"
     var state = "xyz"
     var code_challenge: String
     var code_challenge_method = "S256"
@@ -16,7 +16,7 @@ struct AuthorizeForm: Content {
 struct TokenRequestBody: Content {
     var code: String
     var codeVerifier: String
-    var redirectUri = "watchswifty://auth"
+    var redirectUri = "dev.patmei.watchswifty:/auth"
 }
 
 struct TokenGrantBody: Codable {
@@ -34,7 +34,7 @@ struct LoginReturnForm: Content { var username: String; var password: String; va
 struct APIAuthorizeTests {
     let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk-verifier-1234567890"
 
-    func authorizePath(challenge: String, redirect: String = "watchswifty://auth", device: String = "Patricks iPhone") -> String {
+    func authorizePath(challenge: String, redirect: String = "dev.patmei.watchswifty:/auth", device: String = "Patricks iPhone") -> String {
         var components = URLComponents(string: "/api/auth/authorize")!
         components.queryItems = [
             .init(name: "redirect_uri", value: redirect), .init(name: "state", value: "xyz"),
@@ -52,7 +52,7 @@ struct APIAuthorizeTests {
         }, afterResponse: { res async in
             #expect(res.status == .seeOther)
             let location = res.headers.first(name: .location) ?? ""
-            #expect(location.hasPrefix("watchswifty://auth?code="))
+            #expect(location.hasPrefix("dev.patmei.watchswifty:/auth?code="))
             #expect(location.contains("state=xyz"))
             code = URLComponents(string: location)?.queryItems?.first { $0.name == "code" }?.value ?? ""
         })
@@ -116,10 +116,10 @@ struct APIAuthorizeTests {
     @Test func codeExpiresAfter60Seconds() async throws {
         let store = AuthCodeStore()
         let now = Date()
-        let code = await store.issue(userID: UUID(), challenge: pkceChallenge(verifier), redirectURI: "watchswifty://auth",
+        let code = await store.issue(userID: UUID(), challenge: pkceChallenge(verifier), redirectURI: "dev.patmei.watchswifty:/auth",
                                      deviceName: "X", now: now)
         await #expect(throws: APIError.invalidGrant) {
-            try await store.redeem(code: code, verifier: verifier, redirectURI: "watchswifty://auth", now: now.addingTimeInterval(61))
+            try await store.redeem(code: code, verifier: verifier, redirectURI: "dev.patmei.watchswifty:/auth", now: now.addingTimeInterval(61))
         }
     }
 
@@ -127,10 +127,13 @@ struct APIAuthorizeTests {
         try await withTestApp { app in
             try await createUser(app, "pat")
             let web = try await login(app, "pat")
-            try await app.testing().test(.GET, authorizePath(challenge: pkceChallenge(verifier), redirect: "https://evil.example/cb"),
-                                         headers: web) { res async in
-                #expect(res.status == .badRequest)
-                #expect(res.headers.first(name: .location) == nil)
+            // The old `watchswifty://auth` is gone: only the reverse-DNS scheme of the app counts.
+            for redirect in ["https://evil.example/cb", "watchswifty://auth", "dev.patmei.watchswifty://auth"] {
+                try await app.testing().test(.GET, authorizePath(challenge: pkceChallenge(verifier), redirect: redirect),
+                                             headers: web) { res async in
+                    #expect(res.status == .badRequest, "\(redirect)")
+                    #expect(res.headers.first(name: .location) == nil)
+                }
             }
         }
     }
@@ -145,7 +148,7 @@ struct APIAuthorizeTests {
                 try req.content.encode(form, as: .urlEncodedForm)
             }, afterResponse: { res async in
                 #expect(res.status == .seeOther)
-                #expect(res.headers.first(name: .location) == "watchswifty://auth?error=access_denied&state=xyz")
+                #expect(res.headers.first(name: .location) == "dev.patmei.watchswifty:/auth?error=access_denied&state=xyz")
             })
         }
     }

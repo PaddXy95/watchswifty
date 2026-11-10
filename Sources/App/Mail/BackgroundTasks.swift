@@ -1,7 +1,7 @@
 import Foundation
 import NIOConcurrencyHelpers
 
-/// Work the response does not wait for (the „Passwort vergessen“ mail). Tests wait for it with `drain()`.
+/// Work the response does not wait for (the „Passwort vergessen“ and „Neues Gerät“ mails). Tests wait for it with `drain()`.
 final class BackgroundTasks: Sendable {
     private let running = NIOLockedValueBox<[UUID: Task<Void, Never>]>([:])
 

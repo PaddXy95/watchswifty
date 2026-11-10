@@ -11,6 +11,8 @@ extension APIHandler {
                                                                    redirectURI: body.redirectUri)
         guard let user = try await User.find(grant.userID, on: request.db) else { throw APIError.invalidGrant }
         let issued = try await APITokenService(db: request.db).issue(userID: grant.userID, name: grant.deviceName, kind: .device)
+        let notice = request.deviceNotice
+        request.application.backgroundTasks.run { await notice.handle(userID: grant.userID, deviceName: grant.deviceName) }
         return .ok(.init(body: .json(.init(token: issued.token, expiresAt: issued.record.expiresAt, device: try Self.device(issued.record),
                                            user: .init(username: user.username, isAdmin: user.isAdmin)))))
     }

@@ -18,6 +18,8 @@ struct APIDocsTests {
             try await app.testing().test(.GET, "/api-docs/init.js") { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains(#"url: "/api/openapi.yaml""#))
+                #expect(res.body.string.contains("persistAuthorization: false"))   // bearer token never in localStorage
+                #expect(res.body.string.contains(#"localStorage.removeItem("authorized")"#))
             }
         }
     }
