@@ -17,6 +17,22 @@ struct AccountController {
         protected.post("account", "devices", use: createDeviceToken)
         protected.post("account", "devices", ":deviceID", "revoke", use: revokeDevice)
         protected.post("account", "oidc", "link", use: startLink)
+        protected.post("account", "oidc", "reauth", use: startReauth)
+    }
+
+    /// „Über … bestätigen“: SSO accounts confirm through the provider before they get a manual token.
+    func startReauth(req: Request) async throws -> Response {
+        guard req.application.loginSettings.current.oidc != nil else { throw Abort(.notFound) }
+        req.session.data[OIDCController.intentKey] = OIDCIntent.reauth.rawValue
+        req.session.data[OIDCController.returnToKey] = "/account"
+        return req.redirect(to: "/auth/oidc/start", redirectType: .normal)
+    }
+
+    /// SSO accounts get no new API token without a fresh confirmation by the provider (spec „App verbinden“).
+    private func tokenNeedsReauth(_ req: Request) throws -> Bool {
+        let login = req.application.loginSettings.current
+        return try req.currentUser.isSSOAccount(login.oidc, passwordLogin: login.passwordLogin)
+            && !OIDCController.isFresh(verifiedAt: req.session.data[OIDCController.verifiedAtKey], now: .now)
     }
 
     /// „Mit … verknüpfen“: remembers the intent in the (signed-in) session and starts the provider flow on the
@@ -46,6 +62,10 @@ struct AccountController {
 
     /// Token for scripts or trying out the API docs; shown only in this response.
     func createDeviceToken(req: Request) async throws -> HTMLResponse {
+        if try tokenNeedsReauth(req) {
+            let ssoName = req.application.loginSettings.current.oidc?.displayName ?? "SSO"
+            return try await page(req, status: .forbidden, error: "Bitte zuerst über \(ssoName) bestätigen – danach das Token erstellen.")
+        }
         let name = try req.content.decode(DeviceInput.self).name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...60).contains(name.count) else {
             return try await page(req, status: .unprocessableEntity, error: "Der Name muss 1 bis 60 Zeichen haben.")
@@ -129,6 +149,7 @@ struct AccountController {
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),
                                                         mailConfigured: mailConfigured, sso: sso,
-                                                        passwordChange: user.hasPassword && config.passwordLogin))
+                                                        passwordChange: user.hasPassword && config.passwordLogin,
+                                                        tokenNeedsReauth: try tokenNeedsReauth(req)))
     }
 }

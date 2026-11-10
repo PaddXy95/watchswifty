@@ -19,6 +19,8 @@ struct OIDCController {
     static let invalidLinkMessage = "Der Verknüpfungslink ist ungültig oder abgelaufen – bitte den Admin um einen neuen bitten."
     /// Session key for intents only a signed-in user can start (`link`, `reauth`); never taken from the URL.
     static let intentKey = "oidc.intent"
+    /// Session key: where a server-started re-check returns to (set by the server, never from the URL).
+    static let returnToKey = "oidc.returnTo"
     /// Session key: when the provider last confirmed the signed-in account (seconds since 1970).
     static let verifiedAtKey = "oidc.verifiedAt"
     static let reauthWindow: TimeInterval = 300
@@ -35,12 +37,16 @@ struct OIDCController {
     func start(req: Request) async throws -> Response {
         let (oidc, provider) = try configured(req)
         if let redirect = canonicalRedirect(req, oidc) { return redirect }
-        let returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
+        var returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
         let verifier = Self.randomToken()
         var intent = OIDCIntent.login
         if req.auth.has(User.self), req.hasSession, let raw = req.session.data[Self.intentKey] {
             req.session.data[Self.intentKey] = nil
             if let stored = OIDCIntent(rawValue: raw), stored == .link || stored == .reauth { intent = stored }
+            if let serverReturnTo = req.session.data[Self.returnToKey] {
+                req.session.data[Self.returnToKey] = nil
+                if intent == .reauth { returnTo = serverReturnTo }
+            }
         }
         var linkToken: String?
         if let token = try? req.query.get(String.self, at: "link") {

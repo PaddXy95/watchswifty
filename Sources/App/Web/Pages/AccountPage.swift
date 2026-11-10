@@ -20,6 +20,8 @@ struct AccountPage: HTML {
     var sso: AccountSSO? = nil
     /// „Passwort ändern“ only for accounts with a password while the password login is on.
     var passwordChange = true
+    /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
+    var tokenNeedsReauth = false
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -100,6 +102,12 @@ struct AccountPage: HTML {
                             }
                         }
                     }
+                }
+            }
+            if tokenNeedsReauth, let sso {
+                p(.class("muted")) { "Für ein neues Token einmal über \(sso.name) bestätigen (gilt 5 Minuten)." }
+                form(.method(.post), .action("/account/oidc/reauth"), .class("inline-form")) {
+                    button(.type(.submit)) { "Über \(sso.name) bestätigen" }
                 }
             }
             form(.method(.post), .action("/account/devices"), .class("inline-form")) {

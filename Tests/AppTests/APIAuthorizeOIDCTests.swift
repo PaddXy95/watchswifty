@@ -137,4 +137,33 @@ struct APIAuthorizeOIDCTests {
             #expect(page.location?.hasPrefix("/auth/oidc/start") == true)
         }
     }
+
+    @Test func ssoAccountManualTokenNeedsReauth() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let headers = try await signedInSSOUser(app, fake)
+            let refused = try await browserPost(app, "/account/devices", form: ["name": "Skript"], headers: headers)
+            #expect(refused.status == .forbidden)
+            #expect(refused.body.contains("Bitte zuerst über SSO bestätigen – danach das Token erstellen."))
+            #expect(refused.body.contains("action=\"/account/oidc/reauth\""))
+            #expect(try await APIToken.query(on: app.db).count() == 0)
+
+            let reauth = try await browserPost(app, "/account/oidc/reauth", form: [:], headers: headers)
+            #expect(reauth.location == "/auth/oidc/start")
+            let back = try await oidcFlow(app, fake, start: try #require(reauth.location), headers: reauth.headers)
+            #expect(back.location == "/account")
+            let created = try await browserPost(app, "/account/devices", form: ["name": "Skript"], headers: back.headers)
+            #expect(created.status == .ok)
+            #expect(try await APIToken.query(on: app.db).count() == 1)
+        }
+    }
+
+    @Test func passwordAccountManualTokenNeedsNoReauth() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let user = try await createUser(app, "anna")
+            try await linkOIDC(app, user)
+            let created = try await browserPost(app, "/account/devices", form: ["name": "Skript"], headers: try await login(app, "anna"))
+            #expect(created.status == .ok)
+        }
+    }
 }
