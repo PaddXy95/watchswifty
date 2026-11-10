@@ -61,6 +61,7 @@ struct AccountController {
     }
 
     func changePassword(req: Request) async throws -> HTMLResponse {
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(ChangeInput.self)
         do {
             try await req.account.changePassword(user: try req.currentUser, current: input.currentPassword, new: input.newPassword)

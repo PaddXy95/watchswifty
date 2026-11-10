@@ -26,11 +26,13 @@ struct PasswordResetController {
     }
 
     func forgotPage(req: Request) async throws -> HTMLResponse {
-        HTMLResponse(ForgotPasswordPage(mailEnabled: try await req.mailSettings.state().settings != nil))
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        return HTMLResponse(ForgotPasswordPage(mailEnabled: try await req.mailSettings.state().settings != nil))
     }
 
     /// Answers at once and identically for every username; the mail goes out in the background.
     func forgot(req: Request) async throws -> HTMLResponse {
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
         let username = try req.content.decode(ForgotInput.self).username
         guard try await req.mailSettings.state().settings != nil else { return HTMLResponse(ForgotPasswordPage(mailEnabled: false)) }
         let service = req.forgotPassword
@@ -41,12 +43,15 @@ struct PasswordResetController {
     func show(req: Request) async throws -> HTMLResponse {
         let token = (try? req.query.get(String.self, at: "token")) ?? ""
         switch try await PasswordTokenService(db: req.db).check(token) {
+        case .success(let record) where record.tokenPurpose == .reset && !req.application.appConfig.passwordLogin:
+            return page(problem: .invalid)
         case .success(let record): return page(token: token, purpose: record.tokenPurpose, config: req.application.appConfig)
         case .failure(let problem): return page(problem: problem)
         }
     }
 
     func submit(req: Request) async throws -> Response {
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(ResetInput.self)
         let service = PasswordTokenService(db: req.db)
         let record: PasswordToken

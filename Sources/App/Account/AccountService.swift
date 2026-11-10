@@ -13,6 +13,7 @@ struct AccountService {
     var passwordLogin = true
 
     func changePassword(user: User, current: String, new: String) async throws {
+        guard passwordLogin else { throw APIError.passwordLoginDisabled() }
         guard user.hasPassword else { throw APIError.noPassword }
         guard try await hasher.verify(current, created: user.passwordHash) else {
             throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)

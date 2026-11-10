@@ -73,6 +73,7 @@ struct AdminUsersController {
     }
 
     func resetPassword(req: Request) async throws -> Response {
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(PasswordInput.self)
         do {
             try await req.userAdmin.resetPassword(id: try targetID(req), password: input.password, actingUserID: try req.userID)

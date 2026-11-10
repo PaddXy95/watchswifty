@@ -34,6 +34,7 @@ struct AuthController {
     }
 
     func login(req: Request) async throws -> Response {
+        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(LoginInput.self)
         let returnTo = input.returnTo.flatMap { isSafeReturnTo($0) ? $0 : nil }
         let username = User.normalize(input.username)

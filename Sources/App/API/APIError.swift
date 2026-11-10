@@ -27,6 +27,11 @@ struct APIError: Error, Sendable, Equatable {
         APIError(status: .serviceUnavailable, code: "mailFailed", message: message)
     }
 
+    /// `PASSWORD_LOGIN=false`: passwords can be neither used nor set.
+    static func passwordLoginDisabled(_ message: String = "Der Passwort-Login ist abgeschaltet.") -> APIError {
+        APIError(status: .conflict, code: "passwordLoginDisabled", message: message)
+    }
+
     /// The account's address comes from the OIDC provider (linked account without password).
     static func emailFromProvider(name: String) -> APIError {
         APIError(status: .conflict, code: "emailFromProvider", message: "Die Adresse kommt von \(name) – bitte dort ändern.")

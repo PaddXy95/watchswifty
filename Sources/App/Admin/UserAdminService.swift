@@ -88,6 +88,9 @@ struct UserAdminService {
         let username = User.normalize(rawUsername)
         if let error = AccountValidation.usernameError(username) { throw APIError.validation(error) }
         let password = rawPassword.flatMap { $0.isEmpty ? nil : $0 }
+        if password != nil, !passwordLogin {
+            throw APIError.passwordLoginDisabled("Der Passwort-Login ist abgeschaltet – nur Einladungen.")
+        }
         if let password, let error = AccountValidation.passwordError(password) { throw APIError.validation(error) }
         var address: String?
         if let raw = rawEmail, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -143,6 +146,7 @@ struct UserAdminService {
 
     /// Also ends an open invitation or reset link.
     func resetPassword(id: UUID, password: String, actingUserID: UUID) async throws {
+        guard passwordLogin else { throw APIError.passwordLoginDisabled() }
         guard id != actingUserID else { throw APIError.selfAction }
         let user = try await target(id)
         if let error = AccountValidation.passwordError(password) { throw APIError.validation(error) }
