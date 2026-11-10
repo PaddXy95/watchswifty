@@ -88,6 +88,22 @@ struct OIDCLoginService {
     }
 }
 
+/// How far the switch-over to the provider is (users page, startup warnings).
+struct OIDCReadiness: Equatable, Sendable {
+    let linked: Int
+    let total: Int
+    let adminLinked: Bool
+}
+
+extension OIDCLoginService {
+    /// Counts accounts linked with the configured issuer (older issuers do not count).
+    static func readiness(db: any Database, oidc: OIDCConfig) async throws -> OIDCReadiness {
+        let users = try await User.query(on: db).all()
+        let linked = users.filter { $0.isLinked(oidc) }
+        return OIDCReadiness(linked: linked.count, total: users.count, adminLinked: linked.contains { $0.isAdmin })
+    }
+}
+
 extension Request {
     /// Only valid while OIDC is configured.
     var oidcLogin: OIDCLoginService {

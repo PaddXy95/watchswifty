@@ -51,7 +51,7 @@ struct UserAdminService {
 
     func row(for user: User, now: Date = .now) async throws -> AdminUserRow {
         var invite = InviteState.none
-        if !user.hasPassword {
+        if !user.hasPassword, !user.isLinked(oidc) {
             let token = try await PasswordTokenService(db: db).latest(userID: user.requireID(), purpose: .invite)
             invite = token.map { $0.expiresAt > now ? .pending(expires: $0.expiresAt) : .expired } ?? .expired
         }
@@ -124,6 +124,9 @@ struct UserAdminService {
     func resendInvite(id: UUID, inviter: User) async throws -> User {
         let user = try await target(id)
         guard !user.hasPassword else { throw APIError.validation(Self.hasPasswordMessage) }
+        if let oidc, user.isLinked(oidc) {
+            throw APIError.validation("Das Konto ist mit \(oidc.displayName) verknüpft – keine Einladung nötig.")
+        }
         guard let settings = try await mail.settings.state().settings else { throw APIError.mailNotConfigured(Self.inviteNeedsMailMessage) }
         guard let address = user.emailState(cipher).address else { throw APIError.validation(Self.noAddressMessage) }
         try await sendInvite(user: user, address: address, inviter: inviter, settings: settings)

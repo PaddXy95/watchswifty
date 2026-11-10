@@ -110,8 +110,12 @@ struct AdminUsersController {
                       ssoLink: AdminSSOLink? = nil) async throws -> HTMLResponse {
         let users = try await req.userAdmin.list()
         let mailConfigured = try await req.mailSettings.state().settings != nil
+        let config = req.application.appConfig
+        var readiness: OIDCReadiness?
+        if let oidc = config.oidc { readiness = try await OIDCLoginService.readiness(db: req.db, oidc: oidc) }
         return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users, mailConfigured: mailConfigured,
                                                            currentUserID: try req.userID, error: error, notice: notice,
-                                                           ssoName: req.application.appConfig.oidc?.displayName, ssoLink: ssoLink))
+                                                           ssoName: config.oidc?.displayName, ssoLink: ssoLink, readiness: readiness,
+                                                           passwordLogin: config.passwordLogin))
     }
 }

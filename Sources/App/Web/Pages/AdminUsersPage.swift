@@ -13,11 +13,21 @@ struct AdminUsersPage: HTML {
     var ssoName: String? = nil
     /// A link just created for passing on (shown only in this response).
     var ssoLink: AdminSSOLink? = nil
+    var readiness: OIDCReadiness? = nil
+    var passwordLogin = true
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
             h1 { "Benutzer" }
             Messages(error: error, notice: notice)
+            if let ssoName, let readiness {
+                p(.class("muted")) {
+                    "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
+                    if passwordLogin {
+                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), PASSWORD_LOGIN=false setzen."
+                    }
+                }
+            }
             if let ssoLink {
                 p(.class("notice")) {
                     "Verknüpfungslink für \(ssoLink.username) (7 Tage gültig, nur jetzt sichtbar – bitte weitergeben): "
@@ -84,6 +94,7 @@ struct UserRow: HTML {
             td { user.username; if isSelf { " (du)" } }
             td {
                 if user.isAdmin { span(.class("badge")) { "Admin" } } else { "Benutzer" }
+                if let ssoName, row.ssoLinked { " "; span(.class("badge")) { ssoName } }
                 switch row.invite {
                 case .none: ""
                 case .pending(let expires): span(.class("muted")) { " · Einladung offen (bis \(CalendarDay.display(CalendarDay.today(now: expires))))" }
@@ -99,7 +110,7 @@ struct UserRow: HTML {
                         button(.type(.submit)) { "Verknüpfungslink (\(ssoName))" }
                     }
                 }
-                if !user.hasPassword {
+                if !user.hasPassword, !row.ssoLinked {
                     form(.method(.post), .action("/admin/users/\(id)/invite"), .class("inline-form")) {
                         button(.type(.submit)) { "Einladung erneut senden" }
                     }
