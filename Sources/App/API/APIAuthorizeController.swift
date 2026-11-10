@@ -25,9 +25,9 @@ struct APIAuthorizeController {
     func show(req: Request) async throws -> Response {
         let params = try validated(try req.query.decode(Params.self))
         let config = req.application.loginSettings.current
-        if let oidc = config.oidc, !isCanonical(req, oidc),
-           req.auth.get(User.self).map({ $0.isSSOAccount(oidc, passwordLogin: config.passwordLogin) }) ?? true {
-            return req.redirect(to: oidc.canonicalOrigin + req.url.string, redirectType: .normal)
+        if let oidc = config.oidc, req.auth.get(User.self).map({ $0.isSSOAccount(oidc, passwordLogin: config.passwordLogin) }) ?? true,
+           let redirect = canonicalRedirect(req, oidc) {
+            return redirect
         }
         if let reauth = reauthRedirect(req, returnTo: req.url.string) { return reauth }
         guard req.auth.has(User.self) else {

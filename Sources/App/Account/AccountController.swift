@@ -22,7 +22,9 @@ struct AccountController {
     /// canonical address.
     func startLink(req: Request) async throws -> Response {
         guard let oidc = req.application.loginSettings.current.oidc else { throw Abort(.notFound) }
-        guard isCanonical(req, oidc) else {
+        // Behind a proxy that rewrites Host, the browser's Origin still shows where it is.
+        let browserOrigin = req.headers.first(name: .origin).map(OriginCheckMiddleware.normalizeOrigin)
+        guard isCanonical(req, oidc) || browserOrigin == oidc.canonicalOrigin else {
             return req.redirect(to: oidc.canonicalOrigin + "/account?sso=host", redirectType: .normal)
         }
         req.session.data[OIDCController.intentKey] = OIDCIntent.link.rawValue

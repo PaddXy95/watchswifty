@@ -56,7 +56,7 @@ struct OIDCLoginTests {
             let start = try await browserGet(app, "/auth/oidc/start?returnTo=%2Fapi%2Fauth%2Fauthorize%3Fx%3D1",
                                              headers: ["Host": "other.lan:8080"])
             #expect(start.status == .seeOther)
-            #expect(start.location == "http://localhost:8080/auth/oidc/start?returnTo=%2Fapi%2Fauth%2Fauthorize%3Fx%3D1")
+            #expect(start.location == "http://localhost:8080/auth/oidc/start?returnTo=%2Fapi%2Fauth%2Fauthorize%3Fx%3D1&oidc_c=1")
         }
     }
 
@@ -67,6 +67,20 @@ struct OIDCLoginTests {
             let start = try await browserGet(app, "/auth/oidc/start", headers: ["Host": "localhost:8080"])
             #expect(start.status == .seeOther)
             #expect(start.location?.hasPrefix("https://id.example.test/authorize") == true)
+        }
+    }
+
+    @Test func proxyWithoutHostDoesNotLoop() async throws {
+        var config = AppConfig.testingOIDC
+        config.oidc?.redirectURL = URL(string: "https://nas.lan:8443/auth/oidc/callback")!
+        try await withTestApp(config: config) { app in
+            let first = try await browserGet(app, "/auth/oidc/start", headers: ["Host": "watchswifty:8080"])
+            #expect(first.status == .seeOther)
+            #expect(first.location == "https://nas.lan:8443/auth/oidc/start?oidc_c=1")
+            // The proxy still sends its own Host: continue instead of redirecting again.
+            let second = try await browserGet(app, "/auth/oidc/start?oidc_c=1", headers: ["Host": "watchswifty:8080"])
+            #expect(second.status == .seeOther)
+            #expect(second.location?.hasPrefix("https://id.example.test/authorize") == true)
         }
     }
 

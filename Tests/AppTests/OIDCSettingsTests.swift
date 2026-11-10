@@ -174,8 +174,9 @@ struct OIDCSettingsTests {
             var headers = try await login(app, "anna")
             headers.replaceOrAdd(name: .origin, value: "https://watch.example.lan")
             headers.replaceOrAdd(name: .host, value: "internal:8080")
-            let result = try await browserPost(app, "/account/oidc/link", form: [:], headers: headers)
-            #expect(result.status != .forbidden)
+            let result = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "password123"], headers: headers)
+            #expect(result.status == .seeOther)
+            #expect(result.location == "/auth/oidc/start")
         }
     }
 }

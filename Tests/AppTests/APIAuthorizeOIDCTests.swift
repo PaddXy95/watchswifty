@@ -117,7 +117,10 @@ struct APIAuthorizeOIDCTests {
         try await withTestApp(config: .testingOIDC) { app in
             let page = try await browserGet(app, authorizePath, headers: ["Host": "other.lan:8080"])
             #expect(page.status == .seeOther)
-            #expect(page.location == "http://localhost:8080" + authorizePath)
+            #expect(page.location == "http://localhost:8080" + authorizePath + "&oidc_c=1")
+            let again = try await browserGet(app, authorizePath + "&oidc_c=1", headers: ["Host": "other.lan:8080"])
+            #expect(again.status == .seeOther)
+            #expect(again.location?.hasPrefix("/login?returnTo=") == true)
         }
     }
 

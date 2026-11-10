@@ -34,9 +34,7 @@ struct OIDCController {
 
     func start(req: Request) async throws -> Response {
         let (oidc, provider) = try configured(req)
-        guard isCanonical(req, oidc) else {
-            return req.redirect(to: oidc.canonicalOrigin + req.url.string, redirectType: .normal)
-        }
+        if let redirect = canonicalRedirect(req, oidc) { return redirect }
         let returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
         let verifier = Self.randomToken()
         var intent = OIDCIntent.login
@@ -260,4 +258,19 @@ struct OIDCController {
 /// True when the request reached WatchSwifty under the canonical address of the OIDC flows.
 func isCanonical(_ req: Request, _ oidc: OIDCConfig) -> Bool {
     OriginCheckMiddleware.requestMatches(origin: oidc.canonicalOrigin, req)
+}
+
+/// Marks a redirect to the canonical address, so a proxy that does not forward the browser's Host cannot cause a loop.
+let canonicalMarker = "oidc_c"
+
+/// Redirect of a GET to the same path on the canonical address; nil when already there – or when this request already
+/// came from such a redirect (the proxy rewrites Host: continue and warn instead of looping).
+func canonicalRedirect(_ req: Request, _ oidc: OIDCConfig) -> Response? {
+    guard !isCanonical(req, oidc) else { return nil }
+    if req.url.query?.split(separator: "&").contains(where: { $0.hasPrefix(canonicalMarker + "=") }) == true {
+        req.logger.warning("OIDC: Die Anfrage kommt nicht mit der Adresse \(oidc.canonicalOrigin) an – der Reverse-Proxy sollte Host (inkl. Port) oder X-Forwarded-Host weitergeben.")
+        return nil
+    }
+    let separator = req.url.query == nil ? "?" : "&"
+    return req.redirect(to: oidc.canonicalOrigin + req.url.string + separator + canonicalMarker + "=1", redirectType: .normal)
 }
