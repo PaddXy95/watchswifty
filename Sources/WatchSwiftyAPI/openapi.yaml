@@ -1586,6 +1586,115 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/admin/oidc:
+    get:
+      operationId: getOIDCSettings
+      tags: [Admin]
+      summary: Anmeldung über OIDC (SSO) – Einstellungen (nur Admins; das Client-Secret wird nie ausgegeben)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Einstellungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OIDCSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: setOIDCSettings
+      tags: [Admin]
+      summary: SSO-Einstellungen speichern (verschlüsselt, wirken sofort). Ohne `clientSecret` bleibt das gespeicherte – außer Issuer oder Client-ID ändern sich. Danach wird die Verbindung geprüft (`checkError`).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OIDCSettingsUpdate"
+      responses:
+        "200":
+          description: Gespeichert (auch wenn die Prüfung fehlschlug – siehe `checkError`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OIDCSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: deleteOIDCSettings
+      tags: [Admin]
+      summary: SSO-Einstellungen löschen (nur bei eingeschaltetem Passwort-Login)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Gelöscht
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/admin/oidc/test:
+    post:
+      operationId: testOIDCSettings
+      tags: [Admin]
+      summary: Verbindung zum Provider testen (Discovery und Schlüssel neu laden)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Verbindung in Ordnung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OIDCCheck"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: SSO nicht eingerichtet (`validation`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Prüfung fehlgeschlagen (`oidcCheckFailed`, Ursache in `message`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/admin/oidc/password-login:
+    put:
+      operationId: setPasswordLogin
+      tags: [Admin]
+      summary: Passwort-Login ein- oder ausschalten (aus nur mit eingerichtetem SSO und eigenem verknüpftem Konto)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordLoginUpdate"
+      responses:
+        "200":
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OIDCSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
   /v1/admin/mail:
     get:
       operationId: getMailSettings
@@ -2354,6 +2463,66 @@ components:
           type: string
           format: date-time
           description: Ablauf der offenen Einladung
+    OIDCSettings:
+      type: object
+      required: [configured, unreadable, hasClientSecret, passwordLogin, passwordLoginForced]
+      properties:
+        configured:
+          type: boolean
+        unreadable:
+          type: boolean
+          description: Gespeichert, aber mit dem Server-Schlüssel nicht lesbar (SSO dann aus)
+        displayName:
+          type: string
+        issuer:
+          type: string
+        clientId:
+          type: string
+        hasClientSecret:
+          type: boolean
+        baseUrl:
+          type: string
+          description: Adresse von WatchSwifty
+        redirectUrl:
+          type: string
+          description: Rücksprung-URL für den Provider (`baseUrl` + `/auth/oidc/callback`)
+        passwordLogin:
+          type: boolean
+        passwordLoginForced:
+          type: boolean
+          description: Per `PASSWORD_LOGIN=true` erzwungen (Notschalter)
+        checkError:
+          type: string
+          description: Nur nach dem Speichern – warum die Prüfung der Verbindung fehlschlug
+    OIDCSettingsUpdate:
+      type: object
+      required: [issuer, clientId, baseUrl]
+      properties:
+        displayName:
+          type: string
+        issuer:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Leer oder weggelassen = gespeichertes behalten (nicht, wenn sich Issuer oder Client-ID ändern)
+        baseUrl:
+          type: string
+    OIDCCheck:
+      type: object
+      required: [issuer, keyCount]
+      properties:
+        issuer:
+          type: string
+        keyCount:
+          type: integer
+    PasswordLoginUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
     SSOLinkResult:
       type: object
       required: [mailed]

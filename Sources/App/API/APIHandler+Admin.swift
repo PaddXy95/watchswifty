@@ -105,6 +105,66 @@ extension APIHandler {
 }
 
 extension APIHandler {
+    // MARK: - SSO settings
+
+    func getOIDCSettings(_ input: Operations.getOIDCSettings.Input) async throws -> Operations.getOIDCSettings.Output {
+        _ = try APIContext.requireAdmin()
+        let request = try APIContext.request()
+        return .ok(.init(body: .json(Self.oidcSettings(try await request.oidcSettings.state(), request: request))))
+    }
+
+    func setOIDCSettings(_ input: Operations.setOIDCSettings.Input) async throws -> Operations.setOIDCSettings.Output {
+        _ = try APIContext.requireAdmin()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        let request = try APIContext.request()
+        let saved = try await request.oidcSettings.save(OIDCSettingsInput(displayName: body.displayName, issuer: body.issuer,
+                                                                          clientID: body.clientId, clientSecret: body.clientSecret,
+                                                                          baseURL: body.baseUrl))
+        var checkError: String?
+        if let config = saved.config, case .failure(let failure) = await SystemController.check(request, config) {
+            checkError = failure.message
+        }
+        return .ok(.init(body: .json(Self.oidcSettings(try await request.oidcSettings.state(), request: request, checkError: checkError))))
+    }
+
+    func deleteOIDCSettings(_ input: Operations.deleteOIDCSettings.Input) async throws -> Operations.deleteOIDCSettings.Output {
+        _ = try APIContext.requireAdmin()
+        try await APIContext.request().oidcSettings.delete()
+        return .noContent(.init())
+    }
+
+    func testOIDCSettings(_ input: Operations.testOIDCSettings.Input) async throws -> Operations.testOIDCSettings.Output {
+        _ = try APIContext.requireAdmin()
+        let request = try APIContext.request()
+        guard let config = request.application.loginSettings.current.oidc else {
+            throw APIError.validation(OIDCSettingsService.needsOIDCMessage)
+        }
+        do {
+            let result = try await request.application.oidcProviders.provider(for: config).check()
+            return .ok(.init(body: .json(.init(issuer: result.issuer, keyCount: result.keyCount))))
+        } catch let error as OIDCError {
+            throw APIError(status: .serviceUnavailable, code: "oidcCheckFailed", message: error.adminDescription(name: config.displayName))
+        }
+    }
+
+    func setPasswordLogin(_ input: Operations.setPasswordLogin.Input) async throws -> Operations.setPasswordLogin.Output {
+        let admin = try APIContext.requireAdmin()
+        guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
+        let request = try APIContext.request()
+        try await request.oidcSettings.setPasswordLogin(body.enabled, actingUser: admin)
+        return .ok(.init(body: .json(Self.oidcSettings(try await request.oidcSettings.state(), request: request))))
+    }
+
+    /// Never includes the client secret.
+    static func oidcSettings(_ state: OIDCSettingsState, request: Request, checkError: String? = nil) -> Components.Schemas.OIDCSettings {
+        let settings = state.settings
+        let login = request.application.loginSettings.current
+        return .init(configured: settings != nil, unreadable: state == .unreadable, displayName: settings?.displayName,
+                     issuer: settings?.issuer, clientId: settings?.clientID, hasClientSecret: settings != nil,
+                     baseUrl: settings?.baseURL, redirectUrl: settings?.redirectURL, passwordLogin: login.passwordLogin,
+                     passwordLoginForced: login.passwordLoginForced, checkError: checkError)
+    }
+
     func getMailSettings(_ input: Operations.getMailSettings.Input) async throws -> Operations.getMailSettings.Output {
         _ = try APIContext.requireAdmin()
         return .ok(.init(body: .json(Self.mailSettings(try await APIContext.request().mailSettings.state()))))
