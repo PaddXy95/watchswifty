@@ -175,6 +175,31 @@ struct OIDCTokenValidatorTests {
         #expect(try await validate(token, jwks: pair.jwks).subject == "sub-1")
     }
 
+    @Test func jwksWithEncryptionAndUnknownKeysStillWorks() async throws {
+        let pair = try await OIDCTestKeys.es256()
+        let signing = String(pair.jwks.dropFirst(#"{"keys":["#.count).dropLast(2))
+        let jwks = #"{"keys":[{"kty":"oct","k":"c2VjcmV0","kid":"hmac"},"#
+            + #"{"kty":"RSA","use":"enc","alg":"RSA-OAEP-256","kid":"enc1","n":"AQAB","e":"AQAB"},"#
+            + #"{"kty":"OKP","crv":"X25519","use":"enc","kid":"x1","x":"AQAB"},"# + signing + "]}"
+        let token = try await OIDCTestKeys.token(TestIDToken(now: now), with: pair)
+        #expect(try await validate(token, jwks: jwks).subject == "sub-1")
+    }
+
+    @Test func jwksKeyWithoutKidIsUsable() async throws {
+        let pair = try await OIDCTestKeys.es256()
+        let jwks = pair.jwks.replacingOccurrences(of: #","kid":"k1""#, with: "")
+        let withoutKid = JWTKeyCollection()
+        await withoutKid.add(ecdsa: try #require(pair.ecdsaKey))
+        let token = try await withoutKid.sign(TestIDToken(now: now))
+        #expect(try await validate(token, jwks: jwks).subject == "sub-1")
+    }
+
+    @Test func jwksWithoutSigningKeyIsMisconfigured() async throws {
+        await #expect(throws: OIDCError.self) {
+            _ = try await OIDCKeySet.from(jwks: Data(#"{"keys":[{"kty":"oct","k":"c2VjcmV0"}]}"#.utf8))
+        }
+    }
+
     @Test func garbageRejected() async throws {
         let pair = try await OIDCTestKeys.es256()
         await expectError(.failed(logReason: "")) { try await validate("not-a-token", jwks: pair.jwks) }

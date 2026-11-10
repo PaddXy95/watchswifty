@@ -8,12 +8,29 @@ struct OIDCKeySet: Sendable {
     let keyIDs: Set<String>
     var keyCount = 0
 
-    /// Keys from a JWKS document; keys of other types (e.g. `oct`) are skipped by jwt-kit or rejected later.
+    /// Signing keys from a JWKS document, key by key: encryption keys (`use: enc`), unsupported types or algorithms
+    /// (`oct`, X25519, `RSA-OAEP-256` …) are skipped instead of failing the whole set; keys without `kid` get a local
+    /// one. Throws `OIDCError.misconfigured` when no usable signing key remains.
     static func from(jwks data: Data) async throws -> OIDCKeySet {
-        let jwks = try JSONDecoder().decode(JWKS.self, from: data)
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = root["keys"] as? [[String: Any]] else {
+            throw OIDCError.misconfigured(logReason: "JWKS nicht lesbar")
+        }
         let keys = JWTKeyCollection()
-        try await keys.add(jwks: jwks)
-        return OIDCKeySet(keys: keys, keyIDs: Set(jwks.keys.compactMap { $0.keyIdentifier?.string }), keyCount: jwks.keys.count)
+        var keyIDs: Set<String> = []
+        var added = 0
+        for (index, var entry) in entries.enumerated() {
+            if (entry["use"] as? String) == "enc" { continue }
+            let kid = entry["kid"] as? String
+            if kid == nil { entry["kid"] = "_watchswifty_\(index)" }
+            guard let json = try? JSONSerialization.data(withJSONObject: entry),
+                  let jwk = try? JSONDecoder().decode(JWK.self, from: json),
+                  (try? await keys.add(jwk: jwk)) != nil else { continue }
+            if let kid { keyIDs.insert(kid) }
+            added += 1
+        }
+        guard added > 0 else { throw OIDCError.misconfigured(logReason: "JWKS enthält keinen nutzbaren Signaturschlüssel") }
+        return OIDCKeySet(keys: keys, keyIDs: keyIDs, keyCount: added)
     }
 }
 

@@ -126,12 +126,7 @@ actor LiveOIDCProvider: OIDCProvider {
             if status >= 500 { throw OIDCError.unreachable }
             throw OIDCError.failed(logReason: "JWKS antwortete mit HTTP \(status)")
         }
-        let loaded: OIDCKeySet
-        do {
-            loaded = try await OIDCKeySet.from(jwks: body)
-        } catch {
-            throw OIDCError.misconfigured(logReason: "JWKS nicht lesbar")
-        }
+        let loaded = try await OIDCKeySet.from(jwks: body)
         keySet = loaded
         keysLoadedAt = now()
         return loaded
