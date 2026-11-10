@@ -18,8 +18,8 @@ nur HTML-Seiten (htmx) mit Cookie-Login und Origin-Prüfung; maschinenlesbar sin
 ## Ziele, Nicht-Ziele, Anti-Ziele
 **Ziele**
 - Eine App kann alles, was die Weboberfläche kann, mit denselben Regeln und Ergebnissen (gleiche Services).
-- Anmeldung funktioniert mit Passwort-Login **und** später mit dem geplanten Authentik-Login
-  (`2026-11-07-authentik-oidc-design.md`, Passwort-Login dort abschaltbar) – ohne Änderung an der App.
+- Anmeldung funktioniert mit Passwort-Login **und** später mit dem geplanten OIDC-Login (SSO)
+  (`2026-11-07-oidc-login-design.md`, Passwort-Login dort abschaltbar) – ohne Änderung an der App.
 - Die Doku unter `/api` ist immer aktuell (aus derselben Datei wie der Server) und lässt sich mit einem Token
   direkt ausprobieren.
 - Die iOS-App kann ihren Client aus derselben `openapi.yaml` erzeugen.
@@ -79,7 +79,7 @@ nur HTML-Seiten (htmx) mit Cookie-Login und Origin-Prüfung; maschinenlesbar sin
 Ablauf nach RFC 8252 (OAuth für native Apps, Authorization Code + PKCE), aber ohne allgemeines OAuth:
 1. App erzeugt `code_verifier` (PKCE, S256) und `state` und öffnet
    `GET /api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`.
-2. Ist der Browser nicht angemeldet, erscheint die normale Login-Seite (Passwort bzw. später Authentik) und kehrt
+2. Ist der Browser nicht angemeldet, erscheint die normale Login-Seite (Passwort bzw. später SSO) und kehrt
    danach zu diesem Aufruf zurück. Dann zeigt der Server eine Bestätigung: „Die WatchSwifty-App auf
    „{device_name}“ mit deinem Konto verbinden?“ – „Verbinden“ / „Abbrechen“ (POST, durch die Origin-Prüfung).
 3. „Verbinden“ erzeugt einen Einmal-Code (zufällig, 60 s gültig, nur einmal einlösbar, gebunden an Benutzer,
@@ -100,13 +100,13 @@ Ablauf nach RFC 8252 (OAuth für native Apps, Authorization Code + PKCE), aber o
 - Passwortänderung oder Admin-Passwort-Reset lassen Geräte bestehen; das Löschen eines Benutzers löscht seine Geräte.
 - **Rücksprung nach dem Login** [Entscheidung des Entwurfs]: `/api/auth/authorize` leitet nicht angemeldete Browser
   mit `returnTo` (nur relative Pfade unter `/api/auth/authorize`, sonst verworfen) auf die Login-Seite; der
-  Passwort-Login kehrt danach dorthin zurück. Der Authentik-Entwurf bekommt einen Nachtrag, denselben `returnTo` über
+  Passwort-Login kehrt danach dorthin zurück. Der OIDC-Entwurf bekommt einen Nachtrag, denselben `returnTo` über
   `/auth/oidc/start` (auch beim Wechsel auf die kanonische Adresse) und den Callback mitzunehmen. Damit ist egal, ob
-  API oder Authentik zuerst kommt.
+  API oder SSO zuerst kommt.
 - **Token-Laufzeit** [entschieden]: **90 Tage ab Ausstellung**, dann neu verbinden. `POST auth/token` liefert
   `expiresAt`; ein abgelaufenes Token ergibt `401` mit Code `tokenExpired`, die App öffnet dann wieder das
-  Browser-Fenster (bei bestehender Web-Anmeldung genügt „Verbinden“; bei Authentik wird der Zugang dabei neu
-  geprüft). Abgelaufene Tokens werden von der täglichen Pflege gelöscht; manuell erstellte Tokens laufen ebenso
+  Browser-Fenster (bei bestehender Web-Anmeldung genügt „Verbinden“; bei SSO-Konten wird der Zugang dabei beim
+  Provider neu geprüft, s. `2026-11-07-oidc-login-design.md`, „App verbinden“). Abgelaufene Tokens werden von der täglichen Pflege gelöscht; manuell erstellte Tokens laufen ebenso
   nach 90 Tagen ab.
 - **Token für Skripte und die Doku** [Entscheidung des Entwurfs, Teil von v1]: Unter **Konto → Geräte** kann man
   zusätzlich ein Token von Hand erstellen (Name eingeben, Token wird einmal angezeigt). Es erscheint in der Liste
@@ -117,7 +117,7 @@ Ablauf nach RFC 8252 (OAuth für native Apps, Authorization Code + PKCE), aber o
 Alle unter `/api/v1`, alle mit Bearer-Token außer `version`, `auth/token`.
 - **Meta:** `GET version`.
 - **Auth/Konto:** `POST auth/token`, `DELETE auth/token`, `GET me` (Benutzername, Admin, `hasPassword` – bis
-  Authentik kommt immer `true` –, TMDB-Token vorhanden + letzte 4 Zeichen bzw. „nicht lesbar“),
+  SSO kommt immer `true` –, TMDB-Token vorhanden + letzte 4 Zeichen bzw. „nicht lesbar“),
   `PUT me/password` (verlangt wie im Web das aktuelle Passwort; ohne Passwort-Konto `409 noPassword`),
   `PUT me/tmdb-token` (wird bei TMDB geprüft),
   `DELETE me/tmdb-token`, `GET me/devices`, `DELETE me/devices/{id}`, `GET me/followed` (beobachtete Serien).
