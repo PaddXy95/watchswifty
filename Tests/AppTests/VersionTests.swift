@@ -89,6 +89,29 @@ struct VersionTests {
         #expect(!workflow.contains("tags: [\"v*\"]"))
         #expect(workflow.contains("GIT_COMMIT=${{ github.sha }}"))
     }
+
+    /// Beta builds (push to `beta` or a manual run) push only the beta tags: no `latest`, no tag, no release.
+    @Test func betaBuildPushesOnlyBetaTags() throws {
+        let workflow = try String(contentsOfFile: ".github/workflows/docker.yml", encoding: .utf8)
+        #expect(workflow.contains("branches: [main, beta]"))
+        #expect(workflow.contains("workflow_dispatch:"))
+        let beta = try #require(workflow.components(separatedBy: "\n  beta:\n").dropFirst().first)
+        #expect(beta.contains("needs: [test, image]"))
+        #expect(beta.contains("github.ref == 'refs/heads/beta'"))
+        #expect(beta.contains("outputs.image }}:beta\n"))
+        #expect(beta.contains("APP_VERSION=${{ steps.version.outputs.version }}"))
+        #expect(!beta.contains(":latest"))
+        #expect(!beta.contains("gh release"))
+        #expect(!beta.contains("contents: write"))
+    }
+
+    /// A beta build is no X.Y.Z release: labelled with its commit, never offered an "update" to the last release.
+    @Test func betaVersionIsNoRelease() {
+        let beta = AppVersion(version: "0.3.1-beta", commit: "abcdef1234")
+        #expect(beta.label == "0.3.1-beta (abcdef1)")
+        #expect(beta.releaseURL == nil)
+        #expect(isNewerVersion("0.3.0", than: beta.version) == nil)
+    }
 }
 
 @Suite("DataDirectory")

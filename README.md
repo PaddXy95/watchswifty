@@ -107,6 +107,8 @@ Die laufende Version steht links im Footer und unter `http://<server>:8080/versi
 - Pull Request → Tests und ein Probe-Build des Images (nichts wird hochgeladen).
 - Push auf `main` → Tests und Image-Build laufen parallel; nur wenn die Tests grün sind: Image nach GHCR
   hochladen und ein GitHub-Release `vX.Y.Z` erstellen.
+- Push auf `beta` oder „Run workflow“ (GitHub → Actions → CI/CD) auf einem beliebigen Branch → wie bei `main`,
+  aber nur das Image `beta` wird hochgeladen; kein Release (siehe [Beta-Version testen](#beta-version-testen)).
 
 Die Abhängigkeiten werden im Docker-Build in einer eigenen Schicht übersetzt und im GitHub-Actions-Cache
 gehalten; solange sich `Package.swift`/`Package.resolved` nicht ändern, wird bei einem Push nur die App selbst
@@ -123,6 +125,8 @@ CHANGELOG ein Abschnitt `## [X.Y.Z]`, wird er als Release-Text verwendet, sonst 
 | `latest` | neuestes Release |
 | `0.1.3` | genau diese Version |
 | `0.1` | neueste 0.1.x-Version |
+| `beta` | neuester Beta-Stand (ungetestet, nur für eine Test-Instanz) |
+| `beta-abc1234` | Beta-Stand genau dieses Commits |
 
 Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.3`.
 
@@ -136,6 +140,58 @@ dafür öffentlich sein.
 Beim allerersten Release legt GitHub das Paket `watchswifty` als privat an; damit der Server es ohne Login
 laden kann, unter GitHub → Packages → watchswifty → Package settings die Sichtbarkeit auf „Public“ stellen
 (oder auf dem Server `docker login ghcr.io` mit einem Token ausführen).
+
+### Beta-Version testen
+
+Neue Funktionen lassen sich vor dem Release in einer zweiten Instanz ausprobieren. Ein Push auf den Branch `beta`
+baut nach grünen Tests `ghcr.io/paddxy95/watchswifty:beta` (dazu `beta-<commit>`); einen beliebigen Branch baut
+man über GitHub → Actions → CI/CD → „Run workflow“. Es entsteht kein Release, `latest` bleibt unverändert. Die
+Beta zeigt ihre Version als z. B. `0.3.1-beta (abc1234)` und meldet keine Updates.
+
+Die Beta bekommt einen eigenen Ordner mit dieser `docker-compose.yml` (plus `.env` wie oben). **Nicht** die
+normale `docker-compose.yml` mit `WATCHSWIFTY_VERSION=beta` kopieren: Container- und Volume-Name sind dort fest,
+die Beta würde sonst die echten Daten ändern – und Datenbank-Änderungen einer Beta lassen sich nicht zurücknehmen.
+
+```yaml
+services:
+  watchswifty-beta:
+    image: ghcr.io/paddxy95/watchswifty:beta
+    container_name: watchswifty-beta
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY fehlt in .env (openssl rand -base64 32)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TZ: ${TZ:-Europe/Berlin}
+      TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+    volumes:
+      - watchswifty-beta-data:/data
+
+volumes:
+  watchswifty-beta-data:
+    name: watchswifty-beta-data
+```
+
+Neuen Beta-Stand holen: `docker compose pull && docker compose up -d` im Beta-Ordner.
+
+**Mit einer Kopie der echten Daten testen:** In der Beta-`.env` denselben `TOKEN_KEY` eintragen wie in der
+normalen, sonst lassen sich TMDB-Tokens, E-Mail-Adressen und Mail-Einstellungen nicht entschlüsseln. Dann beide
+Container stoppen und das Volume kopieren:
+
+```bash
+docker run --rm -v watchswifty-data:/from:ro -v watchswifty-beta-data:/to ubuntu:noble cp -a /from/. /to/
+```
+
+Danach beide wieder starten. Die Kopie enthält auch die Mail-Einstellungen: Die Beta verschickt dann echte Mails
+an die Benutzer (z. B. „Anmeldung von neuem Gerät“). Wer das nicht will, löscht in der Beta unter **System** die
+E-Mail-Einstellungen.
+
+Browser trennen Cookies nicht nach Port: Laufen beide Instanzen unter demselben Hostnamen, meldet ein Login in der
+Beta dich in der normalen Instanz ab. Abhilfe: die Beta über einen anderen Namen aufrufen (eigene Subdomain oder
+die IP-Adresse statt des Hostnamens).
 
 ## Update
 

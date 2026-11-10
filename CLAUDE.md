@@ -99,7 +99,9 @@ get deleted.
 ## Releases and CI
 
 - `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`) and a test image build. **A push to
-  `main` publishes**: image to `ghcr.io/paddxy95/watchswifty` and a GitHub release.
+  `main` publishes**: image to `ghcr.io/paddxy95/watchswifty` and a GitHub release. A push to `beta` (or a manual
+  "Run workflow" on any branch) pushes only `:beta` / `:beta-<sha7>` with `APP_VERSION=<next>-beta`; no tag, no
+  release.
 - `VERSION` holds the intended version; `scripts/next-version.sh` releases it if the tag doesn't exist yet, else
   bumps the patch. Release notes come from the matching `## [X.Y.Z] – date` section of `CHANGELOG.md` (German,
   sections like `### Neu`, `### Sicherer`, `### Schneller`) via `scripts/release-notes.sh`.
