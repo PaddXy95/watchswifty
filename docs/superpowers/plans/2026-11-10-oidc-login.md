@@ -504,3 +504,40 @@ Swift Testing.
 - [ ] **Step 3:** Preview check: start `watchswifty` from `.claude/launch.json`; login page renders unchanged without OIDC.
 - [ ] **Step 4:** Commit `docs(oidc): README, compose, changelog`.
 - [ ] **Step 5:** Whole-branch review (fresh reviewer, most capable model) against the spec; fix findings with their own commits.
+
+---
+
+## Addendum (2026-11-10): settings in the UI
+
+Spec: section „Einstellungen (System → Anmeldung (SSO))“ and decision 13. Replaces `OIDC_*` environment variables;
+`PASSWORD_LOGIN=true` is the only remaining variable (emergency switch).
+
+### Task 16: Settings storage and runtime store
+
+**Files:** Create `Sources/App/Auth/OIDC/OIDCSettings.swift` (`OIDCSettings`, `OIDCSettingsState`, `OIDCSettingsInput`,
+`OIDCSettingsService`, `AddOIDCConfig` migration on `app_settings.oidc_config`), `Sources/App/Auth/OIDC/LoginSettings.swift`
+(`LoginSettings`, `LoginSettingsStore`, `OIDCProviderStore`); modify `AppConfig` (drop env parsing of `OIDC_*`,
+`passwordLoginForced` from `PASSWORD_LOGIN=true`), `configure.swift` (seed from `AppConfig.oidc` for tests, load store,
+provider store), every `appConfig.oidc`/`appConfig.passwordLogin` read → `application.loginSettings.current`,
+`OriginCheckMiddleware` (dynamic canonical origin), `OIDCController.register` (always registered, 404 when off).
+Test: `OIDCSettingsTests` (validation messages, secret keep/re-entry rule, sealed storage, unreadable → OIDC off,
+reload on save, `PASSWORD_LOGIN=true` forces on, env `OIDC_*` ignored), existing suites stay green.
+
+### Task 17: `check()` and the System page
+
+**Files:** `OIDCProvider.check()` in protocol, `LiveOIDCProvider`, `FakeOIDCProvider`; `SystemController`
+(`POST /admin/system/oidc`, `/oidc/test`, `/oidc/delete`, `/password-login`), `SystemPage` section. Test:
+`SystemOIDCTests` (save → active immediately and login button appears, save with failing check still saves and
+warns, test button messages, delete blocked while password login is off, password login off blocked without OIDC
+or without own link, forced switch shown and locked, non-admin 403).
+
+### Task 18: App API for the settings
+
+**Files:** `openapi.yaml` (`/v1/admin/oidc`, `/v1/admin/oidc/test`, `/v1/admin/oidc/password-login`, schemas
+`OIDCSettings`, `OIDCSettingsUpdate`, `OIDCCheck`, `PasswordLoginUpdate`), `APIHandler+Admin`. Test: `APIOIDCSettingsTests`
+(secret never in responses, same validation/guards, test endpoint).
+
+### Task 19: Docs
+
+README (setup under System, emergency `PASSWORD_LOGIN=true`), `.env.example`/compose (remove `OIDC_*`), CHANGELOG,
+CLAUDE.md, spec cross-checks.

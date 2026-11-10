@@ -33,6 +33,11 @@ Prüfung mit Schwerpunkt Migration (Umstieg, Providerwechsel, Rückweg, Downgrad
 11. **Issuer-Umzug:** Befehl `oidc-move-issuer <alt> <neu>` schreibt die Verknüpfungen auf eine neue Issuer-URL um.
 12. **Korrekturen aus der zweiten Prüfung** (Migration, Sessions, API) übernommen; sie stehen in den jeweiligen
     Abschnitten.
+13. **Einstellungen im UI (2026-11-10):** Provider-Daten und der Passwort-Login-Schalter werden unter **System →
+    Anmeldung (SSO)** gepflegt (verschlüsselt in der DB, wie die Mail) – **keine `OIDC_*`-Umgebungsvariablen**.
+    Abschalten des Passwort-Logins nur mit Schutz (OIDC eingerichtet, handelnder Admin verknüpft); Notschalter
+    `PASSWORD_LOGIN=true` erzwingt ihn beim Start. Auch über die App-API (Admin). Speichern prüft die Discovery und
+    speichert bei Fehlern trotzdem (mit Warnung); dazu „Verbindung testen“.
 
 ## Begriffe
 
@@ -223,7 +228,7 @@ Prüfung mit Schwerpunkt Migration (Umstieg, Providerwechsel, Rückweg, Downgrad
   Weiterleitung.
 - Provider nicht erreichbar → Meldung „{name} ist gerade nicht erreichbar.“, kein Code.
 
-## Passwort-Login abgeschaltet (`PASSWORD_LOGIN=false`)
+## Passwort-Login abgeschaltet (Schalter unter System)
 
 | Bereich | Web | App-API |
 |---|---|---|
@@ -238,8 +243,8 @@ Prüfung mit Schwerpunkt Migration (Umstieg, Providerwechsel, Rückweg, Downgrad
 
 - `ADMIN_USERNAME`/`ADMIN_PASSWORD` werden ignoriert (Hinweis im Log); der erste OIDC-Login wird Admin, solange es
   keinen Benutzer gibt.
-- `PASSWORD_LOGIN=false` ohne vollständige OIDC-Konfiguration → Startfehler (`ConfigError`) mit klarer Meldung.
-- Start mit `PASSWORD_LOGIN=false`, Benutzer vorhanden, aber **kein Admin verknüpft** → Log-Warnung „Kein Admin ist
+- Abschalten nur, wenn OIDC eingerichtet ist und der handelnde Admin selbst verknüpft ist (s. „Einstellungen“).
+- Start mit abgeschaltetem Passwort-Login, Benutzer vorhanden, aber **kein Admin verknüpft** → Log-Warnung „Kein Admin ist
   mit {name} verknüpft – mit `link-oidc <admin>` einen Verknüpfungslink erzeugen.“; dazu Anzahl nicht verknüpfter
   Konten. Kein Startfehler (sonst ginge auch `docker exec … link-oidc` nicht).
 - Start-Warnung ohne Benutzer: mit OIDC „Kein Benutzer vorhanden – der erste Login über {name} wird Admin.“, sonst wie
@@ -259,31 +264,49 @@ Prüfung mit Schwerpunkt Migration (Umstieg, Providerwechsel, Rückweg, Downgrad
 - Kein API-Endpunkt zum Verknüpfen des eigenen Kontos (nur Browser).
 - Abwärtskompatibel: nur neue Felder und Fehlercodes; ältere App-Versionen ignorieren sie.
 
-## Konfiguration
+## Einstellungen (System → Anmeldung (SSO))
 
-| Variable | Pflicht | Bedeutung |
+Ersetzt die früheren `OIDC_*`-Variablen. Gespeichert als ein verschlüsselter JSON-Block (`app_settings.oidc_config`,
+`TokenCipher`), wie die Mail-Einstellungen. Nur Admins.
+
+| Feld | Pflicht | Bedeutung |
 |---|---|---|
-| `OIDC_ISSUER` | für OIDC | Issuer des Providers, z. B. Authentik `https://auth.example.de/application/o/watchswifty/`, Keycloak `https://kc.example.de/realms/home` |
-| `OIDC_CLIENT_ID` | für OIDC | Client-ID |
-| `OIDC_CLIENT_SECRET` / `OIDC_CLIENT_SECRET_FILE` | für OIDC | Client-Secret bzw. Datei damit (Docker-Secret), analog `TOKEN_KEY_FILE` |
-| `OIDC_REDIRECT_URL` | nein | Rücksprungadresse; Standard: erster Eintrag aus `PUBLIC_ORIGIN` + `/auth/oidc/callback` |
-| `OIDC_NAME` | nein | Anzeigename in Buttons und Meldungen, Standard `SSO` |
-| `PASSWORD_LOGIN` | nein | `false` schaltet den Passwort-Login ab; Standard an |
+| Anzeigename | nein | Name in Buttons und Meldungen, Standard `SSO`, höchstens 40 Zeichen |
+| Issuer | ja | z. B. Authentik `https://auth.example.de/application/o/watchswifty/`, Keycloak `https://kc.example.de/realms/home`, Pocket ID `https://id.example.de` |
+| Client-ID | ja | |
+| Client-Secret | ja | wird nie wieder angezeigt („gespeichert – leer lassen zum Behalten“) |
+| Adresse von WatchSwifty | ja | `https://host[:port]` ohne Pfad (Regeln wie bei der Mail); vorbelegt mit der Mail-Adresse bzw. der Adresse der Anfrage. Rücksprung-URL = Adresse + `/auth/oidc/callback` (wird zum Kopieren angezeigt) – das ist die **kanonische Adresse** |
 
-- OIDC ist aktiv, wenn Issuer, Client-ID und Secret gesetzt sind. Nur ein Teil davon → Startfehler. OIDC aktiv, aber
-  weder `OIDC_REDIRECT_URL` noch `PUBLIC_ORIGIN` → Startfehler. `OIDC_CLIENT_SECRET_FILE` nicht lesbar → Startfehler.
-- Die kanonische Adresse wird automatisch zu den erlaubten Origins der CSRF-Prüfung (`OriginCheckMiddleware`)
-  hinzugefügt.
-- **Discovery** über `<Issuer>/.well-known/openid-configuration` (Issuer mit oder ohne Schrägstrich am Ende), erst
-  beim ersten Login geladen, 24 Stunden zwischengespeichert; verworfen, sobald Token- oder JWKS-Endpunkt mit 404 oder
-  Verbindungsfehler antworten (nächster Login lädt neu). Der `issuer` der Discovery muss bis auf einen abschließenden
-  Schrägstrich zu `OIDC_ISSUER` passen, sonst Log-Hinweis und Meldung „Anmeldung über {name} fehlgeschlagen.“;
-  gespeichert und im Token verglichen wird der `issuer`-Wert der Discovery.
-- **JWKS** ebenso beim ersten Bedarf geladen; bei unbekannter `kid` höchstens einmal pro Minute neu geladen.
+- **Secret neu eingeben, wenn sich Issuer oder Client-ID ändern** (sonst könnte eine gekaperte Admin-Sitzung das
+  gespeicherte Secret an einen eigenen „Provider“ schicken lassen) – Meldung „Bitte das Client-Secret neu eingeben –
+  Issuer oder Client-ID wurden geändert.“
+- **Speichern** prüft danach die Discovery (wie „Verbindung testen“); schlägt das fehl, ist trotzdem gespeichert und
+  die Seite meldet „Gespeichert, aber die Prüfung schlug fehl: {Grund}“.
+- **Verbindung testen:** Discovery + Schlüssel laden → „Verbindung in Ordnung: Issuer {issuer}, {n} Schlüssel.“ bzw.
+  der Fehler (nicht erreichbar, Issuer passt nicht, nur symmetrische Signatur …).
+- **Einstellungen löschen:** nur bei eingeschaltetem Passwort-Login, sonst „Erst den Passwort-Login einschalten.“
+  Danach ist OIDC aus (Rückweg wie unter „Migration“).
+- **Passwort-Login** (Schalter im selben Abschnitt):
+  - Abschalten nur, wenn OIDC eingerichtet ist („Erst OIDC einrichten.“) und das eigene Konto mit dem Provider
+    verknüpft ist („Verknüpfe zuerst dein eigenes Konto mit {name} (unter Konto) – sonst sperrst du dich aus.“).
+  - Einschalten geht immer.
+  - **Notschalter:** Umgebungsvariable `PASSWORD_LOGIN=true` erzwingt beim Start den Passwort-Login; die Seite zeigt
+    „Per PASSWORD_LOGIN=true erzwungen“ und der Schalter ist gesperrt. Andere Werte werden ignoriert (Hinweis im Log).
+- **Laufzeit:** Die Einstellungen werden beim Start und nach jeder Änderung in einen Zwischenspeicher geladen
+  (`LoginSettingsStore`); Änderungen wirken sofort, ohne Neustart. Der Provider-Client wird pro Einstellungsstand
+  erzeugt (Discovery/JWKS-Cache neu bei geänderten Daten). Unlesbare Einstellungen (Server-Schlüssel geändert) → OIDC
+  aus, Passwort-Login an, Hinweis auf der System-Seite und im Log.
+- Die kanonische Adresse gilt zur Laufzeit zusätzlich als erlaubte Origin der CSRF-Prüfung (`OriginCheckMiddleware`).
+- **App-API (Admin):** `GET/PUT/DELETE /v1/admin/oidc`, `POST /v1/admin/oidc/test`, `PUT /v1/admin/oidc/password-login`
+  – gleiche Regeln und Texte; das Secret erscheint nie in Antworten (`hasClientSecret`).
+- **Discovery** über `<Issuer>/.well-known/openid-configuration` (Issuer mit oder ohne Schrägstrich am Ende), beim
+  ersten Login bzw. Test geladen, 24 Stunden zwischengespeichert; verworfen, sobald Token- oder JWKS-Endpunkt mit 404
+  oder Verbindungsfehler antworten. Der `issuer` der Discovery muss bis auf einen abschließenden Schrägstrich zum
+  eingetragenen Issuer passen; gespeichert und im Token verglichen wird der `issuer`-Wert der Discovery.
+- **JWKS** beim ersten Bedarf geladen; bei unbekannter `kid` höchstens einmal pro Minute neu geladen.
 - Die App startet auch, wenn der Provider nicht erreichbar ist.
-- Bietet die Discovery (`id_token_signing_alg_values_supported`) nur symmetrische Algorithmen oder kommt ein Token mit
-  HS*/`none` → abgelehnt, Log-Hinweis „{name} signiert ID-Tokens symmetrisch – beim Provider einen asymmetrischen
-  Signaturschlüssel einstellen (Authentik: beim Provider einen Signing Key wählen).“
+- Nur asymmetrische Signaturen; Hinweis bei HS*: „{name} signiert ID-Tokens symmetrisch – beim Provider einen
+  asymmetrischen Signaturschlüssel einstellen (Authentik: beim Provider einen Signing Key wählen).“
 
 ## Fehlerfälle (Meldung auf der Login-Seite, Details nur im Log)
 
@@ -378,6 +401,20 @@ Statuskasten vor dem Abschalten; Log-Warnung ohne verknüpften Admin; `link-oidc
 - Session (nur bei angemeldeten Benutzern): `oidc.intent` (`link`/`reauth`), `oidc.verifiedAt`.
 
 ## Klassen & Funktionen
+
+### Einstellungen im UI (Nachtrag)
+- `OIDCSettings` (Codable: `displayName`, `issuer`, `clientID`, `clientSecret`, `baseURL`, `passwordLogin`) →
+  `var config: OIDCConfig`.
+- `OIDCSettingsService` (`req.oidcSettings`): `state() -> OIDCSettingsState`, `save(_ input: OIDCSettingsInput) ->
+  OIDCSettings`, `setPasswordLogin(_ enabled: Bool, actingUser: User)`, `delete()`; jede Änderung lädt den
+  `LoginSettingsStore` neu.
+- `LoginSettings` (`oidc: OIDCConfig?`, `passwordLogin: Bool`, `passwordLoginForced: Bool`) in `LoginSettingsStore`
+  (`app.loginSettings`, synchron lesbar); `AppConfig.passwordLoginForced` aus `PASSWORD_LOGIN=true`.
+- `OIDCProviderStore` (`app.oidcProviders.provider(for: OIDCConfig)`): ein Client je Einstellungsstand; Tests
+  übergeben einen festen Fake.
+- `OIDCProvider.check() async throws -> OIDCCheck` (`issuer`, `keyCount`).
+- `AppConfig.oidc`/`passwordLogin` bleiben nur als Vorbelegung für Tests (werden beim Start in die DB geschrieben,
+  nie aus der Umgebung gelesen).
 
 ### `OIDCConfig` (`Sources/App/Auth/OIDC/OIDCConfig.swift`)
 Konfiguration aus der Umgebung; Teil von `AppConfig` (`var oidc: OIDCConfig?`, `var passwordLogin: Bool = true`).
