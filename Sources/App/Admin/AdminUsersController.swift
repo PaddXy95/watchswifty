@@ -31,7 +31,7 @@ struct AdminUsersController {
         }
         guard !created.user.hasPassword else { return req.redirect(to: "/admin/users", redirectType: .normal) }
         if let mailError = created.inviteMailError {
-            return try await page(req, status: .badGateway,
+            return try await page(req, status: .serviceUnavailable,   // not 502: Cloudflare would hide this page
                                   error: "Konto angelegt, aber die Einladung konnte nicht gesendet werden: \(mailError)").encodeResponse(for: req)
         }
         return try await page(req, status: .ok, notice: Self.sentNotice(created.user, req)).encodeResponse(for: req)

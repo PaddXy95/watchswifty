@@ -1390,7 +1390,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        "502":
+        "503":
           $ref: "#/components/responses/MailFailed"
   /v1/admin/users/{id}/password:
     put:
@@ -1615,7 +1615,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        "502":
+        "503":
           $ref: "#/components/responses/MailFailed"
 components:
   parameters:

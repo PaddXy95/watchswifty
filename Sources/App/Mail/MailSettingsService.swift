@@ -23,6 +23,7 @@ struct MailSettingsService {
     static let baseURLMessage = "Adresse von WatchSwifty: z. B. https://watch.example.lan (ohne Pfad)."
     static let passwordReentryMessage = "Bitte das Passwort neu eingeben – Server, Port, Verschlüsselung oder Benutzer wurden geändert."
     static let passwordMissingMessage = "Bitte ein Passwort angeben."
+    static let passwordWithoutUserMessage = "Ein Passwort gilt nur mit Benutzer – bitte den Benutzer eintragen oder das Passwort leer lassen."
 
     let db: any Database
     let cipher: TokenCipher
@@ -65,6 +66,9 @@ struct MailSettingsService {
                                     fromAddress: fromAddress, fromName: fromName, caFile: Self.optional(input.caFile), baseURL: baseURL)
         if username != nil {
             settings.password = try Self.password(input.password, new: settings, stored: stored)
+        } else if Self.optional(input.password) != nil {
+            // Never drop an entered password silently: the mails would go out without login.
+            throw APIError.validation(Self.passwordWithoutUserMessage)
         }
         return settings
     }

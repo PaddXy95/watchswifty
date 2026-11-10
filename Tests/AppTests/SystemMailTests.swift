@@ -92,7 +92,7 @@ struct SystemMailTests {
             try await app.testing().test(.POST, "/admin/system/mail/test", headers: headers, beforeRequest: { req in
                 try req.content.encode(TestMailForm(to: "p@x.de"), as: .urlEncodedForm)
             }, afterResponse: { res async in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 #expect(res.body.string.contains("Mailserver nicht erreichbar (refused)."))
             })
         }

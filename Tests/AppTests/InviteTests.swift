@@ -89,7 +89,7 @@ struct InviteTests {
             try await configureMail(app)
             let headers = try await admin(app)
             try await invite(app, headers, InviteForm(username: "neu", email: "neu@x.de")) { res in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 #expect(res.body.string.contains("Konto angelegt, aber die Einladung konnte nicht gesendet werden: Mailserver nicht erreichbar (refused)."))
                 #expect(res.body.string.contains("Einladung erneut senden"))
             }
@@ -132,7 +132,7 @@ struct InviteTests {
             let neu = try #require(try await user(app, "neu"))
             fake.failure = Self.failure
             try await app.testing().test(.POST, "/admin/users/\(neu.requireID())/invite", headers: headers) { res async in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 #expect(res.body.string.contains("Mailserver nicht erreichbar (refused)."))
             }
             try await MailSettingsService(db: app.db, cipher: app.tokenCipher).delete()
@@ -265,7 +265,7 @@ struct InviteTests {
             }
             fake.failure = Self.failure
             try await app.testing().test(.POST, "/api/v1/admin/users/\(id)/invite", headers: .bearer(token)) { res async throws in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 #expect(try res.content.decode(APIErrorBody.self).code == "mailFailed")
             }
             try await MailSettingsService(db: app.db, cipher: app.tokenCipher).delete()

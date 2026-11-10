@@ -11,6 +11,14 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 ### Geändert
 - **App-Anmeldung:** Die Rücksprung-Adresse heißt jetzt `dev.patmei.watchswifty:/auth` statt `watchswifty://auth`
   (Schema nach Reverse-DNS, RFC 8252). Apps müssen sie anpassen, die alte Adresse wird abgelehnt.
+- App-API: Fehlgeschlagener Mailversand antwortet mit **503** `mailFailed` statt 502.
+
+### Behoben
+- **Hinter Cloudflare** zeigt eine fehlgeschlagene Testmail oder Einladung wieder die Meldung mit der Ursache statt
+  Cloudflares „Bad gateway“-Seite. Cloudflare ersetzt jede 502-Antwort; WatchSwifty antwortet in solchen Fällen
+  jetzt mit 503. Dasselbe gilt für „TMDB nicht erreichbar“.
+- **System → E-Mail:** Ein Passwort ohne Benutzer wurde beim Speichern stillschweigend verworfen, die Mails gingen dann
+  ohne Anmeldung raus. Jetzt erscheint ein Hinweis, und nichts wird gespeichert.
 
 ### Sicherer
 - Keine Seite lässt sich mehr in fremde Seiten einbetten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). Das

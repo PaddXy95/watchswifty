@@ -226,8 +226,8 @@ ausführen.
 - `GET/PUT/DELETE /v1/admin/mail` und `POST /v1/admin/mail/test` (`{ to }`): wie die System-Seite; Antworten
   enthalten nie das Passwort (`hasPassword: bool`).
 - Fehlercodes *(Entscheidung Claude)*: Mail nicht eingerichtet → **422** `mailNotConfigured`; Versand
-  fehlgeschlagen (Testmail, Einladung erneut senden) → **502** `mailFailed` mit der deutschen Meldung in
-  `{"code","message"}`.
+  fehlgeschlagen (Testmail, Einladung erneut senden) → **503** `mailFailed` mit der deutschen Meldung in
+  `{"code","message"}` (anfangs 502; Cloudflare ersetzt 502-Antworten durch eine eigene Seite).
 
 ### 9. Docker und Doku
 

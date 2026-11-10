@@ -74,10 +74,20 @@ struct MailSettingsTests {
 
     @Test func noUsernameNoPassword() async throws {
         try await withTestApp { app in
-            try await service(app).save(mailInput(username: "", password: "ignored"))
-            #expect(try await service(app).state().settings?.password == nil)
             try await service(app).save(mailInput(host: "other.test", username: "", password: ""))
             #expect(try await service(app).state().settings?.host == "other.test")
+            #expect(try await service(app).state().settings?.password == nil)
+        }
+    }
+
+    /// A password without a user used to be dropped silently: saved as „eingerichtet“, sent without login.
+    @Test func passwordWithoutUsernameRejected() async throws {
+        try await withTestApp { app in
+            await #expect(throws: APIError.validation(MailSettingsService.passwordWithoutUserMessage)) {
+                try await service(app).save(mailInput(username: "", password: "relay-secret"))
+            }
+            let state = try await service(app).state()
+            #expect(state == .notConfigured)
         }
     }
 

@@ -22,8 +22,9 @@ struct APIError: Error, Sendable, Equatable {
         APIError(status: .unprocessableEntity, code: "mailNotConfigured", message: message)
     }
 
+    /// 503, never 502/504: proxies like Cloudflare replace those with their own page and hide the message.
     static func mailFailed(_ message: String) -> APIError {
-        APIError(status: .badGateway, code: "mailFailed", message: message)
+        APIError(status: .serviceUnavailable, code: "mailFailed", message: message)
     }
 
     static func validation(_ message: String) -> APIError {
