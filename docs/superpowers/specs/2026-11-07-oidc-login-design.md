@@ -292,6 +292,7 @@ Prüfung mit Schwerpunkt Migration (Umstieg, Providerwechsel, Rückweg, Downgrad
 | Provider nicht erreichbar (Discovery, Token, JWKS) | „{name} ist gerade nicht erreichbar.“ |
 | Cookie fehlt/manipuliert/älter als 10 Minuten oder `state` passt nicht (z. B. alter Tab) | „Anmeldung abgelaufen – bitte erneut versuchen.“ |
 | `error=access_denied` (Benutzer beim Provider nicht freigegeben) | „{name} hat die Anmeldung abgelehnt.“ |
+| Provider verweigert den Zugriff mit eigener Fehlerseite statt Rücksprung (z. B. Pocket ID mit Gruppenbeschränkung) | keine – der Benutzer bleibt beim Provider; README-Hinweis |
 | anderer `error` | „Anmeldung über {name} fehlgeschlagen.“ |
 | Token ungültig (Algorithmus, Signatur, `iss`, `aud`/`azp`, `exp`/`iat`, `nonce`) oder Discovery-Issuer passt nicht | „Anmeldung über {name} fehlgeschlagen.“ |
 | Geparkte Identität für „Neues Konto“ abgelaufen | „Anmeldung abgelaufen – bitte erneut versuchen.“ |
@@ -625,7 +626,20 @@ Validator- und Provider-Tests erzeugen Schlüssel im Test (ES256 und RSA über `
   - allgemein: Client-Typ *confidential*, Redirect-URI `https://<watchswifty>/auth/oidc/callback`, Scopes
     `openid profile email`, asymmetrische Signatur; Freigabe der Benutzer/Gruppen regelt der Provider;
   - Beispiel Authentik: Provider „OAuth2/OpenID“, Signing Key wählen, Subject-Modus auf dem Standard lassen,
-    Application anlegen und freigeben; kurze Hinweise zu Issuer-Formaten (Keycloak, Authelia, Pocket ID);
+    Application anlegen und freigeben; kurze Hinweise zu Issuer-Formaten (Keycloak, Authelia);
+  - Beispiel Pocket ID (geprüft am Quellcode v2.19.2): OIDC-Client anlegen (nicht „public“), Callback-URL
+    `https://<watchswifty>/auth/oidc/callback`; `OIDC_ISSUER` = `APP_URL` von Pocket ID (ohne Pfad, z. B.
+    `https://id.example.de`). Hinweise:
+    - Callback muss https sein – Pocket ID lehnt http-Callbacks ab, außer mit `ALLOW_INSECURE_CALLBACK_URLS=true`;
+    - ist in Pocket ID `INTERNAL_APP_URL` gesetzt, zeigen Token- und JWKS-Endpunkt in der Discovery auf diese
+      interne Adresse – WatchSwifty muss sie erreichen (z. B. gleiches Docker-Netz), sonst „{name} ist gerade nicht
+      erreichbar.“;
+    - Benutzernamen dürfen dort Großbuchstaben, `@` und 1–50 Zeichen haben; die Seite „Neues Konto anlegen“ schlägt
+      dann einen passenden Namen vor oder lässt das Feld leer;
+    - Konten ohne E-Mail in Pocket ID liefern keinen `email`-Claim (Adresse bleibt leer bzw. unverändert);
+    - mit Gruppenbeschränkung am Client zeigt Pocket ID Nicht-Mitgliedern eine eigene Fehlerseite, statt zu
+      WatchSwifty zurückzuleiten;
+    - Signatur standardmäßig RS256, nach Schlüsselwechsel ggf. ES256/EdDSA – beides unterstützt;
   - Variablen in `docker-compose.yml` (auskommentiert), `.env.example` und der Konfigurationstabelle;
   - Umstieg Schritt für Schritt, Providerwechsel, Issuer-Umzug, Rückweg (aus „Migration“); Hinweis zum
     E-Mail-Restrisiko;
