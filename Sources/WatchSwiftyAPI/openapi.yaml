@@ -777,7 +777,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          description: Konto ohne Passwort (`noPassword`)
+          description: Konto ohne Passwort (`noPassword`) oder Passwort-Login abgeschaltet (`passwordLoginDisabled`)
           content:
             application/json:
               schema:
@@ -806,7 +806,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          description: Konto ohne Passwort (`noPassword`)
+          description: Konto ohne Passwort (`noPassword`) oder Adresse kommt vom OIDC-Provider (`emailFromProvider`)
           content:
             application/json:
               schema:
@@ -1353,6 +1353,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Startpasswort, obwohl der Passwort-Login abgeschaltet ist (`passwordLoginDisabled`) – dann nur Einladungen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "422":
           description: Ungültige Angaben (`validation`) oder Einladung ohne eingerichtete Mail (`mailNotConfigured`)
           content:
@@ -1420,8 +1426,51 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Passwort-Login abgeschaltet (`passwordLoginDisabled`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "422":
           $ref: "#/components/responses/Unprocessable"
+  /v1/admin/users/{id}/sso-link:
+    post:
+      operationId: createSSOLink
+      tags: [Admin]
+      summary: Verknüpfungslink für ein anderes, noch nicht mit dem OIDC-Provider verknüpftes Konto (7 Tage, einmalig)
+      description: Mit eingerichteter Mail und lesbarer Adresse geht der Link per Mail (`mailed`), sonst kommt er einmalig als `url` zurück.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Erstellt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSOLinkResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Benutzer unbekannt oder OIDC nicht eingerichtet (`notFound`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Eigenes Konto (`selfAction`) oder schon verknüpft (`validation`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/admin/users/{id}/admin:
     put:
       operationId: setUserAdmin
@@ -2278,7 +2327,7 @@ components:
           type: string
     UserSummary:
       type: object
-      required: [id, username, isAdmin, hasTMDBToken, invitePending]
+      required: [id, username, isAdmin, hasTMDBToken, invitePending, ssoLinked]
       properties:
         id:
           type: string
@@ -2297,11 +2346,30 @@ components:
           description: E-Mail-Adresse nur maskiert, z. B. `p•••@example.org` (fehlt ohne lesbare Adresse)
         invitePending:
           type: boolean
-          description: Konto ohne Passwort, dessen Einladung noch gilt
+          description: Konto ohne Passwort, dessen Einladung noch gilt (für mit dem OIDC-Provider verknüpfte Konten immer `false`)
+        ssoLinked:
+          type: boolean
+          description: Mit dem konfigurierten OIDC-Provider verknüpft
         inviteExpiresAt:
           type: string
           format: date-time
           description: Ablauf der offenen Einladung
+    SSOLinkResult:
+      type: object
+      required: [mailed]
+      properties:
+        mailed:
+          type: boolean
+          description: Link ging per Mail an die hinterlegte Adresse
+        emailHint:
+          type: string
+          description: Maskierte Adresse, an die gesendet wurde (bzw. werden sollte)
+        url:
+          type: string
+          description: Der Link zum Weitergeben, nur wenn er nicht gemailt wurde – wird nie wieder angezeigt
+        mailError:
+          type: string
+          description: Warum die Mail nicht rausging
     CreatedUser:
       allOf:
         - $ref: "#/components/schemas/UserSummary"
@@ -2625,7 +2693,7 @@ components:
           type: boolean
     Me:
       type: object
-      required: [username, isAdmin, hasPassword, tmdbToken]
+      required: [username, isAdmin, hasPassword, tmdbToken, ssoLinked, passwordLogin]
       properties:
         username:
           type: string
@@ -2633,7 +2701,13 @@ components:
           type: boolean
         hasPassword:
           type: boolean
-          description: Konto hat ein Passwort (ohne Authentik immer `true`).
+          description: Konto hat ein Passwort; über SSO angelegte Konten haben keins.
+        ssoLinked:
+          type: boolean
+          description: Konto ist mit dem konfigurierten OIDC-Provider verknüpft.
+        passwordLogin:
+          type: boolean
+          description: Der Server erlaubt den Passwort-Login („Passwort ändern“ nur bei `hasPassword` und `passwordLogin`).
         tmdbToken:
           $ref: "#/components/schemas/TMDBTokenState"
         email:

@@ -45,7 +45,9 @@ extension APIHandler {
         } else {
             token = .init(state: stored.isEmpty ? Components.Schemas.TMDBTokenState.statePayload.none : .unreadable)
         }
-        return .init(username: user.username, isAdmin: user.isAdmin, hasPassword: user.hasPassword, tmdbToken: token,
+        let config = request.application.appConfig
+        return .init(username: user.username, isAdmin: user.isAdmin, hasPassword: user.hasPassword,
+                     ssoLinked: user.isLinked(config.oidc), passwordLogin: config.passwordLogin, tmdbToken: token,
                      email: user.emailState(request.application.tokenCipher).address)
     }
 }

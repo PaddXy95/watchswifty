@@ -59,7 +59,15 @@ extension APIHandler {
         if case .pending(let date) = row.invite { expires = date }
         return .init(id: user.id?.uuidString ?? "", username: user.username, isAdmin: user.isAdmin,
                      hasTMDBToken: !(user.tmdbToken ?? "").isEmpty, createdAt: user.createdAt, emailHint: row.emailHint,
-                     invitePending: expires != nil, inviteExpiresAt: expires)
+                     invitePending: expires != nil, ssoLinked: row.ssoLinked, inviteExpiresAt: expires)
+    }
+
+    func createSSOLink(_ input: Operations.createSSOLink.Input) async throws -> Operations.createSSOLink.Output {
+        let admin = try APIContext.requireAdmin()
+        guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
+        let result = try await APIContext.request().userAdmin.createSSOLink(id: id, inviter: admin)
+        return .ok(.init(body: .json(.init(mailed: result.mailed, emailHint: result.emailHint, url: result.url,
+                                           mailError: result.mailError))))
     }
 
     func getSystem(_ input: Operations.getSystem.Input) async throws -> Operations.getSystem.Output {
