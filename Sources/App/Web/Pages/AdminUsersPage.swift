@@ -9,16 +9,26 @@ struct AdminUsersPage: HTML {
     let currentUserID: UUID
     let error: String?
     let notice: String?
+    /// `OIDC_NAME` when OIDC is configured.
+    var ssoName: String? = nil
+    /// A link just created for passing on (shown only in this response).
+    var ssoLink: AdminSSOLink? = nil
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
             h1 { "Benutzer" }
             Messages(error: error, notice: notice)
+            if let ssoLink {
+                p(.class("notice")) {
+                    "Verknüpfungslink für \(ssoLink.username) (7 Tage gültig, nur jetzt sichtbar – bitte weitergeben): "
+                    code { ssoLink.url }
+                }
+            }
             table {
                 thead { tr { th { "Benutzername" }; th { "Rolle" }; th { "E-Mail" }; th { "Angelegt" }; th { "Aktionen" } } }
                 tbody {
                     for row in users {
-                        UserRow(row: row, isSelf: row.user.id == currentUserID)
+                        UserRow(row: row, isSelf: row.user.id == currentUserID, ssoName: ssoName)
                     }
                 }
             }
@@ -52,9 +62,16 @@ struct AdminUsersPage: HTML {
     }
 }
 
+/// A „Verknüpfungslink“ to show once on the users page.
+struct AdminSSOLink: Sendable {
+    let username: String
+    let url: String
+}
+
 struct UserRow: HTML {
     let row: AdminUserRow
     let isSelf: Bool
+    var ssoName: String? = nil
 
     private var user: User { row.user }
 
@@ -77,6 +94,11 @@ struct UserRow: HTML {
             td { created }
             td {
                 let id = user.id?.uuidString ?? ""
+                if let ssoName, !row.ssoLinked, !isSelf {
+                    form(.method(.post), .action("/admin/users/\(id)/sso-link"), .class("inline-form")) {
+                        button(.type(.submit)) { "Verknüpfungslink (\(ssoName))" }
+                    }
+                }
                 if !user.hasPassword {
                     form(.method(.post), .action("/admin/users/\(id)/invite"), .class("inline-form")) {
                         button(.type(.submit)) { "Einladung erneut senden" }

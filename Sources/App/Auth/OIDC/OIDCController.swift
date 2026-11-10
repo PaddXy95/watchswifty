@@ -17,6 +17,7 @@ struct OIDCController {
     struct NewAccountInput: Content { var username: String }
 
     static let expiredMessage = "Anmeldung abgelaufen – bitte erneut versuchen."
+    static let invalidLinkMessage = "Der Verknüpfungslink ist ungültig oder abgelaufen – bitte den Admin um einen neuen bitten."
     /// Session key for intents only a signed-in user can start (`link`, `reauth`); never taken from the URL.
     static let intentKey = "oidc.intent"
 
@@ -34,8 +35,16 @@ struct OIDCController {
             req.session.data[Self.intentKey] = nil
             if let stored = OIDCIntent(rawValue: raw), stored == .link || stored == .reauth { intent = stored }
         }
+        var linkToken: String?
+        if let token = try? req.query.get(String.self, at: "link") {
+            guard try await OIDCLinkTokenService(db: req.db).check(token) != nil else {
+                return try await page(req, status: .badRequest, error: Self.invalidLinkMessage)
+            }
+            intent = .linkToken
+            linkToken = token
+        }
         let flow = OIDCFlowCookie(state: Self.randomToken(), nonce: Self.randomToken(), verifier: verifier, startedAt: .now,
-                                  intent: intent, returnTo: returnTo)
+                                  intent: intent, returnTo: returnTo, linkToken: linkToken)
         let url: URL
         do {
             url = try await provider.authorizationURL(state: flow.state, nonce: flow.nonce, codeChallenge: pkceChallenge(verifier))
@@ -72,6 +81,19 @@ struct OIDCController {
             return try await failure(req, error, returnTo: flow.returnTo)
         }
         let service = try req.oidcLogin
+        if flow.intent == .linkToken, let token = flow.linkToken {
+            let tokens = OIDCLinkTokenService(db: req.db)
+            guard let record = try await tokens.check(token), let user = try await User.find(record.$user.id, on: req.db) else {
+                return try await page(req, status: .badRequest, error: Self.invalidLinkMessage)
+            }
+            do {
+                try await service.link(user, to: identity)
+            } catch let error as APIError where error.status == .unprocessableEntity {
+                return try await page(req, status: .unprocessableEntity, error: error.message)
+            }
+            _ = try await tokens.consume(token)
+            return signIn(req, user, redirect: "/account?sso=linked")
+        }
         if flow.intent == .link, let user = req.auth.get(User.self) {
             let response: Response
             do {

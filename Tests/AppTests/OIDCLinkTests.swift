@@ -1,4 +1,5 @@
 @testable import App
+import ConsoleKit
 import Fluent
 import Foundation
 import Testing
@@ -151,6 +152,181 @@ struct OIDCLinkTests {
             try await createUser(app, "bert")
             let withPassword = try await browserGet(app, "/account", headers: try await login(app, "bert"))
             #expect(withPassword.body.contains("Passwort ändern"))
+        }
+    }
+
+    // MARK: - Link tokens (Task 8)
+
+    @Test func linkTokenLinksAndSignsIn() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            #expect(result.location == "/account?sso=linked")
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "sub-1")
+            #expect(try await OIDCLinkTokenService(db: app.db).check(token) == nil)
+            let account = try await browserGet(app, "/account", headers: result.headers)
+            #expect(account.body.contains("anna"))
+        }
+    }
+
+    @Test func linkTokenIsSingleUse() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            fake.identity = oidcIdentity("sub-2")
+            let again = try await browserGet(app, "/auth/oidc/start?link=\(token)", headers: .sameOrigin)
+            #expect(again.status == .badRequest)
+            #expect(again.body.contains("Der Verknüpfungslink ist ungültig oder abgelaufen – bitte den Admin um einen neuen bitten."))
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "sub-1")
+        }
+    }
+
+    @Test func expiredLinkTokenFails() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 60,
+                                                                         now: Date().addingTimeInterval(-61))
+            let result = try await browserGet(app, "/auth/oidc/start?link=\(token)", headers: .sameOrigin)
+            #expect(result.status == .badRequest)
+            #expect(result.body.contains("Der Verknüpfungslink ist ungültig oder abgelaufen"))
+        }
+    }
+
+    @Test func linkTokenForTakenIdentityFails() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let other = try await createUser(app, "bert")
+            try await linkOIDC(app, other)
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            #expect(result.status == .unprocessableEntity)
+            #expect(result.body.contains("Dieses SSO-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft."))
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == nil)
+        }
+    }
+
+    @Test func linkTokenNotUsableAtResetPassword() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            let page = try await browserGet(app, "/reset-password?token=\(token)", headers: .sameOrigin)
+            #expect(page.body.contains("Der Link ist ungültig oder abgelaufen."))
+            let post = try await browserPost(app, "/reset-password", form: ["token": token, "password": "newpassword1",
+                                                                           "passwordRepeat": "newpassword1"], headers: .sameOrigin)
+            #expect(post.body.contains("Der Link ist ungültig oder abgelaufen."))
+        }
+    }
+
+    @Test func adminSSOLinkMailsWhenPossible() async throws {
+        let mail = FakeMailSender()
+        try await withTestApp(config: .testingOIDC, mail: mail) { app in
+            try await configureMail(app)
+            let user = try await createUser(app, "anna")
+            user.email = try app.tokenCipher.seal("anna@example.org")
+            try await user.save(on: app.db)
+            let admin = try await login(app, "admin", password: "adminpass123")
+            let result = try await browserPost(app, "/admin/users/\(try user.requireID())/sso-link", form: [:], headers: admin)
+            #expect(result.status == .ok)
+            #expect(result.body.contains("Verknüpfungslink an a•••@example.org gesendet."))
+            let sent = try #require(mail.sent.last)
+            #expect(sent.to == "anna@example.org")
+            #expect(sent.header("Subject") == "WatchSwifty: Konto mit SSO verknüpfen")
+            #expect(sent.body.contains("http://localhost:8080/auth/oidc/start?link="))
+            #expect(!result.body.contains("/auth/oidc/start?link="))
+        }
+    }
+
+    @Test func adminSSOLinkShownWithoutMail() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let user = try await createUser(app, "anna")
+            let admin = try await login(app, "admin", password: "adminpass123")
+            let page = try await browserGet(app, "/admin/users", headers: admin)
+            #expect(page.body.contains("/admin/users/\(try user.requireID())/sso-link"))
+            let result = try await browserPost(app, "/admin/users/\(try user.requireID())/sso-link", form: [:], headers: admin)
+            #expect(result.status == .ok)
+            #expect(result.body.contains("http://localhost:8080/auth/oidc/start?link="))
+            #expect(result.body.contains("nur jetzt sichtbar"))
+            let again = try await browserGet(app, "/admin/users", headers: admin)
+            #expect(!again.body.contains("/auth/oidc/start?link="))
+        }
+    }
+
+    @Test func adminSSOLinkShownWhenMailFails() async throws {
+        let mail = FakeMailSender()
+        mail.failure = MailError(message: "550 nope")
+        try await withTestApp(config: .testingOIDC, mail: mail) { app in
+            try await configureMail(app)
+            let user = try await createUser(app, "anna")
+            user.email = try app.tokenCipher.seal("anna@example.org")
+            try await user.save(on: app.db)
+            let admin = try await login(app, "admin", password: "adminpass123")
+            let result = try await browserPost(app, "/admin/users/\(try user.requireID())/sso-link", form: [:], headers: admin)
+            #expect(result.body.contains("/auth/oidc/start?link="))
+            #expect(result.body.contains("550 nope"))
+        }
+    }
+
+    @Test func adminSSOLinkNotForSelfOrLinked() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let adminUser = try #require(try await User.query(on: app.db).filter(\.$username == "admin").first())
+            let linked = try await createUser(app, "anna")
+            try await linkOIDC(app, linked)
+            let admin = try await login(app, "admin", password: "adminpass123")
+            let page = try await browserGet(app, "/admin/users", headers: admin)
+            #expect(!page.body.contains("/admin/users/\(try adminUser.requireID())/sso-link"))
+            #expect(!page.body.contains("/admin/users/\(try linked.requireID())/sso-link"))
+            let selfResult = try await browserPost(app, "/admin/users/\(try adminUser.requireID())/sso-link", form: [:], headers: admin)
+            #expect(selfResult.status == .unprocessableEntity)
+            let linkedResult = try await browserPost(app, "/admin/users/\(try linked.requireID())/sso-link", form: [:], headers: admin)
+            #expect(linkedResult.status == .unprocessableEntity)
+        }
+    }
+
+    @Test func adminSSOLinkWithoutOIDCIs404() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "anna")
+            let admin = try await login(app, "admin", password: "adminpass123")
+            let result = try await browserPost(app, "/admin/users/\(try user.requireID())/sso-link", form: [:], headers: admin)
+            #expect(result.status == .notFound)
+        }
+    }
+
+    private func runLinkCommand(_ app: Application, _ arguments: [String]) async throws -> ScriptedConsole {
+        let console = ScriptedConsole(answers: [])
+        var context = CommandContext(console: console, input: CommandInput(arguments: ["App", "link-oidc"] + arguments))
+        context.application = app
+        try await app.asyncCommands.group().run(using: &context)
+        return console
+    }
+
+    @Test func linkCommandUnlinksAndPrintsURL() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            let user = try await createUser(app, "anna")
+            try await linkOIDC(app, user, subject: "old")
+            let console = try await runLinkCommand(app, ["Anna"])
+            #expect(console.printed.contains("Verknüpfungslink für anna (1 Stunde gültig): http://localhost:8080/auth/oidc/start?link="))
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == nil)
+            let token = try #require(console.printed.split(separator: "link=").last.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            #expect(try await OIDCLinkTokenService(db: app.db).check(token) != nil)
+        }
+    }
+
+    @Test func linkCommandWithoutOIDCFails() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "anna")
+            await #expect(throws: CommandFailure.self) { _ = try await runLinkCommand(app, ["anna"]) }
+        }
+    }
+
+    @Test func linkCommandUnknownUserFails() async throws {
+        try await withTestApp(config: .testingOIDC) { app in
+            await #expect(throws: CommandFailure("Benutzer „nobody“ gibt es nicht.")) { _ = try await runLinkCommand(app, ["nobody"]) }
         }
     }
 }

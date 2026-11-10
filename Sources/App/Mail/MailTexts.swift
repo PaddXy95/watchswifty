@@ -52,6 +52,25 @@ enum MailTexts {
             """)
     }
 
+    /// Admin's „Verknüpfungslink“: binds whoever signs in at the provider to this account.
+    static func ssoLink(to: String, username: String, inviter: String, ssoName: String, link: String, expires: Date) -> OutgoingMail {
+        OutgoingMail(to: to, subject: "WatchSwifty: Konto mit \(ssoName) verknüpfen", body: """
+            Hallo \(username),
+
+            \(inviter) hat dir einen Link geschickt, mit dem du dein WatchSwifty-Konto „\(username)“ mit \(ssoName) verknüpfst \
+            (gültig bis \(CalendarDay.display(CalendarDay.today(now: expires))), nur einmal nutzbar):
+
+            \(link)
+
+            Danach meldest du dich immer über \(ssoName) an.
+
+            Hast du das nicht erwartet? Dann ignoriere diese Mail.
+
+            Viele Grüße
+            WatchSwifty
+            """)
+    }
+
     static func invite(to: String, username: String, inviter: String, link: String, expires: Date) -> OutgoingMail {
         OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
             Hallo,
