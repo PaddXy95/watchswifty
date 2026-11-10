@@ -17,7 +17,7 @@ struct OriginCheckMiddleware: AsyncMiddleware {
             return try await next.respond(to: request)
         }
         if let origin = request.headers.first(name: .origin) {
-            guard allowedOrigins.contains(Self.normalizeOrigin(origin)) || matchesRequestHost(origin, request) else {
+            guard allowedOrigins.contains(Self.normalizeOrigin(origin)) || Self.requestMatches(origin: origin, request) else {
                 throw Abort(.forbidden, reason: "Anfrage abgelehnt: Herkunft passt nicht zur Adresse.")
             }
         } else if !request.isHTMX {
@@ -26,7 +26,9 @@ struct OriginCheckMiddleware: AsyncMiddleware {
         return try await next.respond(to: request)
     }
 
-    private func matchesRequestHost(_ origin: String, _ request: Request) -> Bool {
+    /// True when `origin` names the host the browser talked to (Host / X-Forwarded-Host [+ X-Forwarded-Port]);
+    /// the scheme only decides the default port, so TLS-terminating proxies match too.
+    static func requestMatches(origin: String, _ request: Request) -> Bool {
         guard let url = URL(string: origin), let scheme = url.scheme?.lowercased(), let originHost = url.host?.lowercased() else {
             return false
         }
