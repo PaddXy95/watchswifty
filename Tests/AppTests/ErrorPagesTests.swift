@@ -49,7 +49,7 @@ struct ErrorPagesTests {
             try await createUser(app, "pat")
             let headers = try await login(app, "pat").adding(.htmx)
             try await app.testing().test(.GET, "/search/results?q=Dark", headers: headers) { res async in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 #expect(res.headers.first(name: "HX-Retarget") == "#flash")
                 #expect(res.body.string.contains("TMDB nicht erreichbar"))
             }

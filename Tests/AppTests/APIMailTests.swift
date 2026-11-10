@@ -112,7 +112,7 @@ struct APIMailTests {
             try await app.testing().test(.POST, "/api/v1/admin/mail/test", headers: .bearer(token), beforeRequest: { req in
                 try req.content.encode(TestMailForm(to: "p@x.de"), as: .json)
             }, afterResponse: { res async throws in
-                #expect(res.status == .badGateway)
+                #expect(res.status == .serviceUnavailable)   // never 502: proxies like Cloudflare replace it
                 let error = try res.content.decode(APIErrorBody.self)
                 #expect(error.code == "mailFailed")
                 #expect(error.message == "Mailserver nicht erreichbar (refused).")

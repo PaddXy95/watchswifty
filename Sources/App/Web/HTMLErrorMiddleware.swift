@@ -46,7 +46,8 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
             case .notFound: return (.notFound, "Bei TMDB nicht gefunden.")
             case .missingToken: return (.unprocessableEntity, error.description)
             case .unauthorized: return (.unprocessableEntity, "TMDB hat deinen Token abgelehnt – bitte unter Konto erneuern.")
-            default: return (.badGateway, "TMDB nicht erreichbar: \(error)")
+            // 503, not 502: proxies like Cloudflare replace a 502 with their own page and hide this message.
+            default: return (.serviceUnavailable, "TMDB nicht erreichbar: \(error)")
             }
         case let abort as any AbortError:
             let status = abort.status
