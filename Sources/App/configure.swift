@@ -3,7 +3,8 @@ import FluentSQLiteDriver
 import Vapor
 
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
-               releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil) async throws {
+               releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil,
+               oidcProvider: (any OIDCProvider)? = nil) async throws {
     app.appConfig = config
     app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
                                                                databasePath: config.databasePath, logger: app.logger))
@@ -13,13 +14,19 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.authCodes = AuthCodeStore()
     app.mailSender = mailSender ?? LiveMailSender()
     app.backgroundTasks = BackgroundTasks()
+    app.oidcIdentityLock = AsyncMutex()
+    app.oidcUsedStates = OIDCUsedStates()
+    if let oidc = config.oidc {
+        app.oidcProvider = oidcProvider ?? LiveOIDCProvider(config: oidc, transport: VaporOIDCTransport(client: app.client),
+                                                            logger: app.logger)
+    }
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
     app.middleware = Middlewares()
     app.middleware.use(FrameDenyMiddleware())
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
+    app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins + [config.oidc?.canonicalOrigin].compactMap { $0 }))
     app.sessions.use(.fluent)
     app.sessions.configuration = .init(cookieName: "watchswifty_session") { sessionID in
         .init(string: sessionID.string, expires: Date(timeIntervalSinceNow: 2_592_000), maxAge: 2_592_000,

@@ -7,6 +7,14 @@ struct LoginPage: HTML {
     var returnTo: String? = nil
     /// Mail is set up, so „Passwort vergessen?“ can help.
     var forgotPasswordLink = false
+    /// `OIDC_NAME` when OIDC is configured: shows „Mit … anmelden“.
+    var ssoName: String? = nil
+    /// `PASSWORD_LOGIN`: without it only the OIDC button is shown.
+    var passwordLogin = true
+
+    private var ssoHref: String {
+        "/auth/oidc/start" + (returnTo.map { "?returnTo=" + formEncode($0) } ?? "")
+    }
 
     var body: some HTML {
         PageLayout(title: "Anmelden", nav: nil) {
@@ -15,6 +23,10 @@ struct LoginPage: HTML {
                 if let error {
                     p(.class("error"), .custom(name: "role", value: "alert")) { error }
                 }
+                if let ssoName {
+                    a(.href(ssoHref), .class("button primary sso")) { "Mit \(ssoName) anmelden" }
+                }
+                if passwordLogin {
                 form(.method(.post), .action("/login")) {
                     if let returnTo { input(.type(.hidden), .name("returnTo"), .value(returnTo)) }
                     label {
@@ -27,10 +39,11 @@ struct LoginPage: HTML {
                         input(.type(.password), .name("password"), .required,
                               .custom(name: "autocomplete", value: "current-password"))
                     }
-                    button(.type(.submit), .class("primary")) { "Anmelden" }
+                    button(.type(.submit), .class(ssoName == nil ? "primary" : "")) { "Anmelden" }
                 }
                 if forgotPasswordLink {
                     p { a(.href("/forgot-password")) { "Passwort vergessen?" } }
+                }
                 }
             }
         }
