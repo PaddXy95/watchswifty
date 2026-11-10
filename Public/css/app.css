@@ -50,6 +50,12 @@ button:hover { border-color: var(--ink-3); }
 input, select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-1) var(--space-2); }
 label { display: block; margin-bottom: var(--space-3); color: var(--ink-2); }
 label input, label select { display: block; margin-top: var(--space-1); width: 100%; max-width: 24rem; }
+/* Checkboxes sit beside their text and are never stretched like text fields. */
+label.checkbox { display: flex; width: fit-content; align-items: center; gap: var(--space-2); color: var(--ink); cursor: pointer; }
+label.checkbox input { width: 1.125rem; height: 1.125rem; max-width: none; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.inline-form label.checkbox { margin: 0; }
+button.danger { background: transparent; color: var(--accent); border-color: var(--accent-dim); }
+button.danger:hover { border-color: var(--accent); }
 
 .muted { color: var(--ink-3); }
 .error { color: var(--accent); }
@@ -303,9 +309,16 @@ summary { cursor: pointer; font-weight: 600; }
 
 /* System / update check */
 .update-note { max-width: 46rem; }
-.updates .inline-form { align-items: center; }
-label.checkbox { display: inline-flex; align-items: center; gap: var(--space-2); }
+.update-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.update-actions .inline-form { align-items: center; gap: var(--space-3); margin: 0; }
 .update-result { margin-top: var(--space-3); }
+
+/* System → E-Mail: test mail and delete below the form */
+.mail-tool { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--line); max-width: 46rem; }
+.mail-tool h3 { font-size: var(--text-base); margin: 0 0 var(--space-1); }
+.mail-tool p { margin: 0 0 var(--space-3); }
+.mail-tool .inline-form { margin: 0; gap: var(--space-2); }
+.mail-tool input[type="email"] { width: 20rem; max-width: 100%; }
 .update-available { padding: var(--space-3) var(--space-4); background: var(--paper-2); border: 1px solid var(--accent-dim); border-radius: var(--radius); max-width: 46rem; }
 .update-available p { margin: 0 0 var(--space-2); }
 .update-available pre { margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); background: var(--paper); border-radius: var(--radius); overflow-x: auto; }

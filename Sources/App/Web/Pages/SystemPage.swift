@@ -52,16 +52,18 @@ struct SystemPage: HTML {
                     "PaddXy95/watchswifty. GitHub sieht dabei die IP-Adresse dieses Servers; Daten aus WatchSwifty werden "
                     "nicht übertragen."
                 }
-                form(.method(.post), .action("/admin/system/update-check"), .class("inline-form")) {
-                    label(.class("checkbox")) {
-                        input(.type(.checkbox), .name("enabled"))
-                            .attributes(.checked, when: state.enabled)
-                        " Automatisch alle 12 Stunden prüfen"
+                div(.class("update-actions")) {
+                    form(.method(.post), .action("/admin/system/update-check"), .class("inline-form")) {
+                        label(.class("checkbox")) {
+                            input(.type(.checkbox), .name("enabled"))
+                                .attributes(.checked, when: state.enabled)
+                            "Automatisch alle 12 Stunden prüfen"
+                        }
+                        button(.type(.submit)) { "Speichern" }
                     }
-                    button(.type(.submit)) { "Speichern" }
-                }
-                form(.method(.post), .action("/admin/system/check-now"), .class("inline-form")) {
-                    button(.type(.submit), .class("primary")) { "Jetzt prüfen" }
+                    form(.method(.post), .action("/admin/system/check-now"), .class("inline-form")) {
+                        button(.type(.submit), .class("primary")) { "Jetzt prüfen" }
+                    }
                 }
                 UpdateResult(current: current, state: state)
             }
@@ -220,15 +222,23 @@ struct MailSection: HTML {
                 button(.type(.submit), .class("primary")) { "Speichern" }
             }
             if state.settings != nil {
-                form(.method(.post), .action("/admin/system/mail/test"), .class("inline-form")) {
-                    input(.type(.email), .name("to"), .value(testRecipient ?? ""), .required,
-                          .custom(name: "placeholder", value: "Empfänger"), .custom(name: "aria-label", value: "Empfänger der Testmail"))
-                    button(.type(.submit)) { "Testmail senden" }
+                div(.class("mail-tool")) {
+                    h3 { "Testmail" }
+                    p(.class("muted")) { "Schickt eine kurze Mail mit den gespeicherten Einstellungen. Klappt es nicht, steht hier die Ursache." }
+                    form(.method(.post), .action("/admin/system/mail/test"), .class("inline-form")) {
+                        input(.type(.email), .name("to"), .value(testRecipient ?? ""), .required,
+                              .custom(name: "placeholder", value: "Empfänger"), .custom(name: "aria-label", value: "Empfänger der Testmail"))
+                        button(.type(.submit)) { "Testmail senden" }
+                    }
                 }
             }
             if state != .notConfigured {
-                form(.method(.post), .action("/admin/system/mail/delete"), .class("inline-form")) {
-                    button(.type(.submit)) { "E-Mail-Einstellungen löschen" }
+                div(.class("mail-tool")) {
+                    h3 { "Einstellungen löschen" }
+                    p(.class("muted")) { "Danach verschickt WatchSwifty keine Mails mehr – keine Einladungen, kein „Passwort vergessen“." }
+                    form(.method(.post), .action("/admin/system/mail/delete"), .class("inline-form")) {
+                        button(.type(.submit), .class("danger")) { "E-Mail-Einstellungen löschen" }
+                    }
                 }
             }
         }

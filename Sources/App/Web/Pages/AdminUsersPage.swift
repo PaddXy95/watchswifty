@@ -42,9 +42,9 @@ struct AdminUsersPage: HTML {
                     input(.type(.password), .name("password"), .custom(name: "autocomplete", value: "new-password"))
                         .attributes(.required, when: !mailConfigured)
                 }
-                label {
+                label(.class("checkbox")) {
                     input(.type(.checkbox), .name("isAdmin"), .value("true"))
-                    " Admin"
+                    "Admin"
                 }
                 button(.type(.submit), .class("primary")) { "Konto anlegen" }
             }
