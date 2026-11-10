@@ -33,13 +33,23 @@ struct AppConfig: Sendable {
     var appVersion: AppVersion = .current
     /// Longest wait for one mail sent while the request waits (invitation, test mail).
     var mailDeadline: Duration = .seconds(30)
+    /// Test seed only (never read from the environment): written as the OIDC settings at startup.
+    var oidc: OIDCConfig? = nil
+    /// Test seed only: the password-login switch stored with `oidc`.
+    var passwordLogin: Bool = true
+    /// `PASSWORD_LOGIN=true`: emergency switch that keeps the password login on (settings live under System).
+    var passwordLoginForced: Bool = false
+    /// Variables that are set but no longer read (logged at startup).
+    var environmentHints: [String] = []
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
             guard let raw = env[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
             return raw
         }
-        return AppConfig(
+        let publicOrigins = (value("PUBLIC_ORIGIN") ?? "").split(separator: ",")
+            .map { OriginCheckMiddleware.normalizeOrigin(String($0)) }.filter { !$0.isEmpty }
+        var config = AppConfig(
             tmdbLanguage: value("TMDB_LANGUAGE") ?? "de-DE",
             databasePath: value("DATABASE_PATH") ?? "/data/watchswifty.sqlite",
             host: value("HOST") ?? "0.0.0.0",
@@ -48,11 +58,20 @@ struct AppConfig: Sendable {
             adminPassword: value("ADMIN_PASSWORD"),
             loginFailureDelay: .seconds(1),
             backgroundJobsEnabled: true,
-            publicOrigins: (value("PUBLIC_ORIGIN") ?? "").split(separator: ",").map { OriginCheckMiddleware.normalizeOrigin(String($0)) }
-                .filter { !$0.isEmpty },
+            publicOrigins: publicOrigins,
             tokenKey: value("TOKEN_KEY"),
             tokenKeyFile: value("TOKEN_KEY_FILE")
         )
+        config.passwordLoginForced = value("PASSWORD_LOGIN")?.lowercased() == "true"
+        if let raw = value("PASSWORD_LOGIN"), !config.passwordLoginForced {
+            config.environmentHints.append(
+                "PASSWORD_LOGIN=\(raw) wird ignoriert – nur PASSWORD_LOGIN=true wirkt (Notschalter); den Passwort-Login unter System abschalten.")
+        }
+        for name in ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_CLIENT_SECRET_FILE", "OIDC_REDIRECT_URL", "OIDC_NAME"]
+        where value(name) != nil {
+            config.environmentHints.append("\(name) wird ignoriert – SSO wird unter System → Anmeldung über OIDC (SSO) eingerichtet.")
+        }
+        return config
     }
 
     static var testing: AppConfig {
@@ -68,6 +87,14 @@ struct AppConfig: Sendable {
             bcryptCost: 4
         )
         config.today = { "2026-11-07" }
+        return config
+    }
+
+    /// `testing` with an OIDC provider whose canonical address is the test host (`http://localhost:8080`).
+    static var testingOIDC: AppConfig {
+        var config = testing
+        config.oidc = OIDCConfig(issuer: "https://id.example.test", clientID: "watchswifty", clientSecret: "secret",
+                                 redirectURL: URL(string: "http://localhost:8080/auth/oidc/callback")!, displayName: "SSO")
         return config
     }
 }

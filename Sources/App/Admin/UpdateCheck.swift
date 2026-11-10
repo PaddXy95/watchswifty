@@ -90,6 +90,8 @@ final class AppSettings: Model, @unchecked Sendable {
     @OptionalField(key: "check_error") var checkError: String?
     /// Mail settings (`MailSettings` as JSON, sealed with the server key); nil = mail not set up.
     @OptionalField(key: "mail_config") var mailConfig: String?
+    /// OIDC settings (`OIDCSettings` as JSON, sealed with the server key); nil = SSO not set up.
+    @OptionalField(key: "oidc_config") var oidcConfig: String?
 
     init() {
         self.updateCheck = false

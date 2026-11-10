@@ -16,6 +16,12 @@ struct AccountPage: HTML {
     var newToken: String? = nil
     var email: EmailState = .none
     var mailConfigured = false
+    /// OIDC section; nil without OIDC.
+    var sso: AccountSSO? = nil
+    /// „Passwort ändern“ only for accounts with a password while the password login is on.
+    var passwordChange = true
+    /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
+    var tokenNeedsReauth = false
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -98,13 +104,45 @@ struct AccountPage: HTML {
                     }
                 }
             }
+            if tokenNeedsReauth, let sso {
+                p(.class("muted")) { "Für ein neues Token einmal über \(sso.name) bestätigen (gilt 5 Minuten)." }
+                form(.method(.post), .action("/account/oidc/reauth"), .class("inline-form")) {
+                    button(.type(.submit)) { "Über \(sso.name) bestätigen" }
+                }
+            }
             form(.method(.post), .action("/account/devices"), .class("inline-form")) {
                 input(.type(.text), .name("name"), .required, .custom(name: "maxlength", value: "60"),
                       .custom(name: "placeholder", value: "Name, z. B. Skript"), .custom(name: "aria-label", value: "Name des Tokens"))
                 button(.type(.submit)) { "Token erstellen" }
             }
 
+            if let sso {
+                h2 { sso.name }
+                if sso.linked {
+                    p { "Mit \(sso.name) verknüpft." }
+                } else {
+                    p(.class("muted")) { "Verknüpfe dein Konto, um dich künftig über \(sso.name) anzumelden." }
+                    form(.method(.post), .action("/account/oidc/link")) {
+                        if sso.needsPassword {
+                            label {
+                                "Aktuelles Passwort"
+                                input(.type(.password), .name("currentPassword"), .required,
+                                      .custom(name: "autocomplete", value: "current-password"))
+                            }
+                        }
+                        button(.type(.submit), .class("primary")) { "Mit \(sso.name) verknüpfen" }
+                    }
+                }
+            }
+
             h2 { "E-Mail-Adresse" }
+            if let sso, sso.emailFromProvider {
+                switch email {
+                case .address(let address): p { "Hinterlegt: \(address)" }
+                default: p { "Keine Adresse hinterlegt." }
+                }
+                p(.class("muted")) { "Die Adresse kommt von \(sso.name) – dort ändern." }
+            } else {
             p(.class("muted")) { "Für „Passwort vergessen“. Nur du siehst sie vollständig." }
             if !mailConfigured {
                 p(.class("muted")) { "Der Admin hat den Mail-Versand noch nicht eingerichtet – „Passwort vergessen“ funktioniert erst danach." }
@@ -125,7 +163,9 @@ struct AccountPage: HTML {
                 }
                 button(.type(.submit)) { "Adresse speichern" }
             }
+            }
 
+            if passwordChange {
             h2 { "Passwort ändern" }
             form(.method(.post), .action("/account/password")) {
                 label {
@@ -139,8 +179,18 @@ struct AccountPage: HTML {
                 }
                 button(.type(.submit), .class("primary")) { "Passwort ändern" }
             }
+            }
         }
     }
+}
+
+/// What the Konto page shows about the OIDC link.
+struct AccountSSO: Sendable {
+    let name: String
+    let linked: Bool
+    let emailFromProvider: Bool
+    /// Linking asks for the current password (accounts that have one).
+    var needsPassword = false
 }
 
 /// Step-by-step help for getting a TMDB token (open while none is stored).

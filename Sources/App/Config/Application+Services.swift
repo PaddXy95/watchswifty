@@ -107,3 +107,26 @@ extension Application {
         set { storage[DummyPasswordHashKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct OIDCIdentityLockKey: StorageKey { typealias Value = AsyncMutex }
+    private struct OIDCUsedStatesKey: StorageKey { typealias Value = OIDCUsedStates }
+
+    /// States of OIDC flows already completed (single-use flow cookies).
+    var oidcUsedStates: OIDCUsedStates {
+        get {
+            guard let states = storage[OIDCUsedStatesKey.self] else { fatalError("OIDC states not configured") }
+            return states
+        }
+        set { storage[OIDCUsedStatesKey.self] = newValue }
+    }
+
+    /// Serializes creating and linking OIDC accounts (first admin, unique identities).
+    var oidcIdentityLock: AsyncMutex {
+        get {
+            guard let lock = storage[OIDCIdentityLockKey.self] else { fatalError("OIDC lock not configured") }
+            return lock
+        }
+        set { storage[OIDCIdentityLockKey.self] = newValue }
+    }
+}

@@ -52,14 +52,41 @@ enum MailTexts {
             """)
     }
 
-    static func invite(to: String, username: String, inviter: String, link: String, expires: Date) -> OutgoingMail {
-        OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
+    /// Admin's „Verknüpfungslink“: binds whoever signs in at the provider to this account.
+    static func ssoLink(to: String, username: String, inviter: String, ssoName: String, link: String, expires: Date) -> OutgoingMail {
+        OutgoingMail(to: to, subject: "WatchSwifty: Konto mit \(ssoName) verknüpfen", body: """
+            Hallo \(username),
+
+            \(inviter) hat dir einen Link geschickt, mit dem du dein WatchSwifty-Konto „\(username)“ mit \(ssoName) verknüpfst \
+            (gültig bis \(CalendarDay.display(CalendarDay.today(now: expires))), nur einmal nutzbar):
+
+            \(link)
+
+            Danach meldest du dich immer über \(ssoName) an.
+
+            Hast du das nicht erwartet? Dann ignoriere diese Mail.
+
+            Viele Grüße
+            WatchSwifty
+            """)
+    }
+
+    /// With `ssoName` the invitation can also be accepted through the OIDC provider; without password login only so.
+    static func invite(to: String, username: String, inviter: String, link: String, expires: Date, ssoName: String? = nil,
+                       passwordLogin: Bool = true) -> OutgoingMail {
+        let until = CalendarDay.display(CalendarDay.today(now: expires))
+        let how = switch (ssoName, passwordLogin) {
+        case (nil, _): "Über diesen Link legst du dein Passwort fest (gültig bis \(until)):"
+        case (let name?, true): "Über diesen Link legst du dein Passwort fest oder verknüpfst dein Konto mit \(name) (gültig bis \(until)):"
+        case (let name?, false): "Über diesen Link meldest du dich über \(name) an und nimmst die Einladung an (gültig bis \(until)):"
+        }
+        return OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
             Hallo,
 
             \(inviter) hat dich zu WatchSwifty eingeladen, einem Tracker für Serien und Filme.
             Dein Benutzername: \(username)
 
-            Über diesen Link legst du dein Passwort fest (gültig bis \(CalendarDay.display(CalendarDay.today(now: expires)))):
+            \(how)
 
             \(link)
 

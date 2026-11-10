@@ -14,6 +14,16 @@ struct AdminUserRow: Sendable {
     let user: User
     let emailHint: String?
     let invite: InviteState
+    /// Linked with the configured OIDC provider.
+    var ssoLinked = false
+}
+
+/// Result of „Verknüpfungslink“: mailed, or the link to pass on (shown once).
+struct SSOLinkResult: Equatable, Sendable {
+    let mailed: Bool
+    let emailHint: String?
+    let url: String?
+    let mailError: String?
 }
 
 /// User administration shared by the „Benutzer“ page and `/v1/admin/users`. Admins never act on their own account
@@ -28,6 +38,8 @@ struct UserAdminService {
     let hasher: AsyncPasswordHasher
     let cipher: TokenCipher
     let mail: MailService
+    var oidc: OIDCConfig? = nil
+    var passwordLogin = true
 
     func list() async throws -> [AdminUserRow] {
         var rows: [AdminUserRow] = []
@@ -39,11 +51,34 @@ struct UserAdminService {
 
     func row(for user: User, now: Date = .now) async throws -> AdminUserRow {
         var invite = InviteState.none
-        if !user.hasPassword {
+        if !user.hasPassword, !user.isLinked(oidc) {
             let token = try await PasswordTokenService(db: db).latest(userID: user.requireID(), purpose: .invite)
             invite = token.map { $0.expiresAt > now ? .pending(expires: $0.expiresAt) : .expired } ?? .expired
         }
-        return AdminUserRow(user: user, emailHint: user.emailState(cipher).address.map(EmailAddress.mask), invite: invite)
+        return AdminUserRow(user: user, emailHint: user.emailState(cipher).address.map(EmailAddress.mask), invite: invite,
+                            ssoLinked: user.isLinked(oidc))
+    }
+
+    /// „Verknüpfungslink“ for another, not yet linked account: mailed when possible, else returned to show once.
+    func createSSOLink(id: UUID, inviter: User) async throws -> SSOLinkResult {
+        guard let oidc else { throw APIError.notFound }
+        guard id != inviter.id else { throw APIError.selfAction }
+        let user = try await target(id)
+        guard !user.isLinked(oidc) else { throw APIError.validation("Das Konto ist schon mit \(oidc.displayName) verknüpft.") }
+        let now = Date.now
+        let token = try await OIDCLinkTokenService(db: db).issue(userID: try user.requireID(), lifetime: OIDCLinkTokenService.adminLifetime,
+                                                                 now: now)
+        let url = oidc.canonicalOrigin + "/auth/oidc/start?link=" + token
+        guard let address = user.emailState(cipher).address, try await mail.settings.state().settings != nil else {
+            return SSOLinkResult(mailed: false, emailHint: nil, url: url, mailError: nil)
+        }
+        do {
+            try await mail.send(MailTexts.ssoLink(to: address, username: user.username, inviter: inviter.username, ssoName: oidc.displayName,
+                                                  link: url, expires: now.addingTimeInterval(OIDCLinkTokenService.adminLifetime)), now: now)
+            return SSOLinkResult(mailed: true, emailHint: EmailAddress.mask(address), url: nil, mailError: nil)
+        } catch let error as MailError {
+            return SSOLinkResult(mailed: false, emailHint: EmailAddress.mask(address), url: url, mailError: error.message)
+        }
     }
 
     /// With a password: a normal account (an address is only stored). Without one but with an address: an account
@@ -53,6 +88,9 @@ struct UserAdminService {
         let username = User.normalize(rawUsername)
         if let error = AccountValidation.usernameError(username) { throw APIError.validation(error) }
         let password = rawPassword.flatMap { $0.isEmpty ? nil : $0 }
+        if password != nil, !passwordLogin {
+            throw APIError.passwordLoginDisabled("Der Passwort-Login ist abgeschaltet – nur Einladungen.")
+        }
         if let password, let error = AccountValidation.passwordError(password) { throw APIError.validation(error) }
         var address: String?
         if let raw = rawEmail, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -89,6 +127,9 @@ struct UserAdminService {
     func resendInvite(id: UUID, inviter: User) async throws -> User {
         let user = try await target(id)
         guard !user.hasPassword else { throw APIError.validation(Self.hasPasswordMessage) }
+        if let oidc, user.isLinked(oidc) {
+            throw APIError.validation("Das Konto ist mit \(oidc.displayName) verknüpft – keine Einladung nötig.")
+        }
         guard let settings = try await mail.settings.state().settings else { throw APIError.mailNotConfigured(Self.inviteNeedsMailMessage) }
         guard let address = user.emailState(cipher).address else { throw APIError.validation(Self.noAddressMessage) }
         try await sendInvite(user: user, address: address, inviter: inviter, settings: settings)
@@ -99,11 +140,13 @@ struct UserAdminService {
         let token = try await PasswordTokenService(db: db).issue(userID: user.requireID(), purpose: .invite, now: now)
         try await mail.send(MailTexts.invite(to: address, username: user.username, inviter: inviter.username,
                                              link: settings.link(token: token),
-                                             expires: now.addingTimeInterval(PasswordTokenPurpose.invite.lifetime)), now: now)
+                                             expires: now.addingTimeInterval(PasswordTokenPurpose.invite.lifetime),
+                                             ssoName: oidc?.displayName, passwordLogin: passwordLogin), now: now)
     }
 
     /// Also ends an open invitation or reset link.
     func resetPassword(id: UUID, password: String, actingUserID: UUID) async throws {
+        guard passwordLogin else { throw APIError.passwordLoginDisabled() }
         guard id != actingUserID else { throw APIError.selfAction }
         let user = try await target(id)
         if let error = AccountValidation.passwordError(password) { throw APIError.validation(error) }
@@ -143,12 +186,14 @@ struct UserAdminService {
 
 extension Application {
     var userAdmin: UserAdminService {
-        UserAdminService(db: db, hasher: password.async, cipher: tokenCipher, mail: mail)
+        UserAdminService(db: db, hasher: password.async, cipher: tokenCipher, mail: mail, oidc: loginSettings.current.oidc,
+                         passwordLogin: loginSettings.current.passwordLogin)
     }
 }
 
 extension Request {
     var userAdmin: UserAdminService {
-        UserAdminService(db: db, hasher: password.async, cipher: application.tokenCipher, mail: mail)
+        UserAdminService(db: db, hasher: password.async, cipher: application.tokenCipher, mail: mail,
+                         oidc: application.loginSettings.current.oidc, passwordLogin: application.loginSettings.current.passwordLogin)
     }
 }

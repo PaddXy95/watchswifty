@@ -9,8 +9,11 @@ struct AccountService {
     let tmdbProvider: TMDBProvider
     let cipher: TokenCipher
     let worker: MatchingWorker
+    var oidc: OIDCConfig? = nil
+    var passwordLogin = true
 
     func changePassword(user: User, current: String, new: String) async throws {
+        guard passwordLogin else { throw APIError.passwordLoginDisabled() }
         guard user.hasPassword else { throw APIError.noPassword }
         guard try await hasher.verify(current, created: user.passwordHash) else {
             throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
@@ -23,6 +26,7 @@ struct AccountService {
     /// Sets (or with an empty value removes) the user's own address. Needs the current password, so a hijacked session
     /// cannot redirect „Passwort vergessen“ to another inbox; open reset links end.
     func setEmail(user: User, email raw: String, currentPassword: String) async throws {
+        if user.emailFromProvider(oidc), let oidc { throw APIError.emailFromProvider(name: oidc.displayName) }
         guard user.hasPassword else { throw APIError.noPassword }
         guard try await hasher.verify(currentPassword, created: user.passwordHash) else {
             throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
@@ -62,6 +66,7 @@ struct AccountService {
 extension Request {
     var account: AccountService {
         AccountService(db: db, hasher: password.async, tmdbProvider: application.tmdbProvider, cipher: application.tokenCipher,
-                       worker: application.matchingWorker)
+                       worker: application.matchingWorker, oidc: application.loginSettings.current.oidc,
+                       passwordLogin: application.loginSettings.current.passwordLogin)
     }
 }

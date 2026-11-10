@@ -136,6 +136,7 @@ summary { cursor: pointer; font-weight: 600; }
 .login h1 { text-align: center; }
 .login label input { max-width: none; }
 .login button { width: 100%; margin-top: var(--space-2); padding: var(--space-2); }
+.login a.sso { display: block; box-sizing: border-box; width: 100%; margin: var(--space-2) 0; padding: var(--space-2); text-align: center; text-decoration: none; }
 
 /* ---- Burger menu (CSS-only, phones) ---- */
 .nav-toggle { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }

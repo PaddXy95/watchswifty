@@ -12,6 +12,7 @@ struct AdminUsersController {
         admin.post(use: create)
         admin.post(":userID", "password", use: resetPassword)
         admin.post(":userID", "invite", use: resendInvite)
+        admin.post(":userID", "sso-link", use: createSSOLink)
         admin.post(":userID", "admin", use: setAdmin)
         admin.delete(":userID", use: delete)
     }
@@ -50,12 +51,29 @@ struct AdminUsersController {
         return try await page(req, status: .ok, notice: Self.sentNotice(user, req))
     }
 
+    func createSSOLink(req: Request) async throws -> HTMLResponse {
+        let result: SSOLinkResult
+        let id = try targetID(req)
+        do {
+            result = try await req.userAdmin.createSSOLink(id: id, inviter: try req.currentUser)
+        } catch let error as APIError where error.status != .notFound {
+            return try await page(req, status: error.status, error: error.message)
+        }
+        if result.mailed {
+            return try await page(req, status: .ok, notice: "Verknüpfungslink an \(result.emailHint ?? "") gesendet.")
+        }
+        let username = try await User.find(id, on: req.db)?.username ?? ""
+        return try await page(req, status: .ok, error: result.mailError.map { "Die Mail ging nicht raus: \($0)" },
+                              ssoLink: AdminSSOLink(username: username, url: result.url ?? ""))
+    }
+
     private static func sentNotice(_ user: User, _ req: Request) -> String {
         let hint = user.emailState(req.application.tokenCipher).address.map(EmailAddress.mask) ?? ""
         return "Einladung an \(hint) gesendet."
     }
 
     func resetPassword(req: Request) async throws -> Response {
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(PasswordInput.self)
         do {
             try await req.userAdmin.resetPassword(id: try targetID(req), password: input.password, actingUserID: try req.userID)
@@ -89,10 +107,16 @@ struct AdminUsersController {
         return id
     }
 
-    private func page(_ req: Request, status: HTTPStatus, error: String? = nil, notice: String? = nil) async throws -> HTMLResponse {
+    private func page(_ req: Request, status: HTTPStatus, error: String? = nil, notice: String? = nil,
+                      ssoLink: AdminSSOLink? = nil) async throws -> HTMLResponse {
         let users = try await req.userAdmin.list()
         let mailConfigured = try await req.mailSettings.state().settings != nil
+        let config = req.application.loginSettings.current
+        var readiness: OIDCReadiness?
+        if let oidc = config.oidc { readiness = try await OIDCLoginService.readiness(db: req.db, oidc: oidc) }
         return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users, mailConfigured: mailConfigured,
-                                                           currentUserID: try req.userID, error: error, notice: notice))
+                                                           currentUserID: try req.userID, error: error, notice: notice,
+                                                           ssoName: config.oidc?.displayName, ssoLink: ssoLink, readiness: readiness,
+                                                           passwordLogin: config.passwordLogin))
     }
 }

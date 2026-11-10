@@ -20,6 +20,7 @@ let package = Package(
         .package(url: "https://github.com/elementary-swift/elementary-htmx.git", exact: "0.7.0"),
         .package(url: "https://github.com/PaddXy95/SwiftySMTPClient.git", .upToNextMinor(from: "0.1.0")),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.5"),
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.8.0"),
     ],
     targets: [
         // Types and server protocol generated from openapi.yaml (the App API's single source).
@@ -45,6 +46,7 @@ let package = Package(
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "SwiftySMTPClient", package: "SwiftySMTPClient"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "JWTKit", package: "jwt-kit"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -56,6 +58,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Elementary", package: "elementary"),
                 .product(name: "SwiftySMTPClient", package: "SwiftySMTPClient"),
+                .product(name: "JWTKit", package: "jwt-kit"),
             ],
             resources: [.copy("Fixtures")],
             swiftSettings: swiftSettings

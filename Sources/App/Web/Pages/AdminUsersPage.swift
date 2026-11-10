@@ -9,21 +9,43 @@ struct AdminUsersPage: HTML {
     let currentUserID: UUID
     let error: String?
     let notice: String?
+    /// SSO display name when OIDC is configured.
+    var ssoName: String? = nil
+    /// A link just created for passing on (shown only in this response).
+    var ssoLink: AdminSSOLink? = nil
+    var readiness: OIDCReadiness? = nil
+    var passwordLogin = true
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
             h1 { "Benutzer" }
             Messages(error: error, notice: notice)
+            if let ssoName, let readiness {
+                p(.class("muted")) {
+                    "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
+                    if passwordLogin {
+                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."
+                    }
+                }
+            }
+            if let ssoLink {
+                p(.class("notice")) {
+                    "Verknüpfungslink für \(ssoLink.username) (7 Tage gültig, nur jetzt sichtbar – bitte weitergeben): "
+                    code { ssoLink.url }
+                }
+            }
             table {
                 thead { tr { th { "Benutzername" }; th { "Rolle" }; th { "E-Mail" }; th { "Angelegt" }; th { "Aktionen" } } }
                 tbody {
                     for row in users {
-                        UserRow(row: row, isSelf: row.user.id == currentUserID)
+                        UserRow(row: row, isSelf: row.user.id == currentUserID, ssoName: ssoName, passwordLogin: passwordLogin)
                     }
                 }
             }
             h2 { "Konto anlegen" }
-            if mailConfigured {
+            if !passwordLogin {
+                p(.class("muted")) { "Der Passwort-Login ist abgeschaltet: neue Konten nur per Einladung (Mail) – oder die Person meldet sich einfach über \(ssoName ?? "SSO") an." }
+            } else if mailConfigured {
                 p(.class("muted")) { "Mit E-Mail-Adresse und ohne Startpasswort bekommt die Person eine Einladung und legt ihr Passwort selbst fest." }
             } else {
                 p(.class("muted")) { "Einladungen per Mail gehen erst, wenn der Mail-Versand unter System eingerichtet ist." }
@@ -37,10 +59,12 @@ struct AdminUsersPage: HTML {
                     "E-Mail-Adresse (optional)"
                     input(.type(.email), .name("email"), .custom(name: "autocomplete", value: "off"))
                 }
+                if passwordLogin {
                 label {
                     mailConfigured ? "Startpasswort (mindestens 8 Zeichen; leer lassen für eine Einladung)" : "Startpasswort (mindestens 8 Zeichen)"
                     input(.type(.password), .name("password"), .custom(name: "autocomplete", value: "new-password"))
                         .attributes(.required, when: !mailConfigured)
+                }
                 }
                 label(.class("checkbox")) {
                     input(.type(.checkbox), .name("isAdmin"), .value("true"))
@@ -52,9 +76,17 @@ struct AdminUsersPage: HTML {
     }
 }
 
+/// A „Verknüpfungslink“ to show once on the users page.
+struct AdminSSOLink: Sendable {
+    let username: String
+    let url: String
+}
+
 struct UserRow: HTML {
     let row: AdminUserRow
     let isSelf: Bool
+    var ssoName: String? = nil
+    var passwordLogin = true
 
     private var user: User { row.user }
 
@@ -67,6 +99,7 @@ struct UserRow: HTML {
             td { user.username; if isSelf { " (du)" } }
             td {
                 if user.isAdmin { span(.class("badge")) { "Admin" } } else { "Benutzer" }
+                if let ssoName, row.ssoLinked { " "; span(.class("badge")) { ssoName } }
                 switch row.invite {
                 case .none: ""
                 case .pending(let expires): span(.class("muted")) { " · Einladung offen (bis \(CalendarDay.display(CalendarDay.today(now: expires))))" }
@@ -77,15 +110,22 @@ struct UserRow: HTML {
             td { created }
             td {
                 let id = user.id?.uuidString ?? ""
-                if !user.hasPassword {
+                if let ssoName, !row.ssoLinked, !isSelf {
+                    form(.method(.post), .action("/admin/users/\(id)/sso-link"), .class("inline-form")) {
+                        button(.type(.submit)) { "Verknüpfungslink (\(ssoName))" }
+                    }
+                }
+                if !user.hasPassword, !row.ssoLinked {
                     form(.method(.post), .action("/admin/users/\(id)/invite"), .class("inline-form")) {
                         button(.type(.submit)) { "Einladung erneut senden" }
                     }
                 }
+                if passwordLogin {
                 form(.method(.post), .action("/admin/users/\(id)/password"), .class("inline-form")) {
                     input(.type(.password), .name("password"), .required, .custom(name: "placeholder", value: "Neues Passwort"),
                           .custom(name: "autocomplete", value: "new-password"))
                     button(.type(.submit)) { "Passwort setzen" }
+                }
                 }
                 form(.method(.post), .action("/admin/users/\(id)/admin"), .class("inline-form")) {
                     input(.type(.hidden), .name("isAdmin"), .value(user.isAdmin ? "false" : "true"))

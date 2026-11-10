@@ -24,6 +24,12 @@ struct APIAuthorizeController {
 
     func show(req: Request) async throws -> Response {
         let params = try validated(try req.query.decode(Params.self))
+        let config = req.application.loginSettings.current
+        if let oidc = config.oidc, req.auth.get(User.self).map({ $0.isSSOAccount(oidc, passwordLogin: config.passwordLogin) }) ?? true,
+           let redirect = canonicalRedirect(req, oidc) {
+            return redirect
+        }
+        if let reauth = reauthRedirect(req, returnTo: req.url.string) { return reauth }
         guard req.auth.has(User.self) else {
             var components = URLComponents()
             components.path = "/login"
@@ -36,6 +42,7 @@ struct APIAuthorizeController {
     func decide(req: Request) async throws -> Response {
         let params = try validated(try req.content.decode(Params.self))
         guard let user = req.auth.get(User.self) else { return req.redirect(to: "/login", redirectType: .normal) }
+        if let reauth = reauthRedirect(req, returnTo: Self.showPath(params)) { return reauth }
         var components = URLComponents(string: Self.redirectURI)!
         if params.decision == "connect" {
             let code = await req.application.authCodes.issue(userID: try user.requireID(), challenge: params.code_challenge,
@@ -45,6 +52,29 @@ struct APIAuthorizeController {
             components.queryItems = [URLQueryItem(name: "error", value: "access_denied"), URLQueryItem(name: "state", value: params.state)]
         }
         return req.redirect(to: components.string ?? Self.redirectURI, redirectType: .normal)
+    }
+
+    /// Signed-in SSO accounts go through the provider first, so an account blocked there gets no new device token
+    /// (spec „App verbinden“). Nil when no detour is needed.
+    private func reauthRedirect(_ req: Request, returnTo: String) -> Response? {
+        let config = req.application.loginSettings.current
+        guard let user = req.auth.get(User.self), user.isSSOAccount(config.oidc, passwordLogin: config.passwordLogin),
+              !OIDCController.isFresh(verifiedAt: req.session.data[OIDCController.verifiedAtKey], now: .now) else { return nil }
+        req.session.data[OIDCController.intentKey] = OIDCIntent.reauth.rawValue
+        return req.redirect(to: "/auth/oidc/start?returnTo=" + formEncode(returnTo), redirectType: .normal)
+    }
+
+    /// The GET address of the consent page for these parameters.
+    static func showPath(_ params: Params) -> String {
+        var components = URLComponents()
+        components.path = "/api/auth/authorize"
+        components.queryItems = [
+            URLQueryItem(name: "redirect_uri", value: params.redirect_uri), URLQueryItem(name: "state", value: params.state),
+            URLQueryItem(name: "code_challenge", value: params.code_challenge),
+            URLQueryItem(name: "code_challenge_method", value: params.code_challenge_method),
+            URLQueryItem(name: "device_name", value: params.device_name),
+        ]
+        return components.string ?? "/api/auth/authorize"
     }
 
     /// Rejects anything but the app's own redirect and a proper PKCE challenge – never redirects on errors.

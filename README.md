@@ -107,6 +107,8 @@ Die laufende Version steht links im Footer und unter `http://<server>:8080/versi
 - Pull Request → Tests und ein Probe-Build des Images (nichts wird hochgeladen).
 - Push auf `main` → Tests und Image-Build laufen parallel; nur wenn die Tests grün sind: Image nach GHCR
   hochladen und ein GitHub-Release `vX.Y.Z` erstellen.
+- Push auf `beta` oder „Run workflow“ (GitHub → Actions → CI/CD) auf einem beliebigen Branch → wie bei `main`,
+  aber nur das Image `beta` wird hochgeladen; kein Release (siehe [Beta-Version testen](#beta-version-testen)).
 
 Die Abhängigkeiten werden im Docker-Build in einer eigenen Schicht übersetzt und im GitHub-Actions-Cache
 gehalten; solange sich `Package.swift`/`Package.resolved` nicht ändern, wird bei einem Push nur die App selbst
@@ -123,6 +125,8 @@ CHANGELOG ein Abschnitt `## [X.Y.Z]`, wird er als Release-Text verwendet, sonst 
 | `latest` | neuestes Release |
 | `0.1.3` | genau diese Version |
 | `0.1` | neueste 0.1.x-Version |
+| `beta` | neuester Beta-Stand (ungetestet, nur für eine Test-Instanz) |
+| `beta-abc1234` | Beta-Stand genau dieses Commits |
 
 Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.3`.
 
@@ -136,6 +140,58 @@ dafür öffentlich sein.
 Beim allerersten Release legt GitHub das Paket `watchswifty` als privat an; damit der Server es ohne Login
 laden kann, unter GitHub → Packages → watchswifty → Package settings die Sichtbarkeit auf „Public“ stellen
 (oder auf dem Server `docker login ghcr.io` mit einem Token ausführen).
+
+### Beta-Version testen
+
+Neue Funktionen lassen sich vor dem Release in einer zweiten Instanz ausprobieren. Ein Push auf den Branch `beta`
+baut nach grünen Tests `ghcr.io/paddxy95/watchswifty:beta` (dazu `beta-<commit>`); einen beliebigen Branch baut
+man über GitHub → Actions → CI/CD → „Run workflow“. Es entsteht kein Release, `latest` bleibt unverändert. Die
+Beta zeigt ihre Version als z. B. `0.3.1-beta (abc1234)` und meldet keine Updates.
+
+Die Beta bekommt einen eigenen Ordner mit dieser `docker-compose.yml` (plus `.env` wie oben). **Nicht** die
+normale `docker-compose.yml` mit `WATCHSWIFTY_VERSION=beta` kopieren: Container- und Volume-Name sind dort fest,
+die Beta würde sonst die echten Daten ändern – und Datenbank-Änderungen einer Beta lassen sich nicht zurücknehmen.
+
+```yaml
+services:
+  watchswifty-beta:
+    image: ghcr.io/paddxy95/watchswifty:beta
+    container_name: watchswifty-beta
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY fehlt in .env (openssl rand -base64 32)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TZ: ${TZ:-Europe/Berlin}
+      TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+    volumes:
+      - watchswifty-beta-data:/data
+
+volumes:
+  watchswifty-beta-data:
+    name: watchswifty-beta-data
+```
+
+Neuen Beta-Stand holen: `docker compose pull && docker compose up -d` im Beta-Ordner.
+
+**Mit einer Kopie der echten Daten testen:** In der Beta-`.env` denselben `TOKEN_KEY` eintragen wie in der
+normalen, sonst lassen sich TMDB-Tokens, E-Mail-Adressen und Mail-Einstellungen nicht entschlüsseln. Dann beide
+Container stoppen und das Volume kopieren:
+
+```bash
+docker run --rm -v watchswifty-data:/from:ro -v watchswifty-beta-data:/to ubuntu:noble cp -a /from/. /to/
+```
+
+Danach beide wieder starten. Die Kopie enthält auch die Mail-Einstellungen: Die Beta verschickt dann echte Mails
+an die Benutzer (z. B. „Anmeldung von neuem Gerät“). Wer das nicht will, löscht in der Beta unter **System** die
+E-Mail-Einstellungen.
+
+Browser trennen Cookies nicht nach Port: Laufen beide Instanzen unter demselben Hostnamen, meldet ein Login in der
+Beta dich in der normalen Instanz ab. Abhilfe: die Beta über einen anderen Namen aufrufen (eigene Subdomain oder
+die IP-Adresse statt des Hostnamens).
 
 ## Update
 
@@ -206,6 +262,87 @@ Schlüssel getrennt von den Daten aufbewahren. Geht er verloren oder ändert er 
 Tokens nicht mehr lesbar: jeder trägt seinen Token unter **Konto** neu ein, alle anderen Daten bleiben erhalten.
 Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
 
+## Anmeldung über OIDC (SSO, optional)
+
+Wer schon einen Identity-Provider betreibt (Authentik, Keycloak, Authelia, Pocket ID, Zitadel, Kanidm …), meldet
+sich darüber an – ein Button „Mit SSO anmelden“ auf der Anmeldeseite. Wer WatchSwifty nutzen darf, regelt der
+Provider (Freigabe der Application für Benutzer bzw. Gruppen). Es gibt genau einen Provider.
+
+**Beim Provider einrichten** (allgemein): einen OAuth2/OpenID-Client vom Typ *confidential* anlegen, Redirect-URI
+`https://<watchswifty>/auth/oidc/callback`, Scopes `openid profile email`, ID-Tokens **asymmetrisch** signieren
+(RS256, ES256, EdDSA …; HS256 wird abgelehnt).
+
+**In WatchSwifty:** als Admin unter **System → Anmeldung über OIDC (SSO)** Anzeigename (z. B. „Authentik“), Issuer,
+Client-ID, Client-Secret und die **Adresse von WatchSwifty** eintragen und speichern. Die Seite zeigt die
+Rücksprung-URL zum Kopieren (Adresse + `/auth/oidc/callback`), prüft die Verbindung gleich mit und hat einen Knopf
+„Verbindung testen“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`) und wirkt sofort, ohne Neustart; das
+Secret wird nie wieder angezeigt und muss neu eingegeben werden, wenn sich Issuer oder Client-ID ändern.
+Umgebungsvariablen braucht es dafür nicht.
+
+Alle Anmeldungen über den Provider laufen über die eingetragene Adresse. Hinter einem Reverse-Proxy muss dieser den
+**Host-Header samt Port** (oder `X-Forwarded-Host`/`X-Forwarded-Port`) weitergeben; sonst funktioniert es zwar auch,
+aber WatchSwifty schreibt bei jeder SSO-Anmeldung eine Warnung ins Log. WatchSwifty muss den Provider unter der
+Issuer-Adresse erreichen (öffentlich vertrauenswürdiges Zertifikat); die App startet aber auch, wenn er gerade nicht
+erreichbar ist.
+
+- **Authentik:** Provider „OAuth2/OpenID“, beim Provider einen **Signing Key** wählen (ohne Key signiert Authentik
+  mit HS256), Subject-Modus auf dem Standard lassen, Application anlegen und freigeben. Issuer ist die
+  „OpenID Configuration Issuer“-Adresse des Providers (mit `/application/o/<slug>/`).
+- **Keycloak:** Issuer `https://kc.example.de/realms/<realm>`, Client mit „Client authentication“ an.
+- **Pocket ID:** OIDC-Client anlegen (nicht „public“); Issuer ist die `APP_URL` von Pocket ID (z. B.
+  `https://id.example.de`). Die Callback-URL muss https sein (sonst `ALLOW_INSECURE_CALLBACK_URLS=true` in Pocket ID);
+  ist dort `INTERNAL_APP_URL` gesetzt, muss WatchSwifty diese interne Adresse erreichen (z. B. gleiches Docker-Netz).
+  Mit Gruppenbeschränkung zeigt Pocket ID Nicht-Mitgliedern eine eigene Fehlerseite.
+
+**Erster Login:** Meldet sich jemand zum ersten Mal über den Provider an, fragt WatchSwifty nach, ob ein neues Konto
+angelegt werden soll (Name vorbelegt) – wer schon ein Konto hat, verknüpft stattdessen (siehe Umstieg). Über SSO
+angelegte Konten haben kein Passwort; ihre E-Mail-Adresse kommt vom Provider.
+
+### Umstieg einer bestehenden Installation
+
+1. OIDC wie oben unter **System** einrichten, **Passwort-Login an lassen** (kein Neustart nötig).
+2. Jeder meldet sich wie gewohnt an und klickt unter **Konto** auf „Mit SSO verknüpfen“. Wer sein Passwort nicht
+   mehr weiß: „Passwort vergessen?“ oder ein **Verknüpfungslink** vom Admin (Benutzer-Seite, per Mail oder zum
+   Weitergeben, 7 Tage gültig). Offene Einladungen lassen sich direkt über SSO annehmen.
+3. Auf der Benutzer-Seite prüfen: „x von y Konten verknüpft · Admin verknüpft: ja“.
+4. Unter **System** „Passwort-Login abschalten“ (geht nur, wenn dein eigenes Konto verknüpft ist). Dann gibt es nur
+   noch den SSO-Button; „Passwort vergessen“, Startpasswörter und „Passwort setzen“ entfallen, neue Konten entstehen
+   per Einladung oder beim ersten SSO-Login. **Notschalter:** `PASSWORD_LOGIN=true` in der `.env` setzen und neu
+   starten – dann bleibt der Passwort-Login an, bis die Variable wieder entfernt ist.
+5. Verbundene Apps laufen weiter (Tokens bis 90 Tage); beim nächsten Verbinden – und für ein von Hand erstelltes
+   Token – geht es einmal über den Provider, ein dort gesperrter Benutzer bekommt kein neues Token. Eine bestehende
+   Web-Sitzung bleibt aber angemeldet, solange sie benutzt wird (jede Nutzung verlängert sie um 30 Tage); wer
+   jemanden sofort aussperren will, löscht das Konto unter **Benutzer**.
+
+Hinweis: Setzt ein Admin einem über SSO angelegten Konto später ein Passwort, behält es die vom Provider übernommene
+Adresse – „Passwort vergessen“ ginge dann an sie.
+
+### Notausgang und Provider-Wechsel
+
+Kommt jemand nicht mehr hinein (Benutzer beim Provider neu angelegt, Passwort-Login zu früh abgeschaltet), gibt es
+einen Verknüpfungslink direkt vom Server (1 Stunde gültig, löst die alte Verknüpfung):
+
+```bash
+docker exec -it watchswifty /app/docker-entrypoint.sh link-oidc <benutzername>
+```
+
+Ändert sich nur die Adresse des Providers (neue Domain, umbenannter Slug), schreibt dieser Befehl alle
+Verknüpfungen um – vorher unter **System** den neuen Issuer eintragen, `<neu>` muss genau der Issuer der neuen
+Discovery sein:
+
+```bash
+docker exec -it watchswifty /app/docker-entrypoint.sh oidc-move-issuer <alt> <neu>
+```
+
+Bei einem **echten Wechsel** des Providers ändern sich die Benutzer-IDs: dann mit eingeschaltetem Passwort-Login neu
+verknüpfen (wie beim Umstieg) oder Verknüpfungslinks verschicken. Eine zufällig gleiche ID beim neuen Provider öffnet
+kein altes Konto.
+
+**Zurück ohne OIDC:** Passwort-Login einschalten und unter **System** „Anmelde-Einstellungen löschen“. Konten mit Passwort melden sich normal an; über
+SSO angelegte Konten gelten wieder als Einladung – „Einladung erneut senden“ oder „Passwort setzen“ auf der
+Benutzer-Seite (bzw. `reset-password`). Schaltet man OIDC später mit demselben Issuer wieder ein, gelten die alten
+Verknüpfungen wieder.
+
 ## E-Mail (optional)
 
 Mit eingerichteter Mail lädt der Admin neue Personen per Mail ein (sie legen ihr Passwort selbst fest, der Link gilt
@@ -267,6 +404,7 @@ Ein erneuter Import desselben (oder eines neueren) Exports legt keine Duplikate 
 | `TOKEN_KEY` | empfohlen | Schlüssel für die gespeicherten TMDB-Tokens (Base64, 32 Byte) |
 | `TOKEN_KEY_FILE` | nein | Datei mit dem Schlüssel statt `TOKEN_KEY` (z. B. Docker-Secret) |
 | `PUBLIC_ORIGIN` | nein | Öffentliche Adresse(n) hinter einem Reverse-Proxy, kommagetrennt, z. B. `https://nas.lan:8443` |
+| `PASSWORD_LOGIN` | nein | Nur `true`: Notschalter, erzwingt den Passwort-Login (SSO wird unter **System** eingerichtet, siehe [Anmeldung über OIDC](#anmeldung-über-oidc-sso-optional)) |
 | `DATABASE_PATH` | nein | Standard `/data/watchswifty.sqlite` |
 | `HOST` / `PORT` | nein | Standard `0.0.0.0` / `8080` |
 

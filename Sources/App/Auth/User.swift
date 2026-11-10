@@ -13,6 +13,9 @@ final class User: Model, @unchecked Sendable {
     @OptionalField(key: "tmdb_token") var tmdbToken: String?
     /// The user's own e-mail address, sealed with the server key (admins only ever see a mask).
     @OptionalField(key: "email") var email: String?
+    /// OpenID Connect identity: the provider's issuer (as its discovery states it) and the subject.
+    @OptionalField(key: "oidc_issuer") var oidcIssuer: String?
+    @OptionalField(key: "oidc_subject") var oidcSubject: String?
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     init() {}
@@ -36,6 +39,25 @@ final class User: Model, @unchecked Sendable {
 }
 
 extension User: ModelSessionAuthenticatable {}
+
+extension User {
+    /// Linked with the configured provider; a link to another (old) issuer does not count, nor does any link while
+    /// OIDC is not configured.
+    func isLinked(_ oidc: OIDCConfig?) -> Bool {
+        guard let oidc, let subject = oidcSubject, !subject.isEmpty else { return false }
+        return oidc.matchesIssuer(oidcIssuer)
+    }
+
+    /// Linked and without a usable password login: such accounts go through the provider when connecting an app.
+    func isSSOAccount(_ oidc: OIDCConfig?, passwordLogin: Bool) -> Bool {
+        isLinked(oidc) && !(hasPassword && passwordLogin)
+    }
+
+    /// Linked accounts without password take their address from the provider (they never get reset mails).
+    func emailFromProvider(_ oidc: OIDCConfig?) -> Bool {
+        isLinked(oidc) && !hasPassword
+    }
+}
 
 enum EmailState: Equatable, Sendable {
     case none

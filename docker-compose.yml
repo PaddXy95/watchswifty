@@ -17,6 +17,8 @@ services:
       TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
       # Nur hinter einem Reverse-Proxy nötig, z. B. https://watch.example.lan
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      # SSO wird unter System eingerichtet. Notschalter (erzwingt den Passwort-Login): PASSWORD_LOGIN=true in der .env
+      # PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
     volumes:
       - watchswifty-data:/data
       # Optional – Mail über SwiftyRelay (README, „E-Mail (optional)“): CA des Relays read-only einbinden.

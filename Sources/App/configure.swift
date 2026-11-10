@@ -3,7 +3,8 @@ import FluentSQLiteDriver
 import Vapor
 
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
-               releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil) async throws {
+               releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil,
+               oidcProvider: (any OIDCProvider)? = nil) async throws {
     app.appConfig = config
     app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
                                                                databasePath: config.databasePath, logger: app.logger))
@@ -13,6 +14,14 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.authCodes = AuthCodeStore()
     app.mailSender = mailSender ?? LiveMailSender()
     app.backgroundTasks = BackgroundTasks()
+    app.oidcIdentityLock = AsyncMutex()
+    app.oidcUsedStates = OIDCUsedStates()
+    app.loginSettings = LoginSettingsStore()
+    let httpClient = app.client
+    let logger = app.logger
+    app.oidcProviders = OIDCProviderStore { oidc in
+        oidcProvider ?? LiveOIDCProvider(config: oidc, transport: VaporOIDCTransport(client: httpClient), logger: logger)
+    }
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
     app.middleware = Middlewares()
@@ -37,6 +46,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     }
 
     app.asyncCommands.use(ResetPasswordCommand(), as: "reset-password")
+    app.asyncCommands.use(LinkOIDCCommand(), as: "link-oidc")
+    app.asyncCommands.use(MoveOIDCIssuerCommand(), as: "oidc-move-issuer")
 
     app.migrations.add(CreateUser())
     app.migrations.add(SessionRecord.migration)
@@ -61,13 +72,26 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddMailConfig())
     app.migrations.add(CreatePasswordToken())
     app.migrations.add(AddUserEmail())
+    app.migrations.add(AddUserOIDC())
+    app.migrations.add(CreateOIDCLinkToken())
+    app.migrations.add(AddOIDCConfig())
 
     try routes(app)
     try await app.autoMigrate()
     let encrypted = try await encryptStoredTokens(db: app.db, cipher: app.tokenCipher)
     if encrypted > 0 { app.logger.notice("\(encrypted) TMDB-Token verschlüsselt gespeichert") }
     try await app.updates.loadStatus()
-    try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
+    if let seed = config.oidc {   // tests only: OIDC is configured under System, never from the environment
+        try await app.oidcSettings.write(OIDCSettings(displayName: seed.displayName, issuer: seed.issuer, clientID: seed.clientID,
+                                                      clientSecret: seed.clientSecret, baseURL: seed.canonicalOrigin,
+                                                      passwordLogin: config.passwordLogin))
+    }
+    await app.loginSettings.reload(db: app.db, cipher: app.tokenCipher, forced: config.passwordLoginForced, logger: app.logger)
+    for hint in config.environmentHints { app.logger.notice("\(hint)") }
+    if config.passwordLoginForced {
+        app.logger.notice("PASSWORD_LOGIN=true: Passwort-Login ist erzwungen (Notschalter).")
+    }
+    try await bootstrapAdmin(config: config, login: app.loginSettings.current, db: app.db, logger: app.logger, hasher: app.password)
 
     app.importLock = AsyncMutex()
     let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)

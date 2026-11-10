@@ -12,7 +12,7 @@ struct AuthTests {
             #expect(users.count == 1)
             #expect(users.first?.isAdmin == true)
             #expect(users.first?.username == "admin")
-            try await bootstrapAdmin(config: .testing, db: app.db, logger: app.logger, hasher: app.password)
+            try await bootstrapAdmin(config: .testing, login: .passwordsOnly, db: app.db, logger: app.logger, hasher: app.password)
             #expect(try await User.query(on: app.db).count() == 1)
         }
     }
