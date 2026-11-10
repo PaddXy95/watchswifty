@@ -15,3 +15,10 @@ func base64URL(_ data: Data) -> String {
 func isSafeReturnTo(_ path: String) -> Bool {
     path.hasPrefix("/api/auth/authorize?") && !path.contains("\n") && !path.contains("\r")
 }
+
+/// Decodes Base64URL without padding (JWT segments, tokens); nil for invalid input.
+func base64URLDecoded(_ text: some StringProtocol) -> Data? {
+    var value = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+    while value.count % 4 != 0 { value += "=" }
+    return Data(base64Encoded: value)
+}
