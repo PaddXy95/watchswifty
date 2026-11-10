@@ -21,7 +21,7 @@ struct AccountController {
     /// „Mit … verknüpfen“: remembers the intent in the (signed-in) session and starts the provider flow on the
     /// canonical address.
     func startLink(req: Request) async throws -> Response {
-        guard let oidc = req.application.appConfig.oidc else { throw Abort(.notFound) }
+        guard let oidc = req.application.loginSettings.current.oidc else { throw Abort(.notFound) }
         guard isCanonical(req, oidc) else {
             return req.redirect(to: oidc.canonicalOrigin + "/account?sso=host", redirectType: .normal)
         }
@@ -48,12 +48,12 @@ struct AccountController {
     func show(req: Request) async throws -> HTMLResponse {
         // After accepting an invitation (see PasswordResetController).
         let welcome = (try? req.query.get(String.self, at: "welcome")) == "1"
-        let name = req.application.appConfig.oidc?.displayName ?? "SSO"
+        let name = req.application.loginSettings.current.oidc?.displayName ?? "SSO"
         switch try? req.query.get(String.self, at: "sso") {
         case "linked": return try await page(req, notice: "Mit \(name) verknüpft.")
         case "taken": return try await page(req, error: "Dieses \(name)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
         case "host":
-            let address = req.application.appConfig.oidc?.canonicalOrigin ?? ""
+            let address = req.application.loginSettings.current.oidc?.canonicalOrigin ?? ""
             return try await page(req, notice: "Verknüpfen geht nur über \(address) – dort erneut anmelden und klicken.")
         default: break
         }
@@ -61,7 +61,7 @@ struct AccountController {
     }
 
     func changePassword(req: Request) async throws -> HTMLResponse {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(ChangeInput.self)
         do {
             try await req.account.changePassword(user: try req.currentUser, current: input.currentPassword, new: input.newPassword)
@@ -107,7 +107,7 @@ struct AccountController {
         let devices = try await APITokenService(db: req.db).list(userID: try req.userID)
         let mailConfigured = try await req.mailSettings.state().settings != nil
         let user = try req.currentUser
-        let config = req.application.appConfig
+        let config = req.application.loginSettings.current
         let sso = config.oidc.map { AccountSSO(name: $0.displayName, linked: user.isLinked($0), emailFromProvider: user.emailFromProvider($0)) }
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,

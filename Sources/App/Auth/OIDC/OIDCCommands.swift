@@ -13,7 +13,7 @@ struct LinkOIDCCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
-        guard let oidc = app.appConfig.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
+        guard let oidc = app.loginSettings.current.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
         let username = User.normalize(signature.username)
         guard let user = try await User.query(on: app.db).filter(\.$username == username).first() else {
             throw CommandFailure("Benutzer „\(username)“ gibt es nicht.")
@@ -40,8 +40,9 @@ struct MoveOIDCIssuerCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
-        guard let oidc = app.appConfig.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
-        if let provider = app.oidcProvider {
+        guard let oidc = app.loginSettings.current.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
+        do {
+            let provider = app.oidcProviders.provider(for: oidc)
             if let discovered = try? await provider.discoveredIssuer() {
                 if discovered != signature.to {
                     context.console.print("Achtung: Die Discovery nennt den Issuer \(discovered) – nicht \(signature.to). Anmeldungen klappen nur, wenn beides genau übereinstimmt.")
@@ -50,7 +51,7 @@ struct MoveOIDCIssuerCommand: AsyncCommand {
                 context.console.print("Hinweis: Discovery nicht erreichbar – der neue Issuer wurde nicht geprüft.")
             }
         }
-        let service = OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: oidc, passwordLogin: app.appConfig.passwordLogin,
+        let service = OIDCLoginService(db: app.db, cipher: app.tokenCipher, oidc: oidc, passwordLogin: app.loginSettings.current.passwordLogin,
                                        lock: app.oidcIdentityLock)
         let moved: Int
         do {

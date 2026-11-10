@@ -17,7 +17,9 @@ struct OriginCheckMiddleware: AsyncMiddleware {
             return try await next.respond(to: request)
         }
         if let origin = request.headers.first(name: .origin) {
-            guard allowedOrigins.contains(Self.normalizeOrigin(origin)) || Self.requestMatches(origin: origin, request) else {
+            let normalized = Self.normalizeOrigin(origin)
+            let ssoOrigin = request.application.loginSettings.current.oidc?.canonicalOrigin
+            guard allowedOrigins.contains(normalized) || normalized == ssoOrigin || Self.requestMatches(origin: origin, request) else {
                 throw Abort(.forbidden, reason: "Anfrage abgelehnt: Herkunft passt nicht zur Adresse.")
             }
         } else if !request.isHTMX {

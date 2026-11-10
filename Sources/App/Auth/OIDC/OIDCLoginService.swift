@@ -130,9 +130,9 @@ extension Request {
     /// Only valid while OIDC is configured.
     var oidcLogin: OIDCLoginService {
         get throws {
-            guard let oidc = application.appConfig.oidc else { throw Abort(.notFound) }
+            guard let oidc = application.loginSettings.current.oidc else { throw Abort(.notFound) }
             return OIDCLoginService(db: db, cipher: application.tokenCipher, oidc: oidc,
-                                    passwordLogin: application.appConfig.passwordLogin, lock: application.oidcIdentityLock)
+                                    passwordLogin: application.loginSettings.current.passwordLogin, lock: application.oidcIdentityLock)
         }
     }
 }

@@ -33,10 +33,12 @@ struct AppConfig: Sendable {
     var appVersion: AppVersion = .current
     /// Longest wait for one mail sent while the request waits (invitation, test mail).
     var mailDeadline: Duration = .seconds(30)
-    /// The OpenID Connect provider, if configured (`OIDC_*`).
+    /// Test seed only (never read from the environment): written as the OIDC settings at startup.
     var oidc: OIDCConfig? = nil
-    /// `PASSWORD_LOGIN=false` switches the password login off (only with OIDC).
+    /// Test seed only: the password-login switch stored with `oidc`.
     var passwordLogin: Bool = true
+    /// `PASSWORD_LOGIN=true`: emergency switch that keeps the password login on (settings live under System).
+    var passwordLoginForced: Bool = false
 
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
         func value(_ key: String) -> String? {
@@ -58,11 +60,7 @@ struct AppConfig: Sendable {
             tokenKey: value("TOKEN_KEY"),
             tokenKeyFile: value("TOKEN_KEY_FILE")
         )
-        config.oidc = try OIDCConfig.fromEnvironment(env, publicOrigins: publicOrigins)
-        config.passwordLogin = value("PASSWORD_LOGIN")?.lowercased() != "false"
-        if !config.passwordLogin, config.oidc == nil {
-            throw ConfigError.invalid("PASSWORD_LOGIN=false geht nur mit vollständiger OIDC-Konfiguration (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET).")
-        }
+        config.passwordLoginForced = value("PASSWORD_LOGIN")?.lowercased() == "true"
         return config
     }
 

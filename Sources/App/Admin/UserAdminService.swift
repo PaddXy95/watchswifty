@@ -186,14 +186,14 @@ struct UserAdminService {
 
 extension Application {
     var userAdmin: UserAdminService {
-        UserAdminService(db: db, hasher: password.async, cipher: tokenCipher, mail: mail, oidc: appConfig.oidc,
-                         passwordLogin: appConfig.passwordLogin)
+        UserAdminService(db: db, hasher: password.async, cipher: tokenCipher, mail: mail, oidc: loginSettings.current.oidc,
+                         passwordLogin: loginSettings.current.passwordLogin)
     }
 }
 
 extension Request {
     var userAdmin: UserAdminService {
         UserAdminService(db: db, hasher: password.async, cipher: application.tokenCipher, mail: mail,
-                         oidc: application.appConfig.oidc, passwordLogin: application.appConfig.passwordLogin)
+                         oidc: application.loginSettings.current.oidc, passwordLogin: application.loginSettings.current.passwordLogin)
     }
 }

@@ -78,17 +78,18 @@ struct OIDCAdminTests {
     }
 
     @Test func startupWarningTexts() throws {
-        var config = AppConfig.testingOIDC
-        #expect(startupWarnings(config: config, readiness: OIDCReadiness(linked: 0, total: 0, adminLinked: false))
+        let oidc = try #require(AppConfig.testingOIDC.oidc)
+        var login = LoginSettings(oidc: oidc, passwordLogin: true, passwordLoginForced: false)
+        #expect(startupWarnings(login: login, readiness: OIDCReadiness(linked: 0, total: 0, adminLinked: false))
             == ["Kein Benutzer vorhanden – der erste Login über SSO wird Admin."])
-        config.passwordLogin = false
-        #expect(startupWarnings(config: config, readiness: OIDCReadiness(linked: 1, total: 3, adminLinked: false)) == [
+        login.passwordLogin = false
+        #expect(startupWarnings(login: login, readiness: OIDCReadiness(linked: 1, total: 3, adminLinked: false)) == [
             "Kein Admin ist mit SSO verknüpft – mit `link-oidc <admin>` einen Verknüpfungslink erzeugen.",
             "2 Konten sind noch nicht mit SSO verknüpft (Verknüpfungslink auf der Benutzer-Seite).",
         ])
-        #expect(startupWarnings(config: config, readiness: OIDCReadiness(linked: 3, total: 3, adminLinked: true)).isEmpty)
-        config.passwordLogin = true
-        #expect(startupWarnings(config: config, readiness: OIDCReadiness(linked: 1, total: 3, adminLinked: false)).isEmpty)
+        #expect(startupWarnings(login: login, readiness: OIDCReadiness(linked: 3, total: 3, adminLinked: true)).isEmpty)
+        login.passwordLogin = true
+        #expect(startupWarnings(login: login, readiness: OIDCReadiness(linked: 1, total: 3, adminLinked: false)).isEmpty)
     }
 
     @Test func adminEnvIgnoredWithoutPasswordLogin() async throws {

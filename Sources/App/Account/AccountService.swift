@@ -66,7 +66,7 @@ struct AccountService {
 extension Request {
     var account: AccountService {
         AccountService(db: db, hasher: password.async, tmdbProvider: application.tmdbProvider, cipher: application.tokenCipher,
-                       worker: application.matchingWorker, oidc: application.appConfig.oidc,
-                       passwordLogin: application.appConfig.passwordLogin)
+                       worker: application.matchingWorker, oidc: application.loginSettings.current.oidc,
+                       passwordLogin: application.loginSettings.current.passwordLogin)
     }
 }

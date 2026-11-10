@@ -26,7 +26,7 @@ struct AuthController {
     /// The login page (password form and/or the OIDC button).
     static func loginResponse(_ req: Request, status: HTTPStatus, error: String?, username: String = "",
                               returnTo: String?) async throws -> Response {
-        let config = req.application.appConfig
+        let config = req.application.loginSettings.current
         let page = LoginPage(error: error, username: username, returnTo: returnTo,
                              forgotPasswordLink: try await req.mailSettings.state().settings != nil,
                              ssoName: config.oidc?.displayName, passwordLogin: config.passwordLogin)
@@ -34,7 +34,7 @@ struct AuthController {
     }
 
     func login(req: Request) async throws -> Response {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(LoginInput.self)
         let returnTo = input.returnTo.flatMap { isSafeReturnTo($0) ? $0 : nil }
         let username = User.normalize(input.username)

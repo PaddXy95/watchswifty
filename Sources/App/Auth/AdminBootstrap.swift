@@ -3,21 +3,21 @@ import Vapor
 
 /// Creates the first admin from ADMIN_USERNAME / ADMIN_PASSWORD while no user exists (not without password login);
 /// logs where the switch-over to OIDC stands.
-func bootstrapAdmin(config: AppConfig, db: any Database, logger: Logger, hasher: any PasswordHasher) async throws {
-    if let oidc = config.oidc {
+func bootstrapAdmin(config: AppConfig, login: LoginSettings, db: any Database, logger: Logger, hasher: any PasswordHasher) async throws {
+    if let oidc = login.oidc {
         let readiness = try await OIDCLoginService.readiness(db: db, oidc: oidc)
-        if !config.passwordLogin, config.adminPassword != nil, readiness.total == 0 {
+        if !login.passwordLogin, config.adminPassword != nil, readiness.total == 0 {
             logger.notice("ADMIN_USERNAME/ADMIN_PASSWORD werden ignoriert, weil PASSWORD_LOGIN=false gesetzt ist.")
         }
-        let creates = config.passwordLogin && readiness.total == 0 && config.adminUsername != nil && config.adminPassword != nil
+        let creates = login.passwordLogin && readiness.total == 0 && config.adminUsername != nil && config.adminPassword != nil
         if !creates {
-            for warning in startupWarnings(config: config, readiness: readiness) { logger.warning("\(warning)") }
+            for warning in startupWarnings(login: login, readiness: readiness) { logger.warning("\(warning)") }
         }
-        guard config.passwordLogin else { return }
+        guard login.passwordLogin else { return }
     }
     guard try await User.query(on: db).count() == 0 else { return }
     guard let username = config.adminUsername, let password = config.adminPassword else {
-        if config.oidc == nil { logger.warning("Kein Benutzer vorhanden – ADMIN_USERNAME und ADMIN_PASSWORD setzen.") }
+        if login.oidc == nil { logger.warning("Kein Benutzer vorhanden – ADMIN_USERNAME und ADMIN_PASSWORD setzen.") }
         return
     }
     guard password.count >= 8 else {
@@ -30,10 +30,10 @@ func bootstrapAdmin(config: AppConfig, db: any Database, logger: Logger, hasher:
 }
 
 /// Startup hints while OIDC is configured (spec „Passwort-Login abgeschaltet“).
-func startupWarnings(config: AppConfig, readiness: OIDCReadiness) -> [String] {
-    guard let oidc = config.oidc else { return [] }
+func startupWarnings(login: LoginSettings, readiness: OIDCReadiness) -> [String] {
+    guard let oidc = login.oidc else { return [] }
     if readiness.total == 0 { return ["Kein Benutzer vorhanden – der erste Login über \(oidc.displayName) wird Admin."] }
-    guard !config.passwordLogin else { return [] }
+    guard !login.passwordLogin else { return [] }
     var warnings: [String] = []
     if !readiness.adminLinked {
         warnings.append("Kein Admin ist mit \(oidc.displayName) verknüpft – mit `link-oidc <admin>` einen Verknüpfungslink erzeugen.")

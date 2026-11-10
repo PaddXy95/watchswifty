@@ -1,6 +1,6 @@
 import Foundation
 
-/// The one OpenID Connect provider (spec `2026-11-07-oidc-login-design.md`, „Konfiguration“).
+/// The one OpenID Connect provider in effect, built from `OIDCSettings` (spec „Einstellungen“).
 struct OIDCConfig: Sendable, Equatable {
     var issuer: String
     var clientID: String
@@ -29,45 +29,5 @@ struct OIDCConfig: Sendable, Equatable {
         var value = issuer
         while value.hasSuffix("/") { value.removeLast() }
         return value
-    }
-
-    /// `nil` when no OIDC variable is set. Throws `ConfigError` for a partial setup, a missing redirect address or an
-    /// unreadable secret file.
-    static func fromEnvironment(_ env: [String: String], publicOrigins: [String]) throws -> OIDCConfig? {
-        func value(_ key: String) -> String? {
-            guard let raw = env[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
-            return raw
-        }
-        let issuer = value("OIDC_ISSUER")
-        let clientID = value("OIDC_CLIENT_ID")
-        let secretFile = value("OIDC_CLIENT_SECRET_FILE")
-        var secret = value("OIDC_CLIENT_SECRET")
-        if secret == nil, let secretFile {
-            guard let data = FileManager.default.contents(atPath: secretFile),
-                  let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !text.isEmpty else {
-                throw ConfigError.invalid("OIDC_CLIENT_SECRET_FILE ist nicht lesbar oder leer: \(secretFile)")
-            }
-            secret = text
-        }
-        if issuer == nil, clientID == nil, secret == nil, secretFile == nil { return nil }
-        guard let issuer, let clientID, let secret else {
-            throw ConfigError.invalid(
-                "OIDC unvollständig: OIDC_ISSUER, OIDC_CLIENT_ID und OIDC_CLIENT_SECRET (oder _FILE) gehören zusammen.")
-        }
-        let redirect: String
-        if let explicit = value("OIDC_REDIRECT_URL") {
-            redirect = explicit
-        } else if let origin = publicOrigins.first {
-            redirect = origin + "/auth/oidc/callback"
-        } else {
-            throw ConfigError.invalid("OIDC braucht OIDC_REDIRECT_URL oder PUBLIC_ORIGIN.")
-        }
-        guard let url = URL(string: redirect), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              url.host != nil else {
-            throw ConfigError.invalid("OIDC_REDIRECT_URL ist keine gültige http(s)-Adresse: \(redirect)")
-        }
-        return OIDCConfig(issuer: issuer, clientID: clientID, clientSecret: secret, redirectURL: url,
-                          displayName: value("OIDC_NAME") ?? "SSO")
     }
 }

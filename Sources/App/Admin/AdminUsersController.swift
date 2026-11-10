@@ -73,7 +73,7 @@ struct AdminUsersController {
     }
 
     func resetPassword(req: Request) async throws -> Response {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(PasswordInput.self)
         do {
             try await req.userAdmin.resetPassword(id: try targetID(req), password: input.password, actingUserID: try req.userID)
@@ -111,7 +111,7 @@ struct AdminUsersController {
                       ssoLink: AdminSSOLink? = nil) async throws -> HTMLResponse {
         let users = try await req.userAdmin.list()
         let mailConfigured = try await req.mailSettings.state().settings != nil
-        let config = req.application.appConfig
+        let config = req.application.loginSettings.current
         var readiness: OIDCReadiness?
         if let oidc = config.oidc { readiness = try await OIDCLoginService.readiness(db: req.db, oidc: oidc) }
         return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users, mailConfigured: mailConfigured,

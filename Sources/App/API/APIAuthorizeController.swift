@@ -24,7 +24,7 @@ struct APIAuthorizeController {
 
     func show(req: Request) async throws -> Response {
         let params = try validated(try req.query.decode(Params.self))
-        let config = req.application.appConfig
+        let config = req.application.loginSettings.current
         if let oidc = config.oidc, !isCanonical(req, oidc),
            req.auth.get(User.self).map({ $0.isSSOAccount(oidc, passwordLogin: config.passwordLogin) }) ?? true {
             return req.redirect(to: oidc.canonicalOrigin + req.url.string, redirectType: .normal)
@@ -57,7 +57,7 @@ struct APIAuthorizeController {
     /// Signed-in SSO accounts go through the provider first, so an account blocked there gets no new device token
     /// (spec „App verbinden“). Nil when no detour is needed.
     private func reauthRedirect(_ req: Request, returnTo: String) -> Response? {
-        let config = req.application.appConfig
+        let config = req.application.loginSettings.current
         guard let user = req.auth.get(User.self), user.isSSOAccount(config.oidc, passwordLogin: config.passwordLogin),
               !OIDCController.isFresh(verifiedAt: req.session.data[OIDCController.verifiedAtKey], now: .now) else { return nil }
         req.session.data[OIDCController.intentKey] = OIDCIntent.reauth.rawValue

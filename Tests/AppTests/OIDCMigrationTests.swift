@@ -219,7 +219,7 @@ struct OIDCMigrationTests {
             user.oidcIssuer = OIDCTestKeys.issuer
             user.oidcSubject = "sub-1"
             try await user.save(on: app.db)
-            #expect(!user.isLinked(app.appConfig.oidc))
+            #expect(!user.isLinked(app.loginSettings.current.oidc))
             #expect(try await app.userAdmin.row(for: user).invite == .expired)
         }
         try await withTestApp(config: .testingOIDC, oidc: fake) { app in

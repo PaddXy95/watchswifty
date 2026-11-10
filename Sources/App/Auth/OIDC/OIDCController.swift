@@ -2,10 +2,9 @@ import Fluent
 import Foundation
 import Vapor
 
-/// `/auth/oidc/*`: start, callback and the confirmation of new accounts (spec „Ablauf“). Registered only with OIDC.
+/// `/auth/oidc/*`: start, callback and the confirmation of new accounts (spec „Ablauf“). 404 while OIDC is not set up.
 struct OIDCController {
     func register(on app: Application) {
-        guard app.appConfig.oidc != nil else { return }
         let sessioned = app.grouped(User.sessionAuthenticator()).grouped("auth", "oidc")
         sessioned.get("start", use: start)
         sessioned.get("callback", use: callback)
@@ -181,7 +180,7 @@ struct OIDCController {
             taken = username
             username = ""
         }
-        return try await HTMLResponse(NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.appConfig.passwordLogin,
+        return try await HTMLResponse(NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.loginSettings.current.passwordLogin,
                                                      username: username, takenSuggestion: taken)).encodeResponse(for: req)
     }
 
@@ -194,7 +193,7 @@ struct OIDCController {
             user = try await req.oidcLogin.createAccount(identity, username: input.username)
         } catch let error as APIError {
             return try await HTMLResponse(status: error.status,
-                                          NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.appConfig.passwordLogin,
+                                          NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.loginSettings.current.passwordLogin,
                                                          username: input.username, error: error.message)).encodeResponse(for: req)
         }
         return signIn(req, user, redirect: flow.returnTo ?? "/account?welcome=1")
@@ -217,8 +216,8 @@ struct OIDCController {
     }
 
     private func configured(_ req: Request) throws -> (OIDCConfig, any OIDCProvider) {
-        guard let oidc = req.application.appConfig.oidc, let provider = req.application.oidcProvider else { throw Abort(.notFound) }
-        return (oidc, provider)
+        guard let oidc = req.application.loginSettings.current.oidc else { throw Abort(.notFound) }
+        return (oidc, req.application.oidcProviders.provider(for: oidc))
     }
 
     /// Signs in like the password login and ends the flow cookie.
@@ -232,7 +231,7 @@ struct OIDCController {
 
     private func failure(_ req: Request, _ error: OIDCError, returnTo: String?) async throws -> Response {
         req.logger.warning("OIDC-Anmeldung fehlgeschlagen: \(error.logDescription)")
-        let name = req.application.appConfig.oidc?.displayName ?? "SSO"
+        let name = req.application.loginSettings.current.oidc?.displayName ?? "SSO"
         return try await page(req, status: Self.status(for: error), error: error.message(name: name), returnTo: returnTo)
     }
 

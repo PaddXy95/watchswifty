@@ -16,9 +16,11 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.backgroundTasks = BackgroundTasks()
     app.oidcIdentityLock = AsyncMutex()
     app.oidcUsedStates = OIDCUsedStates()
-    if let oidc = config.oidc {
-        app.oidcProvider = oidcProvider ?? LiveOIDCProvider(config: oidc, transport: VaporOIDCTransport(client: app.client),
-                                                            logger: app.logger)
+    app.loginSettings = LoginSettingsStore()
+    let httpClient = app.client
+    let logger = app.logger
+    app.oidcProviders = OIDCProviderStore { oidc in
+        oidcProvider ?? LiveOIDCProvider(config: oidc, transport: VaporOIDCTransport(client: httpClient), logger: logger)
     }
     app.passwords.use(.bcrypt(cost: config.bcryptCost))
     app.dummyPasswordHash = try app.password.hash([UInt8].random(count: 16).base64)
@@ -26,7 +28,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.middleware.use(FrameDenyMiddleware())
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins + [config.oidc?.canonicalOrigin].compactMap { $0 }))
+    app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
     app.sessions.use(.fluent)
     app.sessions.configuration = .init(cookieName: "watchswifty_session") { sessionID in
         .init(string: sessionID.string, expires: Date(timeIntervalSinceNow: 2_592_000), maxAge: 2_592_000,
@@ -72,13 +74,23 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddUserEmail())
     app.migrations.add(AddUserOIDC())
     app.migrations.add(CreateOIDCLinkToken())
+    app.migrations.add(AddOIDCConfig())
 
     try routes(app)
     try await app.autoMigrate()
     let encrypted = try await encryptStoredTokens(db: app.db, cipher: app.tokenCipher)
     if encrypted > 0 { app.logger.notice("\(encrypted) TMDB-Token verschlüsselt gespeichert") }
     try await app.updates.loadStatus()
-    try await bootstrapAdmin(config: config, db: app.db, logger: app.logger, hasher: app.password)
+    if let seed = config.oidc {   // tests only: OIDC is configured under System, never from the environment
+        try await app.oidcSettings.write(OIDCSettings(displayName: seed.displayName, issuer: seed.issuer, clientID: seed.clientID,
+                                                      clientSecret: seed.clientSecret, baseURL: seed.canonicalOrigin,
+                                                      passwordLogin: config.passwordLogin))
+    }
+    await app.loginSettings.reload(db: app.db, cipher: app.tokenCipher, forced: config.passwordLoginForced, logger: app.logger)
+    if config.passwordLoginForced {
+        app.logger.notice("PASSWORD_LOGIN=true: Passwort-Login ist erzwungen (Notschalter).")
+    }
+    try await bootstrapAdmin(config: config, login: app.loginSettings.current, db: app.db, logger: app.logger, hasher: app.password)
 
     app.importLock = AsyncMutex()
     let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)

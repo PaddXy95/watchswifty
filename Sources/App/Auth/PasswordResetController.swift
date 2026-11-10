@@ -26,13 +26,13 @@ struct PasswordResetController {
     }
 
     func forgotPage(req: Request) async throws -> HTMLResponse {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         return HTMLResponse(ForgotPasswordPage(mailEnabled: try await req.mailSettings.state().settings != nil))
     }
 
     /// Answers at once and identically for every username; the mail goes out in the background.
     func forgot(req: Request) async throws -> HTMLResponse {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let username = try req.content.decode(ForgotInput.self).username
         guard try await req.mailSettings.state().settings != nil else { return HTMLResponse(ForgotPasswordPage(mailEnabled: false)) }
         let service = req.forgotPassword
@@ -43,15 +43,15 @@ struct PasswordResetController {
     func show(req: Request) async throws -> HTMLResponse {
         let token = (try? req.query.get(String.self, at: "token")) ?? ""
         switch try await PasswordTokenService(db: req.db).check(token) {
-        case .success(let record) where record.tokenPurpose == .reset && !req.application.appConfig.passwordLogin:
+        case .success(let record) where record.tokenPurpose == .reset && !req.application.loginSettings.current.passwordLogin:
             return page(problem: .invalid)
-        case .success(let record): return page(token: token, purpose: record.tokenPurpose, config: req.application.appConfig)
+        case .success(let record): return page(token: token, purpose: record.tokenPurpose, config: req.application.loginSettings.current)
         case .failure(let problem): return page(problem: problem)
         }
     }
 
     func submit(req: Request) async throws -> Response {
-        guard req.application.appConfig.passwordLogin else { throw Abort(.notFound) }
+        guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(ResetInput.self)
         let service = PasswordTokenService(db: req.db)
         let record: PasswordToken
@@ -61,7 +61,7 @@ struct PasswordResetController {
         }
         guard input.password == input.passwordRepeat else {
             return try await page(token: input.token, purpose: record.tokenPurpose, status: .unprocessableEntity,
-                                  error: Self.mismatchMessage, config: req.application.appConfig).encodeResponse(for: req)
+                                  error: Self.mismatchMessage, config: req.application.loginSettings.current).encodeResponse(for: req)
         }
         let user: User
         let purpose: PasswordTokenPurpose
@@ -71,7 +71,7 @@ struct PasswordResetController {
             return try await page(problem: problem).encodeResponse(for: req)
         } catch let error as APIError {
             return try await page(token: input.token, purpose: record.tokenPurpose, status: error.status, error: error.message,
-                                  config: req.application.appConfig).encodeResponse(for: req)
+                                  config: req.application.loginSettings.current).encodeResponse(for: req)
         }
         req.auth.login(user)
         req.session.authenticate(user)
@@ -81,7 +81,7 @@ struct PasswordResetController {
     }
 
     private func page(token: String? = nil, purpose: PasswordTokenPurpose = .reset, problem: PasswordLinkProblem? = nil,
-                      status: HTTPStatus = .ok, error: String? = nil, config: AppConfig? = nil) -> HTMLResponse {
+                      status: HTTPStatus = .ok, error: String? = nil, config: LoginSettings? = nil) -> HTMLResponse {
         HTMLResponse(status: status, headers: Self.headers,
                      ResetPasswordPage(token: token, purpose: purpose, problem: problem?.message, error: error,
                                        ssoName: config?.oidc?.displayName, passwordLogin: config?.passwordLogin ?? true))
