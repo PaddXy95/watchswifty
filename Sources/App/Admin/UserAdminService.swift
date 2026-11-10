@@ -134,7 +134,8 @@ struct UserAdminService {
         let token = try await PasswordTokenService(db: db).issue(userID: user.requireID(), purpose: .invite, now: now)
         try await mail.send(MailTexts.invite(to: address, username: user.username, inviter: inviter.username,
                                              link: settings.link(token: token),
-                                             expires: now.addingTimeInterval(PasswordTokenPurpose.invite.lifetime)), now: now)
+                                             expires: now.addingTimeInterval(PasswordTokenPurpose.invite.lifetime),
+                                             ssoName: oidc?.displayName, passwordLogin: passwordLogin), now: now)
     }
 
     /// Also ends an open invitation or reset link.

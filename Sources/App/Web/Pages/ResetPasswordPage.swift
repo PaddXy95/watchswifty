@@ -7,6 +7,11 @@ struct ResetPasswordPage: HTML {
     let purpose: PasswordTokenPurpose
     let problem: String?
     let error: String?
+    /// `OIDC_NAME`: invitations can also be accepted through the provider.
+    var ssoName: String? = nil
+    var passwordLogin = true
+
+    private var ssoInvite: String? { purpose == .invite ? ssoName : nil }
 
     private var heading: String { purpose == .invite ? "Willkommen bei WatchSwifty" : "Neues Passwort" }
 
@@ -16,9 +21,18 @@ struct ResetPasswordPage: HTML {
                 h1 { heading }
                 if let token {
                     p(.class("muted")) {
-                        purpose == .invite ? "Lege dein Passwort fest, danach bist du angemeldet." : "Wähle ein neues Passwort."
+                        switch (purpose, ssoInvite, passwordLogin) {
+                        case (.invite, let name?, true): "Lege dein Passwort fest oder verknüpfe dein Konto mit \(name), danach bist du angemeldet."
+                        case (.invite, let name?, false): "Melde dich über \(name) an, um die Einladung anzunehmen."
+                        case (.invite, _, _): "Lege dein Passwort fest, danach bist du angemeldet."
+                        default: "Wähle ein neues Passwort."
+                        }
                     }
                     Messages(error: error, notice: nil)
+                    if let name = ssoInvite {
+                        a(.href("/auth/oidc/start?invite=" + formEncode(token)), .class("button primary sso")) { "Mit \(name) verknüpfen" }
+                    }
+                    if passwordLogin {
                     form(.method(.post), .action("/reset-password")) {
                         input(.type(.hidden), .name("token"), .value(token))
                         label {
@@ -31,7 +45,8 @@ struct ResetPasswordPage: HTML {
                             input(.type(.password), .name("passwordRepeat"), .required, .custom(name: "minlength", value: "8"),
                                   .custom(name: "autocomplete", value: "new-password"))
                         }
-                        button(.type(.submit), .class("primary")) { "Passwort speichern" }
+                        button(.type(.submit), .class(ssoInvite == nil ? "primary" : "")) { "Passwort speichern" }
+                    }
                     }
                 } else {
                     p(.class("error"), .custom(name: "role", value: "alert")) { problem ?? "" }

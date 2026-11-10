@@ -43,8 +43,16 @@ struct OIDCController {
             intent = .linkToken
             linkToken = token
         }
+        var inviteToken: String?
+        if let token = try? req.query.get(String.self, at: "invite") {
+            if let problem = try await Self.inviteProblem(req, token) {
+                return try await page(req, status: .badRequest, error: problem.message)
+            }
+            intent = .invite
+            inviteToken = token
+        }
         let flow = OIDCFlowCookie(state: Self.randomToken(), nonce: Self.randomToken(), verifier: verifier, startedAt: .now,
-                                  intent: intent, returnTo: returnTo, linkToken: linkToken)
+                                  intent: intent, returnTo: returnTo, linkToken: linkToken, inviteToken: inviteToken)
         let url: URL
         do {
             url = try await provider.authorizationURL(state: flow.state, nonce: flow.nonce, codeChallenge: pkceChallenge(verifier))
@@ -93,6 +101,24 @@ struct OIDCController {
             }
             _ = try await tokens.consume(token)
             return signIn(req, user, redirect: "/account?sso=linked")
+        }
+        if flow.intent == .invite, let token = flow.inviteToken {
+            if let problem = try await Self.inviteProblem(req, token) {
+                return try await page(req, status: .badRequest, error: problem.message)
+            }
+            let passwordTokens = PasswordTokenService(db: req.db)
+            guard case .success(let record) = try await passwordTokens.check(token),
+                  let user = try await User.find(record.$user.id, on: req.db) else {
+                return try await page(req, status: .badRequest, error: PasswordLinkProblem.invalid.message)
+            }
+            do {
+                try await service.link(user, to: identity)
+            } catch let error as APIError where error.status == .unprocessableEntity {
+                return try await page(req, status: .unprocessableEntity, error: error.message)
+            }
+            try await passwordTokens.deleteAll(userID: user.requireID())
+            try await service.syncEmail(user, from: identity)
+            return signIn(req, user, redirect: "/account?welcome=1")
         }
         if flow.intent == .link, let user = req.auth.get(User.self) {
             let response: Response
@@ -161,6 +187,14 @@ struct OIDCController {
     }
 
     // MARK: - Helpers
+
+    /// Why an invitation token cannot be used through the provider (only invitations, not reset links).
+    static func inviteProblem(_ req: Request, _ token: String) async throws -> PasswordLinkProblem? {
+        switch try await PasswordTokenService(db: req.db).check(token) {
+        case .success(let record): return record.tokenPurpose == .invite ? nil : .invalid
+        case .failure(let problem): return problem
+        }
+    }
 
     private func configured(_ req: Request) throws -> (OIDCConfig, any OIDCProvider) {
         guard let oidc = req.application.appConfig.oidc, let provider = req.application.oidcProvider else { throw Abort(.notFound) }

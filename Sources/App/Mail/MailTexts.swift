@@ -71,14 +71,22 @@ enum MailTexts {
             """)
     }
 
-    static func invite(to: String, username: String, inviter: String, link: String, expires: Date) -> OutgoingMail {
-        OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
+    /// With `ssoName` the invitation can also be accepted through the OIDC provider; without password login only so.
+    static func invite(to: String, username: String, inviter: String, link: String, expires: Date, ssoName: String? = nil,
+                       passwordLogin: Bool = true) -> OutgoingMail {
+        let until = CalendarDay.display(CalendarDay.today(now: expires))
+        let how = switch (ssoName, passwordLogin) {
+        case (nil, _): "Über diesen Link legst du dein Passwort fest (gültig bis \(until)):"
+        case (let name?, true): "Über diesen Link legst du dein Passwort fest oder verknüpfst dein Konto mit \(name) (gültig bis \(until)):"
+        case (let name?, false): "Über diesen Link meldest du dich über \(name) an und nimmst die Einladung an (gültig bis \(until)):"
+        }
+        return OutgoingMail(to: to, subject: "Einladung zu WatchSwifty", body: """
             Hallo,
 
             \(inviter) hat dich zu WatchSwifty eingeladen, einem Tracker für Serien und Filme.
             Dein Benutzername: \(username)
 
-            Über diesen Link legst du dein Passwort fest (gültig bis \(CalendarDay.display(CalendarDay.today(now: expires)))):
+            \(how)
 
             \(link)
 
