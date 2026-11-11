@@ -15,9 +15,11 @@ func seriesDueForRefresh(on db: any Database) async throws -> [Title] {
         .filter { !["Ended", "Canceled"].contains($0.tmdbStatus ?? "") }
 }
 
-/// Token of a user who has the series visible in their library (nil if nobody with a token does).
+/// Token of a user who has the series visible in their library or follows it (nil if nobody with a token does) –
+/// the same users that make it due in `seriesDueForRefresh`.
 func refreshToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
-    let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID).filter(\.$hidden == false).all().map(\.$user.id)
+    let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID)
+        .group(.or) { $0.filter(\.$hidden == false).filter(\.$followed == true) }.all().map(\.$user.id)
     guard !owners.isEmpty else { return nil }
     return try await User.query(on: db).filter(\.$id ~~ owners).filter(\.$tmdbToken != nil).all()
         .lazy.compactMap { cipher.open($0.tmdbToken) }.first

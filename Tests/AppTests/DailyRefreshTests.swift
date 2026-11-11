@@ -88,4 +88,15 @@ struct RefreshTokenTests {
             #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "visible-token")
         }
     }
+
+    @Test func refreshTokenFromFollowerWhoHidSeries() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat", tmdbToken: "follower-token")
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 1])
+            let ws = WatchService(db: app.db)
+            try await ws.setFollowed(userID: pat.requireID(), titleID: show.requireID(), followed: true)
+            try await ws.setHidden(userID: pat.requireID(), titleID: show.requireID(), hidden: true)
+            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "follower-token")
+        }
+    }
 }
