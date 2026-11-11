@@ -43,6 +43,11 @@ struct MailError: Error, Equatable, Sendable {
             message = "Der Mailserver nimmt die Nachricht nicht an (8BITMIME fehlt)."
         case .messageTooLarge:
             message = "Die Nachricht ist für den Mailserver zu groß."
+        // Neither text repeats the rejected value: it could be an address or an AUTH line with credentials.
+        case .invalidAddress:
+            message = "Ungültige Mail-Adresse (Zeilenumbruch, Leerzeichen, < oder > oder Nicht-ASCII-Zeichen) – nichts gesendet."
+        case .invalidCommand(let stage):
+            message = "Ein SMTP-Befehl enthielte einen Zeilenumbruch (\(stage.rawValue)) – Benutzer und Adressen prüfen; nichts gesendet."
         }
         return MailError(message: EmailAddress.maskAll(in: message))
     }

@@ -63,6 +63,8 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
   against clickjacking, including by other services on the same server or under the same domain.
 - The API docs under `/api` no longer store a pasted token in the browser; a previously stored one is deleted on
   opening.
+- **Mail client updated to SwiftySMTPClient 0.1.2:** line breaks in addresses and SMTP commands are rejected before
+  anything is sent (CWE-93), with a German message under **System → E-Mail**.
 
 ## [0.3.0] – 2026-11-09
 
