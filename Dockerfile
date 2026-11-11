@@ -16,6 +16,8 @@ RUN mkdir -p Sources/App Sources/WatchSwiftyAPI Sources/WatchSwiftyClient Tests/
     && echo '' > Sources/WatchSwiftyAPI/Stub.swift \
     && printf 'openapi: 3.1.0\ninfo: {title: stub, version: "0"}\npaths: {}\n' > Sources/WatchSwiftyAPI/openapi.yaml \
     && printf 'generate: [types, server]\naccessModifier: package\n' > Sources/WatchSwiftyAPI/openapi-generator-config.yaml \
+    && cp Sources/WatchSwiftyAPI/openapi.yaml Sources/WatchSwiftyClient/openapi.yaml \
+    && printf 'generate: [types, client]\naccessModifier: public\n' > Sources/WatchSwiftyClient/openapi-generator-config.yaml \
     && echo '' > Tests/AppTests/Stub.swift \
     && swift build -c release --static-swift-stdlib --product App \
     && rm -rf Sources Tests
