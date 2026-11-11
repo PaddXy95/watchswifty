@@ -45,6 +45,7 @@ struct EpisodeNoticeService {
                 group.group(.and) { $0.filter(\.$airDate >= today).filter(\.$airDate <= windowEnd) }
             }.all()
         let sent = try await sentKeys(userID: userID)
+        let firstSeen = try await earliestSeen(of: episodes, announcedOn: announcedOn)
 
         var due: [DueNotice] = []
         for episode in episodes {
@@ -54,7 +55,8 @@ struct EpisodeNoticeService {
             let sibling = SentKey(titleID: episode.$title.id, tmdbEpisodeID: episode.tmdbEpisodeID)
             var kinds = Set<NoticeKind>()
             let windowStart = [entryByTitle[episode.$title.id]?.followedAt, user.notifyAnnouncedSince].compactMap { $0 }.max() ?? .distantPast
-            if announcedOn, let seen = episode.firstSeenAt, seen > windowStart,
+            // A renumbered episode (same TMDB id in another row) counts from when its earliest row was first seen.
+            if announcedOn, let seen = firstSeen[sibling] ?? episode.firstSeenAt, seen > windowStart,
                airDate.map({ CalendarDay.daysBetween($0, today) <= Self.announcedMaxAge }) ?? true,
                !sent.contains(sibling.with(.announced, airDate: nil)) {
                 kinds.insert(.announced)
@@ -117,6 +119,23 @@ struct EpisodeNoticeService {
         guard !doomed.isEmpty else { return 0 }
         try await EpisodeNotice.query(on: db).filter(\.$id ~~ doomed.compactMap(\.id)).delete()
         return doomed.count
+    }
+
+    /// Earliest first-seen time per title + TMDB episode id over all rows (also stale ones); `.distantPast` when any
+    /// row predates first-seen tracking. Only for rows that could be announced.
+    private func earliestSeen(of episodes: [Episode], announcedOn: Bool) async throws -> [SentKey: Date] {
+        guard announcedOn else { return [:] }
+        let candidates = episodes.filter { $0.firstSeenAt != nil }
+        guard !candidates.isEmpty else { return [:] }
+        let rows = try await Episode.query(on: db).filter(\.$title.$id ~~ Array(Set(candidates.map(\.$title.id))))
+            .filter(\.$tmdbEpisodeID ~~ Array(Set(candidates.map(\.tmdbEpisodeID))))
+            .field(\.$id).field(\.$title.$id).field(\.$tmdbEpisodeID).field(\.$firstSeenAt).all()
+        var earliest: [SentKey: Date] = [:]
+        for row in rows {
+            let key = SentKey(titleID: row.$title.id, tmdbEpisodeID: row.tmdbEpisodeID)
+            earliest[key] = min(earliest[key] ?? .distantFuture, row.firstSeenAt ?? .distantPast)
+        }
+        return earliest
     }
 
     /// What the user already got, keyed by title + TMDB episode id, so a renumbered row (same TMDB id) counts too.

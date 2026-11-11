@@ -192,6 +192,31 @@ struct EpisodeNoticeTests {
         }
     }
 
+    @Test func renumberedKnownEpisodeNotAnnounced() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat")
+            // S1E1 was cached before the update (no first-seen time) and before the follow.
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 1], noAirDate: ["1x1"])
+            try await F.follow(app, pat, show)
+            try await F.prefs(app, pat, announced: true)
+            let old = try await episode(app, show, 1, 1)
+            old.lastSeenAt = F.t0
+            try await old.save(on: app.db)
+            let moved = Episode(titleID: try show.requireID(), season: 2, number: 1, name: "Verschoben", airDate: nil,
+                                tmdbEpisodeID: old.tmdbEpisodeID)
+            moved.firstSeenAt = F.t2
+            moved.lastSeenAt = F.t2
+            try await moved.save(on: app.db)
+            show.refreshedAt = F.t2
+            try await show.save(on: app.db)
+            #expect(try await F.due(app, pat).isEmpty)
+            // Same when the old row was first seen before the follow.
+            old.firstSeenAt = F.t0.addingTimeInterval(-60)
+            try await old.save(on: app.db)
+            #expect(try await F.due(app, pat).isEmpty)
+        }
+    }
+
     @Test func staleRowGetsNoReminder() async throws {
         try await withTestApp { app in
             let pat = try await createUser(app, "pat")
