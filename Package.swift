@@ -23,7 +23,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-http-types", from: "1.0.0"),
         .package(url: "https://github.com/elementary-swift/elementary.git", exact: "0.9.0"),
         .package(url: "https://github.com/elementary-swift/elementary-htmx.git", exact: "0.7.0"),
-        .package(url: "https://github.com/PaddXy95/SwiftySMTPClient.git", .upToNextMinor(from: "0.1.0")),
+        .package(url: "https://github.com/PaddXy95/SwiftySMTPClient.git", .upToNextMinor(from: "0.1.2")),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.5"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.8.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.37.0"),

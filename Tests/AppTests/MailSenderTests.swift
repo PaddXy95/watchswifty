@@ -18,6 +18,13 @@ struct MailSenderTests {
         #expect(!rejected.contains("alice@"))
     }
 
+    @Test func describesRejectedLineBreaks() {
+        let address = MailError.smtp(.invalidAddress("alice@example.org\r\nRCPT TO:<x@y.z>")).message
+        #expect(address == "Ungültige Mail-Adresse (Zeilenumbruch, Leerzeichen, < oder > oder Nicht-ASCII-Zeichen) – nichts gesendet.")
+        #expect(MailError.smtp(.invalidCommand(.auth)).message
+            == "Ein SMTP-Befehl enthielte einen Zeilenumbruch (auth) – Benutzer und Adressen prüfen; nichts gesendet.")
+    }
+
     @Test func caFileUnreadable() async throws {
         let settings = MailSettings(host: "relay.test", port: 2525, encryption: .starttls, username: nil, password: nil,
                                     fromAddress: "noreply@example.org", fromName: "WatchSwifty", caFile: "/nonexistent.pem",
