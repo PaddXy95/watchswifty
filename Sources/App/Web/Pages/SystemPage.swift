@@ -37,6 +37,7 @@ struct SystemPage: HTML {
     var mailForm = MailFormValues(baseURL: "")
     var testRecipient: String? = nil
     var oidc: OIDCSection? = nil
+    var notifications: NotificationsSection? = nil
 
     var body: some HTML {
         PageLayout(title: "System", nav: nav) {
@@ -69,6 +70,7 @@ struct SystemPage: HTML {
                 UpdateResult(current: current, state: state)
             }
             MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
+            if let notifications { notifications }
             if let oidc { oidc }
         }
     }
@@ -381,6 +383,58 @@ struct OIDCSection: HTML, Sendable {
                     form(.method(.post), .action("/admin/system/oidc/delete"), .class("inline-form")) {
                         button(.type(.submit), .class("danger")) { "Anmelde-Einstellungen löschen" }
                     }
+                }
+            }
+        }
+    }
+}
+
+/// System → Benachrichtigungen: time of the daily pass and the KNot webhook address.
+struct NotificationsSection: HTML, Sendable {
+    let settings: NotificationSettings
+    let timeZone: String
+    let nextRun: Date
+    /// Rejected input shown again (time, address).
+    var entered: (time: String, url: String)? = nil
+
+    private var isUTC: Bool { ["UTC", "GMT", "Etc/UTC", "Etc/GMT"].contains(timeZone) }
+
+    var body: some HTML {
+        section(.class("mail-settings notification-settings")) {
+            h2 { "Benachrichtigungen" }
+            p(.class("muted")) {
+                "Wer Serien beobachtet, kann sich unter „Konto → Benachrichtigungen“ über neue Folgen informieren lassen – "
+                "per E-Mail oder über einen Webhook. Geprüft wird einmal am Tag; dabei gleicht WatchSwifty auch die Serien mit TMDB ab."
+            }
+            form(.method(.post), .action("/admin/system/notifications")) {
+                label {
+                    "Täglicher Abgleich um"
+                    input(.type(.time), .name("dailyRunTime"), .value(entered?.time ?? settings.dailyRunTime), .required)
+                }
+                p(.class("muted")) { "Zeitzone des Servers: \(timeZone)" }
+                if isUTC {
+                    p(.class("muted")) { "Der Server läuft in UTC – im Container TZ setzen, z. B. TZ=Europe/Berlin." }
+                }
+                p(.class("muted")) {
+                    "Letzter Durchgang: \(settings.lastRunAt.map { formatDateTime($0) + " Uhr" } ?? "noch keiner") · "
+                    "Nächster: \(formatDateTime(nextRun)) Uhr"
+                }
+                label {
+                    "Webhook-Adresse (KNot, optional)"
+                    input(.type(.url), .name("webhookURL"), .value(entered?.url ?? settings.webhookURL ?? ""),
+                          .custom(name: "placeholder", value: "https://knot.example.lan/hook"))
+                }
+                p(.class("muted")) {
+                    a(.href("https://github.com/nexus421/KNot"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "KNot" }
+                    " leitet Webhooks als Mail weiter. Lege dort für jede Person ein eigenes Ziel mit ihrer Mail-Adresse an, "
+                    "erzeuge den Schlüssel mit „java -jar knot.jar key“ und gib ihn weiter – sie trägt ihn unter "
+                    "„Konto → Benachrichtigungen“ ein. Leer lassen schaltet den Webhook ab."
+                }
+                button(.type(.submit), .class("primary")) { "Speichern" }
+            }
+            if settings.webhookURL != nil {
+                form(.method(.post), .action("/admin/system/notifications/webhook/delete"), .class("inline-form")) {
+                    button(.type(.submit)) { "Webhook entfernen" }
                 }
             }
         }

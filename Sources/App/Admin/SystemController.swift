@@ -12,6 +12,8 @@ struct SystemController {
         system.post("mail", use: saveMail)
         system.post("mail", "delete", use: deleteMail)
         system.post("mail", "test", use: testMail)
+        system.post("notifications", use: saveNotifications)
+        system.post("notifications", "webhook", "delete", use: deleteWebhook)
         system.post("oidc", use: saveOIDC)
         system.post("oidc", "test", use: testOIDC)
         system.post("oidc", "delete", use: deleteOIDC)
@@ -64,6 +66,29 @@ struct SystemController {
             return try await page(req, status: apiError.status, error: apiError.message, testRecipient: to)
         }
         return try await page(req, notice: "Testmail gesendet.", testRecipient: to)
+    }
+
+    // MARK: - Benachrichtigungen
+
+    struct NotificationsInput: Content {
+        var dailyRunTime: String
+        var webhookURL: String?
+    }
+
+    func saveNotifications(req: Request) async throws -> HTMLResponse {
+        let input = try req.content.decode(NotificationsInput.self)
+        do {
+            try await req.notificationSettings.save(dailyRunTime: input.dailyRunTime, webhookURL: input.webhookURL)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message,
+                                  notificationsForm: (input.dailyRunTime, input.webhookURL ?? ""))
+        }
+        return try await page(req, notice: "Benachrichtigungen gespeichert.")
+    }
+
+    func deleteWebhook(req: Request) async throws -> HTMLResponse {
+        try await req.notificationSettings.removeWebhook()
+        return try await page(req, notice: "Webhook entfernt.")
     }
 
     // MARK: - Anmeldung (SSO)
@@ -130,7 +155,7 @@ struct SystemController {
 
     private func page(_ req: Request, status: HTTPStatus = .ok, notice: String? = nil, error: String? = nil,
                       mailForm: MailFormValues? = nil, testRecipient: String? = nil,
-                      oidcForm: OIDCFormValues? = nil) async throws -> HTMLResponse {
+                      oidcForm: OIDCFormValues? = nil, notificationsForm: (time: String, url: String)? = nil) async throws -> HTMLResponse {
         let settings = try await req.application.updates.settings()
         let mail = try await req.mailSettings.state()
         let form = mailForm ?? mail.settings.map(MailFormValues.init) ?? MailFormValues(baseURL: Self.requestOrigin(req))
@@ -139,11 +164,16 @@ struct SystemController {
         let oidcValues = oidcForm ?? oidc.settings.map(OIDCFormValues.init)
             ?? OIDCFormValues(baseURL: mail.settings?.baseURL ?? Self.requestOrigin(req))
         let login = req.application.loginSettings.current
+        let notifySettings = try await req.notificationSettings.settings()
+        let notifications = NotificationsSection(settings: notifySettings, timeZone: TimeZone.current.identifier,
+                                                 nextRun: DailySchedule.nextRun(after: .now, time: notifySettings.dailyRunTime, timeZone: .current),
+                                                 entered: notificationsForm)
         return HTMLResponse(status: status, SystemPage(nav: try req.nav(.system), current: req.application.appConfig.appVersion,
                                                        state: UpdateState(settings), notice: notice, error: error, mail: mail,
                                                        mailForm: form, testRecipient: testRecipient ?? ownAddress,
                                                        oidc: OIDCSection(state: oidc, values: oidcValues, passwordLogin: login.passwordLogin,
-                                                                         passwordLoginForced: login.passwordLoginForced)))
+                                                                         passwordLoginForced: login.passwordLoginForced),
+                                                       notifications: notifications))
     }
 
     /// Suggestion for „Adresse von WatchSwifty“ (only pre-fills the form; links use the stored value only).
