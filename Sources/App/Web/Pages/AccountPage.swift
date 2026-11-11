@@ -285,7 +285,8 @@ struct AccountNotificationsSection: HTML, Sendable {
                     }
                 }
             } else if let only = state.available.first {
-                input(.type(.hidden), .name("channel"), .value(only.rawValue))
+                // Keeps the stored choice: a channel that is gone for a while must not be replaced for good.
+                input(.type(.hidden), .name("channel"), .value(state.preferred.rawValue))
                 p { "Senden per \(channelName(only))" }
             } else {
                 input(.type(.hidden), .name("channel"), .value(state.preferred.rawValue))

@@ -166,4 +166,28 @@ struct AccountNotificationsTests {
             #expect(body.contains(#"action="/account/notifications/webhook-key""#))
         }
     }
+
+    @Test func savingTogglesKeepsUnavailablePreference() async throws {
+        try await withTestApp { app in
+            try await configureMail(app)
+            try await configureWebhook(app)
+            let pat = try await notifyUser(app, "pat", email: "pat@x.de")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).save(user: pat, announced: false, soon: false, today: false, channel: .webhook,
+                                             available: [.mail, .webhook])
+            try await NotificationSettingsService(db: app.db).removeWebhook()
+            let headers = try await login(app, "pat")
+            let body = try await page(app, headers)
+            #expect(body.contains("Senden per E-Mail"))
+            #expect(body.contains(#"name="channel" value="webhook""#))
+            try await app.testing().test(.POST, "/account/notifications", headers: headers, beforeRequest: { req in
+                try req.content.encode(PrefsForm(announced: "on", soon: nil, today: nil, channel: "webhook"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                #expect(res.status == .ok)
+            })
+            let stored = try await reload(app, pat)
+            #expect(stored.preferredChannel == .webhook)
+            #expect(stored.notifyAnnounced == true)
+        }
+    }
 }

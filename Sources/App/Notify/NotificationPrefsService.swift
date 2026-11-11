@@ -12,10 +12,13 @@ struct NotificationPrefsService {
     let cipher: TokenCipher
 
     /// Toggles and channel need no password. Switching „neu angekündigt“ on starts its window now, so it does not
-    /// report everything that appeared since the follow.
+    /// report everything that appeared since the follow. Keeping the stored channel is always allowed, even while it is
+    /// not available (the other one is used meanwhile).
     func save(user: User, announced: Bool, soon: Bool, today: Bool, channel: NotifyChannel, available: [NotifyChannel],
               now: Date = .now) async throws {
-        if !available.isEmpty && !available.contains(channel) { throw APIError.validation(Self.channelMessage) }
+        if channel != user.preferredChannel && !available.isEmpty && !available.contains(channel) {
+            throw APIError.validation(Self.channelMessage)
+        }
         if announced && user.notifyAnnounced != true { user.notifyAnnouncedSince = now }
         user.notifyAnnounced = announced
         user.notifySoon = soon
