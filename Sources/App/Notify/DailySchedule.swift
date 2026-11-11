@@ -30,10 +30,26 @@ enum DailySchedule {
             ?? now.addingTimeInterval(86_400)
     }
 
-    /// After a start the pass runs at once (after a short delay) only when the last one is more than 24 hours old.
-    static func runsAtBoot(lastRun: Date?, now: Date) -> Bool {
+    /// Latest moment at or before `now` with the given wall-clock time (on a DST day without it, the next existing one).
+    static func previousRun(atOrBefore now: Date, time: String, timeZone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let (hour, minute) = parse(time) ?? parse(defaultTime)!
+        for daysBack in 0...2 {
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: now),
+                  let candidate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day,
+                                                matchingPolicy: .nextTime, repeatedTimePolicy: .first, direction: .forward)
+            else { continue }
+            if candidate <= now { return candidate }
+        }
+        return now.addingTimeInterval(-86_400)
+    }
+
+    /// After a start the pass runs at once (after a short delay) when the set time passed since the last complete
+    /// pass – a server that was off at that time catches up, a plain restart does not run it again.
+    static func runsAtBoot(lastRun: Date?, now: Date, time: String, timeZone: TimeZone) -> Bool {
         guard let lastRun else { return true }
-        return now.timeIntervalSince(lastRun) > 86_400
+        return lastRun < previousRun(atOrBefore: now, time: time, timeZone: timeZone)
     }
 }
 

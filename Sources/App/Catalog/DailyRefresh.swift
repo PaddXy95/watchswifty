@@ -122,8 +122,9 @@ struct DailyRefreshLifecycle: LifecycleHandler {
         let settings = application.notificationSettings
         let logger = application.logger
         application.storage[TaskKey.self] = Task {
-            let lastRun = try? await settings.settings().lastRunAt
-            if DailySchedule.runsAtBoot(lastRun: lastRun, now: .now) {
+            let stored = try? await settings.settings()
+            if DailySchedule.runsAtBoot(lastRun: stored?.lastRunAt, now: .now, time: stored?.dailyRunTime ?? DailySchedule.defaultTime,
+                                        timeZone: .current) {
                 try? await Task.sleep(for: .seconds(60))
                 if Task.isCancelled { return }
                 await runDailyPass(application)

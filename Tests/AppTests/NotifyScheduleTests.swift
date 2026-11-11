@@ -35,11 +35,27 @@ struct NotifyScheduleTests {
         #expect(DailySchedule.nextRun(after: date("2026-11-07 06:00:00"), time: "kaputt", timeZone: Self.berlin) == date("2026-11-07 07:00:00"))
     }
 
-    @Test func runsAtBootOnlyAfter24h() {
-        let now = date("2026-11-07 12:00:00")
-        #expect(DailySchedule.runsAtBoot(lastRun: nil, now: now))
-        #expect(!DailySchedule.runsAtBoot(lastRun: now.addingTimeInterval(-23 * 3600), now: now))
-        #expect(DailySchedule.runsAtBoot(lastRun: now.addingTimeInterval(-25 * 3600), now: now))
+    @Test func runsAtBootWhenScheduledTimePassedSinceLastRun() {
+        // A NAS that is off 01:00–08:00 with the default 07:00 still gets a pass every day.
+        #expect(DailySchedule.runsAtBoot(lastRun: date("2026-11-06 08:01:00"), now: date("2026-11-07 08:00:00"),
+                                         time: "07:00", timeZone: Self.berlin))
+        #expect(DailySchedule.runsAtBoot(lastRun: nil, now: date("2026-11-07 08:00:00"), time: "07:00", timeZone: Self.berlin))
+    }
+
+    @Test func noBootRunWhenScheduledTimeNotMissed() {
+        // Ran at 07:00 today, restarted at noon.
+        #expect(!DailySchedule.runsAtBoot(lastRun: date("2026-11-07 07:00:05"), now: date("2026-11-07 12:00:00"),
+                                          time: "07:00", timeZone: Self.berlin))
+        // Ran late yesterday evening, restarted before today's 07:00.
+        #expect(!DailySchedule.runsAtBoot(lastRun: date("2026-11-06 23:00:00"), now: date("2026-11-07 06:00:00"),
+                                          time: "07:00", timeZone: Self.berlin))
+    }
+
+    @Test func previousRunAtOrBeforeNow() {
+        #expect(DailySchedule.previousRun(atOrBefore: date("2026-11-07 06:59:59"), time: "07:00", timeZone: Self.berlin)
+                == date("2026-11-06 07:00:00"))
+        #expect(DailySchedule.previousRun(atOrBefore: date("2026-11-07 07:00:00"), time: "07:00", timeZone: Self.berlin)
+                == date("2026-11-07 07:00:00"))
     }
 
     @Test func parseTimes() {
