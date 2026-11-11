@@ -25,6 +25,8 @@ container, one SQLite file, data from TMDB. The web UI is in German; apps such a
 - **Single sign-on (optional)** through your own OpenID Connect provider
 - **Mail (optional)** for invitations, password resets and new devices, for example through
   [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
+- **Notifications (optional)** about new episodes of followed series, by mail or through a
+  [KNot](https://github.com/nexus421/KNot) webhook, once a day at a time the admin chooses
 - **App API** (`/api/v1`, OpenAPI) with device tokens and a Swift client library
 - Secrets such as TMDB tokens and mail settings are encrypted at rest
 
@@ -60,6 +62,7 @@ reverse proxy in front, see [Installation](docs/installation.md#reverse-proxy-ht
 - [TMDB](docs/tmdb.md): getting a token, cached data
 - [Single sign-on](docs/sso.md): OIDC setup, moving an existing installation, emergency access
 - [Mail](docs/email.md): SMTP setup, SwiftyRelay
+- [Notifications](docs/notifications.md): new episodes by mail or KNot webhook, daily run time
 - [Import](docs/import.md): Netflix viewing history and your own film list
 - [App API](docs/app-api.md): connecting apps, tokens, Swift client
 - [Releases](docs/releases.md): versions, image tags, testing a beta

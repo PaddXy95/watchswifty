@@ -404,7 +404,9 @@ struct NotificationsSection: HTML, Sendable {
             h2 { "Benachrichtigungen" }
             p(.class("muted")) {
                 "Wer Serien beobachtet, kann sich unter „Konto → Benachrichtigungen“ über neue Folgen informieren lassen – "
-                "per E-Mail oder über einen Webhook. Geprüft wird einmal am Tag; dabei gleicht WatchSwifty auch die Serien mit TMDB ab."
+                "per E-Mail oder über einen Webhook. Geprüft wird einmal am Tag; dabei gleicht WatchSwifty auch die Serien mit TMDB ab. "
+                DocsLink(page: "notifications.md", label: "Anleitung zu Benachrichtigungen")
+                "."
             }
             form(.method(.post), .action("/admin/system/notifications")) {
                 label {

@@ -69,6 +69,7 @@ struct AccountNotificationsTests {
             try await notifyUser(app, "pat")
             let body = try await page(app, try await login(app, "pat"))
             #expect(body.contains("Noch kein Versandweg"))
+            #expect(body.contains(DocsLink.baseURL + "notifications.md"))
         }
     }
 

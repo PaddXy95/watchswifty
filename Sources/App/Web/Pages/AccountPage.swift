@@ -271,7 +271,9 @@ struct AccountNotificationsSection: HTML, Sendable {
             }
             p(.class("muted")) {
                 "Geprüft wird täglich um \(state.dailyRunTime) Uhr; alles Neue kommt in einer Nachricht. "
-                "Der Hinweis auf neu verbundene Geräte geht immer über denselben Weg."
+                "Der Hinweis auf neu verbundene Geräte geht immer über denselben Weg. "
+                DocsLink(page: "notifications.md", label: "Mehr dazu")
+                "."
             }
             if state.available.count > 1 {
                 p { "Senden per" }

@@ -69,7 +69,8 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   the service and both front doors get it. Errors are `{"code", "message"}` via `APIError`/`APIErrorMiddleware`.
 - Feature folders: `Auth` (incl. `Auth/OIDC`: OIDC login, see below), `Account`, `Admin`, `Catalog` (local cache of TMDB titles/episodes), `Tracking`
   (watches, ratings, comments, continue watching, history, library, stats), `Import` (Netflix CSV, film list,
-  `MatchingWorker`), `Mail`, `TMDB`, `Web`, `API`.
+  `MatchingWorker`), `Mail`, `Notify` (daily run schedule, new-episode notices, KNot webhook, per-user channel),
+  `TMDB`, `Web`, `API`.
 
 ### Auth and security rules
 - Web: Fluent sessions (cookie `watchswifty_session`), `User.sessionAuthenticator()` + `AuthRedirectMiddleware`;
@@ -101,7 +102,14 @@ test seeds). `LiveOIDCProvider`
 `CatalogMaintenance` enforces the TMDB terms: titles are re-fetched after 60 days with the token of a user who uses
 them, unused titles are deleted, TMDB texts are cleared after 180 days without refresh. `titleUsers(on:)` lists every
 table that counts as "using" a title; **a new per-user table referencing titles must be added there**, or its titles
-get deleted.
+get deleted. `episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
+
+### Notifications
+`DailyRefreshLifecycle` runs `runDailyPass` at the admin's time (`app_settings.daily_run_time`, server time zone,
+woken by `DailyRunTrigger` on change); the pass ends with `runNotifications`. Due notices are computed from the current
+catalog (`episodes.first_seen_at`/`last_seen_at`, `user_titles.followed_at`) against `episode_notices`, sent as one
+digest per user through `NotificationService` (mail or `WebhookSender`), and recorded only after a successful send.
+Spec `2026-11-11-notifications-design.md`.
 
 ## Tests
 

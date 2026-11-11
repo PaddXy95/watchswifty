@@ -5,6 +5,16 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
 ## [Unreleased]
 
 ### Added
+- **Notifications about new episodes:** for followed series, every user can be told as soon as a new episode is
+  known, 3 days before it airs and on the air date, in one daily message, by mail or through a
+  [KNot](https://github.com/nexus421/KNot) webhook (**Konto → Benachrichtigungen**, account → notifications). The
+  notice about newly connected devices uses the same channel.
+- **Time of the daily run:** the admin sets it under **System → Benachrichtigungen** (default 07:00, server time
+  zone), together with the KNot webhook address. After a restart the run only repeats when the last one is more than
+  24 hours old.
+- **App API:** `GET/PUT /v1/me/notifications`, `PUT/DELETE /v1/me/notifications/webhook-key`,
+  `POST /v1/me/notifications/test`, `GET/PUT /v1/admin/notifications`; error codes `notificationsNotConfigured` and
+  `notifyFailed`. The Swift client gets the open type `NotifyChannelValue`.
 - **App API: next episode of a series:** `GET /api/v1/tv/{id}` now also returns the next episode (`next`, as in
   „Weiterschauen“ (continue watching)) and, per season, whether the web UI shows it expanded (`isOpen`).
 - **Client library for the iOS app:** The Swift package now also offers the `WatchSwiftyClient` library, generated from
@@ -35,6 +45,8 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
 - App API: A failed mail delivery responds with **503** `mailFailed` instead of 502.
 
 ### Fixed
+- **Followed but hidden series** were never refreshed from TMDB when no other user had them visible: the daily refresh
+  now also uses the token of a user who follows the series.
 - **Behind Cloudflare**, a failed test mail or invitation shows the message with the cause again instead of
   Cloudflare's „Bad gateway“ page. Cloudflare replaces every 502 response; WatchSwifty now responds with 503 in such
   cases. The same applies to „TMDB nicht erreichbar“ (TMDB unreachable).

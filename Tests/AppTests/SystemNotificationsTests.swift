@@ -53,6 +53,7 @@ struct SystemNotificationsTests {
             try await app.testing().test(.GET, "/admin/system", headers: try await adminHeaders(app)) { res async in
                 let body = res.body.string
                 #expect(body.contains("https://github.com/nexus421/KNot"))
+                #expect(body.contains(DocsLink.baseURL + "notifications.md"))
                 #expect(body.contains("Zeitzone des Servers: \(TimeZone.current.identifier)"))
                 #expect(body.contains("Täglicher Abgleich um"))
                 #expect(body.contains("Letzter Durchgang: noch keiner"))

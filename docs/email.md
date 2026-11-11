@@ -2,7 +2,9 @@
 
 Optional. With mail set up, the admin invites people by mail (they choose their password themselves, the link is
 valid for 7 days), everyone can reset their password with „Passwort vergessen?“ (forgot password), and users with an
-address get a mail when an app connects to their account. Without mail everything else works as before.
+address get a mail when an app connects to their account (unless they chose the webhook, see
+[Notifications](notifications.md)). Users can also get [notifications](notifications.md) about new episodes by mail.
+Without mail everything else works as before.
 
 ## Setting up
 
