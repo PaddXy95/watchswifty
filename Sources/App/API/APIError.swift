@@ -27,6 +27,15 @@ struct APIError: Error, Sendable, Equatable {
         APIError(status: .serviceUnavailable, code: "mailFailed", message: message)
     }
 
+    static func notificationsNotConfigured(_ message: String = NotifyError.notConfigured.message) -> APIError {
+        APIError(status: .unprocessableEntity, code: "notificationsNotConfigured", message: message)
+    }
+
+    /// 503 like `mailFailed`.
+    static func notifyFailed(_ message: String) -> APIError {
+        APIError(status: .serviceUnavailable, code: "notifyFailed", message: message)
+    }
+
     /// `PASSWORD_LOGIN=false`: passwords can be neither used nor set.
     static func passwordLoginDisabled(_ message: String = "Der Passwort-Login ist abgeschaltet.") -> APIError {
         APIError(status: .conflict, code: "passwordLoginDisabled", message: message)
@@ -48,6 +57,10 @@ struct APIError: Error, Sendable, Equatable {
             return error
         case let error as MailError:
             return error == .notConfigured ? .mailNotConfigured() : .mailFailed(error.message)
+        case let error as NotifyError:
+            return error == .notConfigured ? .notificationsNotConfigured() : .notifyFailed(error.message)
+        case let error as WebhookError:
+            return .notifyFailed(error.message)
         case let error as ServerError:
             let inner = from(error.underlyingError, path: path)
             // Request problems found by the generated code (content type, missing body, Accept) keep their 4xx status.

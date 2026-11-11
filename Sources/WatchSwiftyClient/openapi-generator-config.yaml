@@ -11,3 +11,4 @@ typeOverrides:
     MappingStatus: MappingStatusValue
     FilmStatus: FilmStatusValue
     DeviceKind: DeviceKindValue
+    NotifyChannel: NotifyChannelValue

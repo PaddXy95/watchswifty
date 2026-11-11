@@ -84,3 +84,13 @@ public struct DeviceKindValue: OpenStringValue {
     public static let manual = Self(rawValue: "manual")
     public static let known: [Self] = [.device, .manual]
 }
+
+/// How notifications are sent (`NotifyChannel`).
+public struct NotifyChannelValue: OpenStringValue {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let mail = Self(rawValue: "mail")
+    public static let webhook = Self(rawValue: "webhook")
+    public static let known: [Self] = [.mail, .webhook]
+}
