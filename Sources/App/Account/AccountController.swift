@@ -7,6 +7,9 @@ struct AccountController {
     struct DeviceInput: Content { var name: String }
     struct EmailInput: Content { var email: String; var currentPassword: String }
     struct LinkInput: Content { var currentPassword: String? }
+    struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var channel: String? }
+    struct WebhookKeyInput: Content { var key: String; var currentPassword: String? }
+    struct WebhookKeyRemoveInput: Content { var currentPassword: String? }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
@@ -18,6 +21,57 @@ struct AccountController {
         protected.post("account", "devices", ":deviceID", "revoke", use: revokeDevice)
         protected.post("account", "oidc", "link", use: startLink)
         protected.post("account", "oidc", "reauth", use: startReauth)
+        protected.post("account", "notifications", use: saveNotifications)
+        protected.post("account", "notifications", "webhook-key", use: saveWebhookKey)
+        protected.post("account", "notifications", "webhook-key", "remove", use: removeWebhookKey)
+        protected.post("account", "notifications", "test", use: testNotification)
+    }
+
+    // MARK: - Benachrichtigungen
+
+    func saveNotifications(req: Request) async throws -> HTMLResponse {
+        let input = try req.content.decode(NotificationPrefsInput.self)
+        let user = try req.currentUser
+        let on = { (value: String?) in !(value ?? "").isEmpty }
+        let channel = input.channel.flatMap(NotifyChannel.init(rawValue:)) ?? user.preferredChannel
+        do {
+            try await req.notificationPrefs.save(user: user, announced: on(input.announced), soon: on(input.soon), today: on(input.today),
+                                                 channel: channel, available: try await req.notifications.availableChannels(for: user))
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
+        }
+        return try await page(req, notice: "Benachrichtigungen gespeichert.")
+    }
+
+    func saveWebhookKey(req: Request) async throws -> HTMLResponse {
+        let input = try req.content.decode(WebhookKeyInput.self)
+        do {
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: input.key, currentPassword: input.currentPassword)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
+        }
+        let removed = input.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return try await page(req, notice: removed ? "Webhook-Schlüssel entfernt." : "Webhook-Schlüssel gespeichert.")
+    }
+
+    func removeWebhookKey(req: Request) async throws -> HTMLResponse {
+        let input = (try? req.content.decode(WebhookKeyRemoveInput.self)) ?? WebhookKeyRemoveInput()
+        do {
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: "", currentPassword: input.currentPassword)
+        } catch let error as APIError {
+            return try await page(req, status: error.status, error: error.message)
+        }
+        return try await page(req, notice: "Webhook-Schlüssel entfernt.")
+    }
+
+    func testNotification(req: Request) async throws -> HTMLResponse {
+        let user = try req.currentUser
+        do {
+            try await req.notifications.send(NotificationTexts.test(username: user.username), to: user)
+        } catch let error as NotifyError {
+            return try await page(req, status: error == .notConfigured ? .unprocessableEntity : .serviceUnavailable, error: error.message)
+        }
+        return try await page(req, notice: "Testnachricht gesendet.")
     }
 
     /// „Über … bestätigen“: SSO accounts confirm through the provider before they get a manual token.
@@ -145,11 +199,19 @@ struct AccountController {
         let config = req.application.loginSettings.current
         let sso = config.oidc.map { AccountSSO(name: $0.displayName, linked: user.isLinked($0), emailFromProvider: user.emailFromProvider($0),
                                                needsPassword: user.hasPassword) }
+        let notifySettings = try await req.notificationSettings.settings()
+        let available = try await req.notifications.availableChannels(for: user)
+        let notifications = AccountNotifications(
+            announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
+            available: available, active: available.contains(user.preferredChannel) ? user.preferredChannel : available.first,
+            preferred: user.preferredChannel, webhookConfigured: notifySettings.webhookURL != nil,
+            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime,
+            needsPassword: user.hasPassword)
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),
                                                         mailConfigured: mailConfigured, sso: sso,
                                                         passwordChange: user.hasPassword && config.passwordLogin,
-                                                        tokenNeedsReauth: try tokenNeedsReauth(req)))
+                                                        tokenNeedsReauth: try tokenNeedsReauth(req), notifications: notifications))
     }
 }
