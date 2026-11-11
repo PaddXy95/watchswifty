@@ -13,7 +13,12 @@ Hintergrund und keinen Betreiber, der Daten sammelt.
   jedem Bildabruf deine IP-Adresse; es werden keine Konto- oder Nutzungsdaten übermittelt.
 - **Auf dem Gerät:** Die Server-Adresse und der Gerätename liegen in den App-Einstellungen, das Anmelde-Token
   (Geräte-Token) im Schlüsselbund dieses Geräts (nicht in iCloud). Eine Kopie der Startseite liegt im Cache, damit sie
-  beim Öffnen sofort erscheint. Abmelden oder Löschen der App entfernt diese Daten.
+  beim Öffnen sofort erscheint.
+  - **Abmelden** widerruft das Token beim Server und löscht es samt der Kopie der Startseite; die Server-Adresse bleibt,
+    bis du „Anderen Server wählen“ tippst.
+  - **Löschen der App** entfernt Einstellungen und Cache. Das Token bleibt im Schlüsselbund, bis die App wieder
+    installiert wird (dann wird es beim ersten Start gelöscht); beim Server läuft es nach 90 Tagen ab und lässt sich
+    jederzeit unter Konto → Geräte abmelden.
 - **Anmeldung:** Sie läuft im Browser-Fenster deines Servers. Die App sieht dein Passwort nicht.
 
 ## Was die App nicht tut

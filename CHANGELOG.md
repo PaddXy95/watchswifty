@@ -5,6 +5,8 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 ## [Unveröffentlicht]
 
 ### Neu
+- **App-API: nächste Folge einer Serie:** `GET /api/v1/tv/{id}` liefert zusätzlich die nächste Folge (`next`, wie bei
+  „Weiterschauen“) und je Staffel, ob die Weboberfläche sie aufgeklappt zeigt (`isOpen`).
 - **Client-Bibliothek für die iOS-App:** Das Swift-Paket bietet zusätzlich die Bibliothek `WatchSwiftyClient`, aus
   derselben API-Beschreibung erzeugt wie der Server. Werte, die mit neuen Versionen wachsen können (Streaming-Dienste,
   Status von Import und Zuordnungen, Geräte-Art), sind dort offen – ältere Apps verstehen neuere Server weiterhin.

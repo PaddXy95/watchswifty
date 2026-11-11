@@ -128,15 +128,20 @@ extension APIHandler {
 
     static func seriesDetail(_ request: Request, user: User, title: Title) async throws -> Components.Schemas.SeriesDetail {
         let model = try await request.seriesDetails.detail(userID: user.requireID(), title: title)
+        // Same rule as „Weiterschauen“: the first aired, unwatched regular episode after the highest watched one.
+        let rows = model.seasons.flatMap(\.episodes)
+        let next = App.nextEpisode(in: rows.map(\.info), watched: Set(rows.filter(\.watched).map(\.info.id)),
+                               today: request.watches.today())
         return .init(
             tmdbId: title.tmdbID, name: title.name, year: title.year, posterPath: title.posterPath,
             overview: title.overview.flatMap { $0.isEmpty ? nil : $0 }, status: title.tmdbStatus,
             runtime: title.runtime.flatMap { $0 > 0 ? $0 : nil }, links: links(title),
             rating: model.rating, comment: model.comment, hidden: model.hidden, followed: model.followed,
             lastService: model.defaultService.flatMap { Components.Schemas.Service(rawValue: $0.rawValue) },
+            next: next.map { .init(episodeId: $0.id.uuidString, season: $0.season, number: $0.number, name: $0.name, airDate: $0.airDate) },
             seasons: model.seasons.map { season in
                 .init(number: season.number, title: season.title, watchedCount: season.watchedCount, comment: season.comment,
-                      episodes: season.episodes.map { row in
+                      isOpen: season.isOpen, episodes: season.episodes.map { row in
                           .init(season: row.info.season, number: row.info.number, name: row.info.name, airDate: row.info.airDate,
                                 overview: row.info.overview.flatMap { $0.isEmpty ? nil : $0 },
                                 runtime: row.info.runtime.flatMap { $0 > 0 ? $0 : nil }, aired: row.aired,

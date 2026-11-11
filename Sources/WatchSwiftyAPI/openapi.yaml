@@ -2782,6 +2782,9 @@ components:
           type: integer
         comment:
           type: string
+        isOpen:
+          type: boolean
+          description: Staffel, die die Weboberfläche aufgeklappt zeigt (die der nächsten Folge bzw. die erste ohne Sichtung).
         episodes:
           type: array
           items:
@@ -2817,6 +2820,8 @@ components:
           type: boolean
         lastService:
           $ref: "#/components/schemas/Service"
+        next:
+          $ref: "#/components/schemas/NextEpisode"
         seasons:
           type: array
           items:
