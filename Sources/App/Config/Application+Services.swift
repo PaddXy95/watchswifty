@@ -143,3 +143,15 @@ extension Application {
         set { storage[DailyRunTriggerKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct WebhookSenderKey: StorageKey { typealias Value = any WebhookSender }
+
+    var webhookSender: any WebhookSender {
+        get {
+            guard let sender = storage[WebhookSenderKey.self] else { fatalError("Webhook sender not configured") }
+            return sender
+        }
+        set { storage[WebhookSenderKey.self] = newValue }
+    }
+}

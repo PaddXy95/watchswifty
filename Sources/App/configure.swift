@@ -4,7 +4,7 @@ import Vapor
 
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
                releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil,
-               oidcProvider: (any OIDCProvider)? = nil) async throws {
+               oidcProvider: (any OIDCProvider)? = nil, webhookSender: (any WebhookSender)? = nil) async throws {
     app.appConfig = config
     app.tokenCipher = TokenCipher(key: try TokenKeyLoader.load(key: config.tokenKey, file: config.tokenKeyFile,
                                                                databasePath: config.databasePath, logger: app.logger))
@@ -13,6 +13,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.updateStatus = UpdateStatus()
     app.authCodes = AuthCodeStore()
     app.mailSender = mailSender ?? LiveMailSender()
+    app.webhookSender = webhookSender ?? LiveWebhookSender(userAgent: "WatchSwifty/\(config.appVersion.version)")
     app.backgroundTasks = BackgroundTasks()
     app.dailyRunTrigger = DailyRunTrigger()
     app.oidcIdentityLock = AsyncMutex()

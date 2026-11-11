@@ -5,12 +5,12 @@ import VaporTesting
 
 func withTestApp(config: AppConfig = .testing, tmdb: FakeTMDBClient = FakeTMDBClient(),
                  releases: FakeReleaseFetcher = FakeReleaseFetcher(), mail: FakeMailSender = FakeMailSender(),
-                 oidc: FakeOIDCProvider = FakeOIDCProvider(),
+                 oidc: FakeOIDCProvider = FakeOIDCProvider(), webhook: FakeWebhookSender = FakeWebhookSender(),
                  _ test: (Application) async throws -> Void) async throws {
     let app = try await Application.make(.testing)
     do {
         try await configure(app, config: config, tmdbProvider: TMDBProvider { _ in tmdb }, releaseFetcher: releases,
-                            mailSender: mail, oidcProvider: oidc)
+                            mailSender: mail, oidcProvider: oidc, webhookSender: webhook)
         try await test(app)
     } catch {
         try await app.asyncShutdown()
