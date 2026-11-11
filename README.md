@@ -475,3 +475,8 @@ swift test
 ```bash
 DATABASE_PATH=./dev.sqlite ADMIN_USERNAME=admin ADMIN_PASSWORD=adminpass123 swift run App serve
 ```
+
+## Lizenz
+
+WatchSwifty steht unter der [MIT-Lizenz](LICENSE). Das gilt für den Server ebenso wie für die Client-Bibliothek
+`WatchSwiftyClient` und die API-Beschreibung (`openapi.yaml`).

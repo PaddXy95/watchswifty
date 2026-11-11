@@ -21,6 +21,8 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
   neue Fehlercodes `passwordLoginDisabled`, `emailFromProvider` und `oidcCheckFailed`.
 - **Mail bei neuem Gerät:** Verbindet sich eine App mit einem Konto, geht eine Mail an die unter **Konto** hinterlegte
   Adresse – mit Gerätename, Zeitpunkt und Link zum Abmelden (nur mit eingerichteter E-Mail).
+- **Lizenz:** WatchSwifty steht unter der MIT-Lizenz (`LICENSE`), ebenso die Client-Bibliothek `WatchSwiftyClient`
+  und die API-Beschreibung. Das Docker-Image trägt die Lizenz als Label.
 
 ### Geändert
 - **App-Anmeldung:** Die Rücksprung-Adresse heißt jetzt `dev.patmei.watchswifty:/auth` statt `watchswifty://auth`
