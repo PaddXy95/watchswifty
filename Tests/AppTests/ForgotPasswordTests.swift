@@ -99,19 +99,20 @@ struct ForgotPasswordTests {
         }
     }
 
+    /// The answer comes while the (slow) send is still running. Checked by the send's result, not by wall-clock time:
+    /// on a loaded CI runner the request alone can take longer than a fixed bound.
     @Test func answerDoesNotWait() async throws {
         let fake = FakeMailSender()
-        fake.delay = .milliseconds(1500)
+        fake.delay = .seconds(5)
         try await withTestApp(mail: fake) { app in
             try await configureMail(app)
             try await userWithEmail(app, "pat", email: "pat@x.de")
-            let started = ContinuousClock.now
             try await app.testing().test(.POST, "/forgot-password", headers: .sameOrigin, beforeRequest: { req in
                 try req.content.encode(ForgotForm(username: "pat"), as: .urlEncodedForm)
             }, afterResponse: { res async in
                 #expect(res.body.string.contains(Self.answer))
+                #expect(fake.sent.isEmpty, "the response waited for the mail")
             })
-            #expect(ContinuousClock.now - started < .seconds(1))
             await app.backgroundTasks.drain()
             #expect(fake.sent.count == 1)
         }

@@ -9,7 +9,7 @@ here, see [Mail](email.md) and [Single sign-on](sso.md).
 | Variable | Required | Meaning |
 |---|---|---|
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | first start only | First admin (password at least 8 characters) |
-| `TZ` | recommended | Time zone for "today", for example `Europe/Berlin` |
+| `TZ` | recommended | Time zone for "today" and for the time of the daily run ([notifications](notifications.md)), for example `Europe/Berlin` |
 | `TMDB_LANGUAGE` | no | Language of the TMDB data, default `de-DE` |
 | `TOKEN_KEY` | recommended | Key for the encrypted secrets (Base64, 32 bytes), see [Encryption key](#encryption-key) |
 | `TOKEN_KEY_FILE` | no | File with the key instead of `TOKEN_KEY` (for example a Docker secret) |

@@ -22,8 +22,9 @@ again. The API does not accept session cookies. Errors come as `{"code": …, "m
 Under **Konto → Geräte** (account → devices) users sign out apps or create a token for scripts or the API page (it is
 shown only once). The API page does not remember a pasted token, so paste it again after reloading.
 
-If [mail](email.md) is set up and the user has an address under **Konto**, every newly connected app triggers a mail
-with the device name, the time and a link to sign it out.
+Every newly connected app triggers a notice with the device name, the time and a link to sign it out. It goes out
+through the user's [notification](notifications.md) channel: by [mail](email.md) when mail is set up and the user has an
+address under **Konto**, or through the KNot webhook when they chose it.
 
 ## Scope
 
