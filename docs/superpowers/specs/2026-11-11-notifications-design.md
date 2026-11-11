@@ -85,8 +85,10 @@ Heute (`DailyRefreshLifecycle`): 60 s nach dem Start, dann alle 24 h – Uhrzeit
   gibt, genau einmal am nächstmöglichen Zeitpunkt).
 - **Änderung greift sofort,** ohne Neustart: Speichern unter System weckt den wartenden Durchgang auf, er berechnet
   die nächste Ausführung neu.
-- **Nach dem Start** läuft der Durchgang nur dann nach 60 s, wenn der letzte vollständige Durchgang mehr als 24 h her
-  ist (oder nie lief) – sonst wartet er auf die eingestellte Uhrzeit. Dafür speichert `app_settings` den Beginn des
+- **Nach dem Start** läuft der Durchgang nur dann nach 60 s, wenn die eingestellte Uhrzeit seit dem letzten
+  vollständigen Durchgang verstrichen ist (oder er nie lief) – sonst wartet er auf die eingestellte Uhrzeit.
+  *(Nach Abschlussprüfung: ursprünglich „mehr als 24 h her“ – damit lief ein Server, der nachts aus ist, nur jeden
+  zweiten Tag. Gemerkt wird der Beginn eines Durchgangs erst, wenn er vollständig war.)* Dafür speichert `app_settings` den Beginn des
   letzten Durchgangs (z. B. `daily_run_at`). *(Entscheidung Claude: Updates und Neustarts lösen so nicht jedes Mal
   einen kompletten TMDB-Abgleich und Meldungen zu ungewohnter Zeit aus; ein verpasster Tag wird nachgeholt.)*
 - **Reihenfolge im Durchgang:** wie heute (Laufzeiten, abgelaufene Tokens, Cache-Pflege, TMDB-Abgleich der Serien),
@@ -171,7 +173,9 @@ reguläre Folgen (`season >= 1`), wie beim Kasten „Neue Folgen“.
 - **Umnummerierte Folgen:** Eine Meldung gilt auch dann als schon verschickt, wenn sie für eine andere Zeile derselben
   Serie mit derselben `tmdb_episode_id` eingetragen ist (gleiche Art, bei `soon`/`today` gleiches Datum). So kommt
   eine verschobene Folge nicht noch einmal als „erkannt“ – soweit TMDB beim Verschieben die ID behält; vergibt TMDB
-  eine neue, ist eine zweite „erkannt“-Meldung hinnehmbar.
+  eine neue, ist eine zweite „erkannt“-Meldung hinnehmbar. Für „erkannt“ zählt außerdem der **früheste**
+  `first_seen_at` aller Zeilen mit dieser ID (leer = schon immer bekannt) *(nach Abschlussprüfung: sonst würde eine
+  Folge, die der Nutzer schon kannte, nach dem Umnummerieren als „neu angekündigt“ gemeldet)*.
 - **Eine Meldung deckt spätere ab:** Wird eine Folge als „erkannt“ verschickt und liegt ihr Datum schon im Fenster
   für „in 3 Tagen“ oder ist heute, werden diese Arten mit eingetragen (sofern der Nutzer sie eingeschaltet hat) – die
   Folge steht dann nur einmal in der Nachricht. Ebenso deckt „heute“ ein noch offenes „in 3 Tagen“ ab.
