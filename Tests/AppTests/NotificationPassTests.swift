@@ -123,4 +123,29 @@ struct NotificationPassTests {
             #expect(result.cleaned == 1)
         }
     }
+
+    @Test func dailyPassSendsAndRecordsItsStartTime() async throws {
+        let mail = FakeMailSender()
+        try await withTestApp(mail: mail) { app in
+            try await configureMail(app)
+            try await seedPat(app)
+            await runDailyPass(app, now: F.t2)
+            #expect(mail.sent.count == 1)
+            let stored = try await NotificationSettingsService(db: app.db).settings()
+            #expect(stored.lastRunAt == F.t2)
+        }
+    }
+
+    @Test func cancelledPassIsNotRecorded() async throws {
+        try await withTestApp { app in
+            let task = Task {
+                while !Task.isCancelled { await Task.yield() }
+                await runDailyPass(app, now: F.t2)
+            }
+            task.cancel()
+            await task.value
+            let stored = try await NotificationSettingsService(db: app.db).settings()
+            #expect(stored.lastRunAt == nil)
+        }
+    }
 }

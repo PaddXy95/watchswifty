@@ -62,16 +62,14 @@ func backfillRuntimes(db: any Database, provider: TMDBProvider, cipher: TokenCip
     return refreshed
 }
 
-/// One daily pass: runtimes, expired tokens, TMDB cache upkeep, refresh of due series, then notifications.
+/// One daily pass: runtimes, expired tokens, TMDB cache upkeep, refresh of due series, then notifications; recorded
+/// as the last run only when it completed.
 func runDailyPass(_ application: Application, now: Date = .now) async {
     let db = application.db
     let provider = application.tmdbProvider
     let worker = application.matchingWorker
     let logger = application.logger
     let cipher = application.tokenCipher
-    do { try await application.notificationSettings.markRun(at: now) } catch {
-        logger.warning("Täglicher Durchgang: Zeitpunkt nicht gespeichert: \(error)")
-    }
     let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
     if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
     if let expired = try? await APITokenService(db: db).deleteExpired(), expired > 0 {
@@ -109,6 +107,11 @@ func runDailyPass(_ application: Application, now: Date = .now) async {
                                           logger: logger)
     if notified.sent > 0 || notified.failed > 0 {
         logger.info("Benachrichtigungen: \(notified.sent) verschickt, \(notified.failed) fehlgeschlagen")
+    }
+    // Only a complete pass counts (its start time): one cut short by a shutdown is repeated after the restart.
+    guard !Task.isCancelled else { return }
+    do { try await application.notificationSettings.markRun(at: now) } catch {
+        logger.warning("Täglicher Durchgang: Zeitpunkt nicht gespeichert: \(error)")
     }
 }
 
