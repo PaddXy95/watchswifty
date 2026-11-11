@@ -121,7 +121,7 @@ extension APIHandler {
 
     static func mapping(_ mapping: NetflixMapping, titleName: String?) -> Components.Schemas.Mapping {
         .init(id: mapping.id?.uuidString ?? "", netflixName: mapping.netflixName, kind: mapping.titleKind == .movie ? .movie : .tv,
-              status: Components.Schemas.Mapping.statusPayload(rawValue: mapping.status) ?? .pending,
+              status: Components.Schemas.MappingStatus(rawValue: mapping.status) ?? .pending,
               title: mapping.$title.value.flatMap { $0 }.map { .init(tmdbId: $0.tmdbID, name: titleName ?? $0.name) })
     }
 

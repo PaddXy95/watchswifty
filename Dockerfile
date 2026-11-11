@@ -8,8 +8,11 @@ WORKDIR /build
 # cached (GitHub Actions cache) until Package.swift/Package.resolved change, so a normal push only compiles the app.
 COPY ./Package.* ./
 RUN swift package resolve
-RUN mkdir -p Sources/App Sources/WatchSwiftyAPI Tests/AppTests/Fixtures \
+RUN mkdir -p Sources/App Sources/WatchSwiftyAPI Sources/WatchSwiftyClient Tests/AppTests/Fixtures \
+        Tests/WatchSwiftyClientTests \
     && echo 'print("stub")' > Sources/App/main.swift \
+    && echo '' > Sources/WatchSwiftyClient/Stub.swift \
+    && echo '' > Tests/WatchSwiftyClientTests/Stub.swift \
     && echo '' > Sources/WatchSwiftyAPI/Stub.swift \
     && printf 'openapi: 3.1.0\ninfo: {title: stub, version: "0"}\npaths: {}\n' > Sources/WatchSwiftyAPI/openapi.yaml \
     && printf 'generate: [types, server]\naccessModifier: package\n' > Sources/WatchSwiftyAPI/openapi-generator-config.yaml \

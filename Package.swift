@@ -4,7 +4,12 @@ import PackageDescription
 let package = Package(
     name: "watchswifty",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v26),
+    ],
+    products: [
+        // Client for the iOS app, generated from the same openapi.yaml (growing enums are open, see OpenValues.swift).
+        .library(name: "WatchSwiftyClient", targets: ["WatchSwiftyClient"]),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.122.3"),
@@ -29,6 +34,12 @@ let package = Package(
             dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
             plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
         ),
+        // Types and client for the iOS app, from the same openapi.yaml (symlink); public, no Vapor.
+        .target(
+            name: "WatchSwiftyClient",
+            dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
+        ),
         .executableTarget(
             name: "App",
             dependencies: [
@@ -48,6 +59,11 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "JWTKit", package: "jwt-kit"),
             ],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "WatchSwiftyClientTests",
+            dependencies: [.target(name: "WatchSwiftyClient")],
             swiftSettings: swiftSettings
         ),
         .testTarget(

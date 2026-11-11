@@ -2030,8 +2030,7 @@ components:
         service:
           $ref: "#/components/schemas/Service"
         origin:
-          type: string
-          enum: [manual, import]
+          $ref: "#/components/schemas/WatchOrigin"
     EpisodeRef:
       type: object
       required: [season, number, name]
@@ -2312,8 +2311,7 @@ components:
           type: string
           enum: [tv, movie]
         status:
-          type: string
-          enum: [pending, auto, confirmed, review, ignored]
+          $ref: "#/components/schemas/MappingStatus"
         title:
           $ref: "#/components/schemas/TitleRef"
     NetflixImport:
@@ -2385,8 +2383,7 @@ components:
         rating:
           type: integer
         status:
-          type: string
-          enum: [pending, imported, review, not_found, skipped]
+          $ref: "#/components/schemas/FilmStatus"
         tmdbId:
           type: integer
         candidates:
@@ -2671,6 +2668,22 @@ components:
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
+    WatchOrigin:
+      type: string
+      description: Herkunft einer Sichtung.
+      enum: [manual, import]
+    MappingStatus:
+      type: string
+      description: Stand einer Netflix-Zuordnung.
+      enum: [pending, auto, confirmed, review, ignored]
+    FilmStatus:
+      type: string
+      description: Stand eines Filmlisten-Eintrags.
+      enum: [pending, imported, review, not_found, skipped]
+    DeviceKind:
+      type: string
+      description: Geräte-Token aus dem Browser-Login oder von Hand erstellt.
+      enum: [device, manual]
     WatchInput:
       type: object
       properties:
@@ -2733,8 +2746,7 @@ components:
         service:
           $ref: "#/components/schemas/Service"
         origin:
-          type: string
-          enum: [manual, import]
+          $ref: "#/components/schemas/WatchOrigin"
     Episode:
       type: object
       required: [season, number, name, aired, watches]
@@ -2844,8 +2856,7 @@ components:
         name:
           type: string
         kind:
-          type: string
-          enum: [device, manual]
+          $ref: "#/components/schemas/DeviceKind"
         createdAt:
           type: string
           format: date-time

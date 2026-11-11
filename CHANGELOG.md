@@ -5,6 +5,9 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
 ## [Unveröffentlicht]
 
 ### Neu
+- **Client-Bibliothek für die iOS-App:** Das Swift-Paket bietet zusätzlich die Bibliothek `WatchSwiftyClient`, aus
+  derselben API-Beschreibung erzeugt wie der Server. Werte, die mit neuen Versionen wachsen können (Streaming-Dienste,
+  Status von Import und Zuordnungen, Geräte-Art), sind dort offen – ältere Apps verstehen neuere Server weiterhin.
 - **Anmeldung über OIDC (SSO):** Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia,
   Pocket ID …) per „Mit SSO anmelden“. Bestehende Konten werden unter **Konto** verknüpft, neue entstehen nach
   Bestätigung beim ersten Login, Einladungen lassen sich über SSO annehmen. Die Benutzer-Seite zeigt, wer schon
