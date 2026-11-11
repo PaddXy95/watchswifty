@@ -33,6 +33,9 @@ Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https:/
   ohne Anmeldung raus. Jetzt erscheint ein Hinweis, und nichts wird gespeichert.
 
 ### Sicherer
+- **Neue Sitzung bei jeder Anmeldung:** Passwort-Login, SSO und das Setzen eines Passworts über Reset- oder
+  Einladungslink vergeben jetzt eine neue Sitzungs-ID und löschen die alte. Eine vorher im Browser untergeschobene
+  Sitzung (etwa durch einen anderen Dienst auf demselben Server) wird so nie zu einer angemeldeten (Session Fixation).
 - **SSO-Konten und Apps:** Konten, die nur über den Provider hineinkommen, gehen vor dem Verbinden einer App und vor
   einem von Hand erstellten Token einmal durch den Provider – wer dort gesperrt ist, bekommt kein neues Token.
 - Keine Seite lässt sich mehr in fremde Seiten einbetten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). Das

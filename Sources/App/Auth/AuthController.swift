@@ -44,8 +44,7 @@ struct AuthController {
         let hash = user.flatMap { $0.hasPassword ? $0.passwordHash : nil } ?? req.application.dummyPasswordHash
         let matches = try await req.password.async.verify(input.password, created: hash)
         if let user, user.hasPassword, matches {
-            req.auth.login(user)
-            req.session.authenticate(user)
+            try await req.signInWithNewSession(user)
             return req.redirect(to: returnTo ?? "/", redirectType: .normal)
         }
         try await Task.sleep(for: req.application.appConfig.loginFailureDelay)

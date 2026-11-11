@@ -114,7 +114,7 @@ struct OIDCController {
             }
             _ = try await tokens.consume(token)
             try await PasswordTokenService(db: req.db).deleteAll(userID: user.requireID())
-            return signIn(req, user, redirect: "/account?sso=linked")
+            return try await signIn(req, user, redirect: "/account?sso=linked")
         }
         if flow.intent == .invite, let token = flow.inviteToken {
             if let problem = try await Self.inviteProblem(req, token) {
@@ -133,7 +133,7 @@ struct OIDCController {
             try await passwordTokens.deleteAll(userID: user.requireID())
             try await OIDCLinkTokenService(db: req.db).deleteAll(userID: user.requireID())
             try await service.syncEmail(user, from: identity)
-            return signIn(req, user, redirect: "/account?welcome=1")
+            return try await signIn(req, user, redirect: "/account?welcome=1")
         }
         if flow.intent == .reauth, let user = req.auth.get(User.self) {
             guard let owner = try await service.account(for: identity), owner.id == user.id else {
@@ -158,7 +158,7 @@ struct OIDCController {
         }
         if let user = try await service.account(for: identity) {
             try await service.syncEmail(user, from: identity)
-            return signIn(req, user, redirect: flow.returnTo ?? "/")
+            return try await signIn(req, user, redirect: flow.returnTo ?? "/")
         }
         var parked = flow
         parked.pending = identity
@@ -202,7 +202,7 @@ struct OIDCController {
                                           NewAccountPage(ssoName: oidc.displayName, passwordLogin: req.application.loginSettings.current.passwordLogin,
                                                          username: input.username, error: error.message)).encodeResponse(for: req)
         }
-        return signIn(req, user, redirect: flow.returnTo ?? "/account?welcome=1")
+        return try await signIn(req, user, redirect: flow.returnTo ?? "/account?welcome=1")
     }
 
     func cancel(req: Request) async throws -> Response {
@@ -226,10 +226,9 @@ struct OIDCController {
         return (oidc, req.application.oidcProviders.provider(for: oidc))
     }
 
-    /// Signs in like the password login and ends the flow cookie.
-    func signIn(_ req: Request, _ user: User, redirect: String) -> Response {
-        req.auth.login(user)
-        req.session.authenticate(user)
+    /// Signs in like the password login (new session ID) and ends the flow cookie.
+    func signIn(_ req: Request, _ user: User, redirect: String) async throws -> Response {
+        try await req.signInWithNewSession(user)
         let response = req.redirect(to: redirect, redirectType: .normal)
         response.cookies[OIDCFlowCookie.name] = OIDCFlowCookie.expired
         return response
