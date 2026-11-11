@@ -92,6 +92,12 @@ final class AppSettings: Model, @unchecked Sendable {
     @OptionalField(key: "mail_config") var mailConfig: String?
     /// OIDC settings (`OIDCSettings` as JSON, sealed with the server key); nil = SSO not set up.
     @OptionalField(key: "oidc_config") var oidcConfig: String?
+    /// Time of the daily pass (`HH:MM`, server time zone); nil = 07:00.
+    @OptionalField(key: "daily_run_time") var dailyRunTime: String?
+    /// Start of the last daily pass (a restart within 24 hours waits for the set time).
+    @OptionalField(key: "daily_run_at") var dailyRunAt: Date?
+    /// KNot webhook address for notifications; nil = webhook off.
+    @OptionalField(key: "webhook_url") var webhookURL: String?
 
     init() {
         self.updateCheck = false

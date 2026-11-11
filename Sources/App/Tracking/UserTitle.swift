@@ -15,6 +15,8 @@ final class UserTitle: Model, @unchecked Sendable {
     /// „Beobachten“: remind about new episodes.
     @OptionalField(key: "followed") var followed: Bool?
     @OptionalField(key: "followed_on") var followedOn: String?
+    /// Exact time of „Beobachten“ (episodes first seen later count as newly announced); nil for older follows.
+    @OptionalField(key: "followed_at") var followedAt: Date?
     /// Day of the last „Erledigt“ on the new-episodes note.
     @OptionalField(key: "new_seen_until") var newSeenUntil: String?
 

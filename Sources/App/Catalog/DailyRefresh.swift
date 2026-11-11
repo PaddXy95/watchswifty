@@ -15,9 +15,11 @@ func seriesDueForRefresh(on db: any Database) async throws -> [Title] {
         .filter { !["Ended", "Canceled"].contains($0.tmdbStatus ?? "") }
 }
 
-/// Token of a user who has the series visible in their library (nil if nobody with a token does).
+/// Token of a user who has the series visible in their library or follows it (nil if nobody with a token does) –
+/// the same users that make it due in `seriesDueForRefresh`.
 func refreshToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
-    let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID).filter(\.$hidden == false).all().map(\.$user.id)
+    let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID)
+        .group(.or) { $0.filter(\.$hidden == false).filter(\.$followed == true) }.all().map(\.$user.id)
     guard !owners.isEmpty else { return nil }
     return try await User.query(on: db).filter(\.$id ~~ owners).filter(\.$tmdbToken != nil).all()
         .lazy.compactMap { cipher.open($0.tmdbToken) }.first
@@ -60,53 +62,83 @@ func backfillRuntimes(db: any Database, provider: TMDBProvider, cipher: TokenCip
     return refreshed
 }
 
-/// Refreshes due series one after another: first 60 s after boot, then every 24 h.
+/// One daily pass: runtimes, expired tokens, TMDB cache upkeep, refresh of due series, then notifications; recorded
+/// as the last run only when it completed.
+func runDailyPass(_ application: Application, now: Date = .now) async {
+    let db = application.db
+    let provider = application.tmdbProvider
+    let worker = application.matchingWorker
+    let logger = application.logger
+    let cipher = application.tokenCipher
+    let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
+    if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
+    if let expired = try? await APITokenService(db: db).deleteExpired(), expired > 0 {
+        logger.info("App-API: \(expired) abgelaufene Geräte-Tokens gelöscht")
+    }
+    if let expired = try? await PasswordTokenService(db: db).deleteExpired(), expired > 0 {
+        logger.info("\(expired) abgelaufene Links zum Passwort-Setzen gelöscht")
+    }
+    if let expired = try? await OIDCLinkTokenService(db: db).deleteExpired(), expired > 0 {
+        logger.info("\(expired) abgelaufene Verknüpfungslinks gelöscht")
+    }
+    let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
+    if !maintenance.isEmpty {
+        logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")
+    }
+    do {
+        let due = try await seriesDueForRefresh(on: db)
+        var requeued = 0
+        for title in due {
+            if Task.isCancelled { break }
+            do {
+                guard let token = try await refreshToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
+                try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+                requeued += try await requeueUnmatchedRows(titleID: title.requireID(), on: db)
+            } catch {
+                logger.warning("TMDB-Abgleich für \(title.name) fehlgeschlagen: \(error)")
+            }
+        }
+        logger.info("TMDB-Abgleich: \(due.count) Serien geprüft, \(requeued) Netflix-Zeilen erneut zur Zuordnung")
+        if requeued > 0 { await worker.kick() }
+    } catch {
+        logger.error("TMDB-Abgleich fehlgeschlagen: \(error)")
+    }
+    let notified = await runNotifications(db: db, notifications: application.notifications, today: application.appConfig.today(),
+                                          logger: logger)
+    if notified.sent > 0 || notified.failed > 0 {
+        logger.info("Benachrichtigungen: \(notified.sent) verschickt, \(notified.failed) fehlgeschlagen")
+    }
+    // Only a complete pass counts (its start time): one cut short by a shutdown is repeated after the restart.
+    guard !Task.isCancelled else { return }
+    do { try await application.notificationSettings.markRun(at: now) } catch {
+        logger.warning("Täglicher Durchgang: Zeitpunkt nicht gespeichert: \(error)")
+    }
+}
+
+/// Runs the daily pass at the admin's time (server time zone). After a start it runs at once (after 60 s) only when
+/// the last pass is more than 24 hours old; a new time under System wakes the loop so it applies immediately.
 struct DailyRefreshLifecycle: LifecycleHandler {
     private struct TaskKey: StorageKey { typealias Value = Task<Void, Never> }
 
     func didBootAsync(_ application: Application) async throws {
-        let db = application.db
-        let provider = application.tmdbProvider
-        let worker = application.matchingWorker
+        let trigger = application.dailyRunTrigger
+        let settings = application.notificationSettings
         let logger = application.logger
-        let cipher = application.tokenCipher
         application.storage[TaskKey.self] = Task {
-            try? await Task.sleep(for: .seconds(60))
+            let stored = try? await settings.settings()
+            if DailySchedule.runsAtBoot(lastRun: stored?.lastRunAt, now: .now, time: stored?.dailyRunTime ?? DailySchedule.defaultTime,
+                                        timeZone: .current) {
+                try? await Task.sleep(for: .seconds(60))
+                if Task.isCancelled { return }
+                await runDailyPass(application)
+            }
             while !Task.isCancelled {
-                let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
-                if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
-                if let expired = try? await APITokenService(db: db).deleteExpired(), expired > 0 {
-                    logger.info("App-API: \(expired) abgelaufene Geräte-Tokens gelöscht")
-                }
-                if let expired = try? await PasswordTokenService(db: db).deleteExpired(), expired > 0 {
-                    logger.info("\(expired) abgelaufene Links zum Passwort-Setzen gelöscht")
-                }
-                if let expired = try? await OIDCLinkTokenService(db: db).deleteExpired(), expired > 0 {
-                    logger.info("\(expired) abgelaufene Verknüpfungslinks gelöscht")
-                }
-                let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
-                if !maintenance.isEmpty {
-                    logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")
-                }
-                do {
-                    let due = try await seriesDueForRefresh(on: db)
-                    var requeued = 0
-                    for title in due {
-                        if Task.isCancelled { break }
-                        do {
-                            guard let token = try await refreshToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
-                            try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
-                            requeued += try await requeueUnmatchedRows(titleID: title.requireID(), on: db)
-                        } catch {
-                            logger.warning("TMDB-Abgleich für \(title.name) fehlgeschlagen: \(error)")
-                        }
-                    }
-                    logger.info("TMDB-Abgleich: \(due.count) Serien geprüft, \(requeued) Netflix-Zeilen erneut zur Zuordnung")
-                    if requeued > 0 { await worker.kick() }
-                } catch {
-                    logger.error("TMDB-Abgleich fehlgeschlagen: \(error)")
-                }
-                try? await Task.sleep(for: .seconds(24 * 3600))
+                let time = (try? await settings.settings().dailyRunTime) ?? DailySchedule.defaultTime
+                let next = DailySchedule.nextRun(after: .now, time: time, timeZone: .current)
+                logger.info("Nächster täglicher Durchgang: \(formatDateTime(next)) Uhr")
+                if await trigger.sleep(until: next) { continue }
+                if Task.isCancelled { break }
+                await runDailyPass(application)
             }
         }
     }

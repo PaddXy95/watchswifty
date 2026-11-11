@@ -72,7 +72,7 @@ extension APIHandler {
 
     static func filmEntry(_ entry: FilmListEntry) -> Components.Schemas.FilmEntry {
         .init(id: entry.id?.uuidString ?? "", title: entry.title, year: entry.year, watchCount: entry.watchList.count, rating: entry.rating,
-              status: Components.Schemas.FilmEntry.statusPayload(rawValue: entry.status) ?? .pending, tmdbId: entry.tmdbID,
+              status: Components.Schemas.FilmStatus(rawValue: entry.status) ?? .pending, tmdbId: entry.tmdbID,
               candidates: entry.candidateList.map(searchResult), error: entry.error)
     }
 }

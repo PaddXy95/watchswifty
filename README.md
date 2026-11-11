@@ -1,477 +1,86 @@
-<img src="Public/favicon.svg" width="96" height="96" alt="WatchSwifty-Icon">
+<img src="Public/favicon.svg" width="96" height="96" alt="WatchSwifty icon">
 
 # WatchSwifty
 
 [![CI/CD](https://github.com/PaddXy95/watchswifty/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/PaddXy95/watchswifty/actions/workflows/docker.yml)
 [![Release](https://img.shields.io/github/v/release/PaddXy95/watchswifty?sort=semver)](https://github.com/PaddXy95/watchswifty/releases)
+![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
+![Vapor](https://img.shields.io/badge/Vapor-4-0D0D0D?logo=vapor&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-[![Swift](https://img.shields.io/badge/Swift-1F2937?style=for-the-badge&logo=swift&logoColor=F97316)](https://www.swift.org)
-[![Vapor](https://img.shields.io/badge/Vapor-1F2937?style=for-the-badge&logo=vapor&logoColor=3B82F6)](https://vapor.codes)
+A self-hosted tracker for series and movies. Mark episodes and movies as watched, rate and comment on them, import
+your Netflix history and always see the next episode to watch, for yourself or a small group of people. One Docker
+container, one SQLite file, data from TMDB. The web UI is in German; apps such as
+[WatchSwifty for iOS](https://github.com/PaddXy95/watchswifty-ios) use its JSON API.
 
-Selbst gehosteter Serien- und Film-Tracker in Swift (Vapor 4, Fluent/SQLite, Elementary + htmx).
+## Features
 
-- **Weiterschauen:** eine Karte pro Serie mit der nächsten Folge (Serien der letzten 3 Monate)
-- **Netflix-Import:** Wiedergabeaktivität als CSV hochladen, wird automatisch TMDB zugeordnet
-- **Manuell:** Serien/Filme suchen, Folgen abhaken (mit Datum und Dienst), bewerten (1–10),
-  private Kommentare zu Serie, Staffel und Film
-- **Verlauf** und **Bibliothek**, Klappentext und Links zu TMDB, IMDb, Rotten Tomatoes, SeriesGraph
-- **Statistik:** gesehene Filme, Serien, Folgen und verbrachte Zeit – insgesamt, pro Jahr/Monat und nach Bewertung
-- **Mehrere Benutzer** mit getrennten Daten; der Admin legt Konten an oder lädt per Mail ein
-- **E-Mail (optional):** Einladungen und „Passwort vergessen“ über einen SMTP-Server, z. B. [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
+- **Continue watching:** one card per series with the next episode (series of the last 3 months)
+- **Netflix import:** upload your viewing history as CSV, titles are matched to TMDB automatically
+- **Tracking by hand:** search series and movies, mark episodes as watched (with date and streaming service), rate
+  them 1–10, private comments on series, seasons and movies
+- **History and library** with synopsis and links to TMDB, IMDb, Rotten Tomatoes and SeriesGraph
+- **Statistics:** movies, series, episodes and time watched, in total, per year and month and by rating
+- **Several users** with separate data; the admin creates accounts or invites people by mail
+- **Single sign-on (optional)** through your own OpenID Connect provider
+- **Mail (optional)** for invitations, password resets and new devices, for example through
+  [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
+- **Notifications (optional)** about new episodes of followed series, by mail or through a
+  [KNot](https://github.com/nexus421/KNot) webhook, once a day at a time the admin chooses
+- **App API** (`/api/v1`, OpenAPI) with device tokens and a Swift client library
+- Secrets such as TMDB tokens and mail settings are encrypted at rest
 
-Repository: https://github.com/PaddXy95/watchswifty
+## Quick start
 
-Film- und Seriendaten stammen von [TMDB](https://www.themoviedb.org). Diese Anwendung verwendet TMDB und die
-TMDB-APIs, ist aber nicht von TMDB unterstützt, zertifiziert oder anderweitig genehmigt. Gemäß den TMDB-Bedingungen
-werden zwischengespeicherte Daten spätestens nach 60 Tagen mit dem Token eines Benutzers, der den Titel nutzt, neu
-geholt; nicht mehr genutzte Titel werden gelöscht.
+Requires Docker with Compose. Every user needs a free [TMDB token](docs/tmdb.md).
 
----
-
-## Schnellstart mit Docker Compose
-
-Die GitHub Action baut bei jedem Push auf `main` das Image `ghcr.io/paddxy95/watchswifty:latest`.
-
-1. Auf dem Server einen Ordner anlegen (z. B. `~/watchswifty`) und `docker-compose.yml` sowie `.env.example`
-   aus diesem Repository hineinkopieren; `.env.example` in `.env` umbenennen.
-2. In der `.env` mindestens `TOKEN_KEY` (Ausgabe von `openssl rand -base64 32`) und `ADMIN_PASSWORD` eintragen
-   und den Schlüssel zusätzlich sicher aufbewahren (siehe [TMDB-Tokens verschlüsselt](#tmdb-tokens-verschlüsselt)).
-   Die Datei nur für dich lesbar machen: `chmod 600 .env`.
-3. Starten:
-
-   ```bash
-   docker compose up -d
-   ```
-
-4. Im Browser `http://<server>:8080` öffnen und mit dem Admin anmelden.
-5. Unter **Konto** den eigenen TMDB-Token hinterlegen (siehe unten).
-
-`ADMIN_USERNAME`/`ADMIN_PASSWORD` werden nur beim allerersten Start gebraucht, solange es noch keinen
-Benutzer gibt; danach werden sie ignoriert. Weitere Konten legt der Admin unter **Benutzer** an.
-
-### Passwort vergessen
-
-Ist [E-Mail](#e-mail-optional) eingerichtet und unter **Konto** eine Adresse hinterlegt, geht es ohne Admin: auf der
-Anmeldeseite „Passwort vergessen?“ wählen, Benutzernamen eingeben, den Link aus der Mail öffnen (gilt eine Stunde).
-
-Ohne Mail – oder wenn sich niemand mehr anmelden kann, auch der einzige Admin – setzt man das Passwort auf dem Server neu:
+Copy `docker-compose.yml` and `.env.example` from this repository into a folder on your server and rename
+`.env.example` to `.env`. Fill in `TOKEN_KEY` (output of the first command, keep it somewhere safe) and
+`ADMIN_PASSWORD`, then start:
 
 ```bash
-docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <benutzername>
-```
-
-Der Befehl fragt das neue Passwort zweimal verdeckt ab; es landet also weder in der Shell-History noch in der
-`.env`. Er läuft über `docker-entrypoint.sh`, damit die Datenbank dem App-Benutzer gehören bleibt. Ein geändertes
-`ADMIN_PASSWORD` in der `.env` hilft hier nicht (siehe oben); andere Benutzer kann ein Admin auch unter
-**Benutzer** zurücksetzen.
-
-Logs ansehen bzw. stoppen:
-
-```bash
-docker compose logs -f watchswifty
+openssl rand -base64 32
 ```
 
 ```bash
-docker compose down
-```
-
-`docker compose down` lässt die Daten im Volume `watchswifty-data` stehen.
-
-## Start mit `docker run`
-
-```bash
-docker volume create watchswifty-data
+chmod 600 .env
 ```
 
 ```bash
-docker run -d --name watchswifty --restart unless-stopped \
-  -p 8080:8080 \
-  -v watchswifty-data:/data \
-  -e TZ=Europe/Berlin \
-  -e TOKEN_KEY='<openssl rand -base64 32>' \
-  -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD='ein-langes-passwort' \
-  ghcr.io/paddxy95/watchswifty:latest
+docker compose up -d
 ```
 
-Statt eines benannten Volumes geht auch ein Verzeichnis, z. B. `-v /srv/watchswifty:/data` (in Compose:
-`- /srv/watchswifty:/data`). Der Container übergibt den Ordner beim Start selbst dem App-Benutzer (UID 999) und
-läuft danach ohne Root-Rechte. Startet man ihn mit eigener `user:`-Angabe, muss der Ordner dieser UID gehören.
-
-## Versionen und Releases
-
-WatchSwifty folgt [SemVer](https://semver.org/lang/de/); Änderungen stehen im [CHANGELOG](CHANGELOG.md).
-Die laufende Version steht links im Footer und unter `http://<server>:8080/version`.
-
-**Ablauf (GitHub Actions):**
-
-- Pull Request → Tests und ein Probe-Build des Images (nichts wird hochgeladen).
-- Push auf `main` → Tests und Image-Build laufen parallel; nur wenn die Tests grün sind: Image nach GHCR
-  hochladen und ein GitHub-Release `vX.Y.Z` erstellen.
-- Push auf `beta` oder „Run workflow“ (GitHub → Actions → CI/CD) auf einem beliebigen Branch → wie bei `main`,
-  aber nur das Image `beta` wird hochgeladen; kein Release (siehe [Beta-Version testen](#beta-version-testen)).
-
-Die Abhängigkeiten werden im Docker-Build in einer eigenen Schicht übersetzt und im GitHub-Actions-Cache
-gehalten; solange sich `Package.swift`/`Package.resolved` nicht ändern, wird bei einem Push nur die App selbst
-neu gebaut.
-
-**Versionsnummer:** In `VERSION` steht die angestrebte Version (Start: `0.1.0`). Gibt es dafür noch kein
-Release, wird genau diese Version veröffentlicht; jeder weitere Push auf `main` zählt die letzte Stelle hoch
-(`0.1.1`, `0.1.2`, …). Für eine neue Minor-/Major-Version `VERSION` ändern, z. B. auf `0.2.0`. Steht im
-CHANGELOG ein Abschnitt `## [X.Y.Z]`, wird er als Release-Text verwendet, sonst erzeugt GitHub die
-Änderungsliste automatisch.
-
-| Image-Tag | Inhalt |
-|---|---|
-| `latest` | neuestes Release |
-| `0.1.3` | genau diese Version |
-| `0.1` | neueste 0.1.x-Version |
-| `beta` | neuester Beta-Stand (ungetestet, nur für eine Test-Instanz) |
-| `beta-abc1234` | Beta-Stand genau dieses Commits |
-
-Für planbare Updates eine feste Version eintragen, z. B. `image: ghcr.io/paddxy95/watchswifty:0.1.3`.
-
-**Auf neue Versionen hinweisen lassen:** Als Admin unter **System** „Automatisch alle 12 Stunden prüfen“
-einschalten oder „Jetzt prüfen“ klicken. Dafür fragt WatchSwifty die GitHub-API (`api.github.com`) nach dem
-neuesten Release; GitHub sieht dabei die IP-Adresse des Servers, Daten aus WatchSwifty werden nicht übertragen.
-Standardmäßig ist die Prüfung aus. Gibt es eine neuere Version, zeigt der Footer Admins „Update auf vX.Y.Z
-verfügbar“ und die System-Seite die Befehle zum Aktualisieren (siehe [Update](#update)). Das Repository muss
-dafür öffentlich sein.
-
-Beim allerersten Release legt GitHub das Paket `watchswifty` als privat an; damit der Server es ohne Login
-laden kann, unter GitHub → Packages → watchswifty → Package settings die Sichtbarkeit auf „Public“ stellen
-(oder auf dem Server `docker login ghcr.io` mit einem Token ausführen).
-
-### Beta-Version testen
-
-Neue Funktionen lassen sich vor dem Release in einer zweiten Instanz ausprobieren. Ein Push auf den Branch `beta`
-baut nach grünen Tests `ghcr.io/paddxy95/watchswifty:beta` (dazu `beta-<commit>`); einen beliebigen Branch baut
-man über GitHub → Actions → CI/CD → „Run workflow“. Es entsteht kein Release, `latest` bleibt unverändert. Die
-Beta zeigt ihre Version als z. B. `0.3.1-beta (abc1234)` und meldet keine Updates.
-
-Die Beta bekommt einen eigenen Ordner mit dieser `docker-compose.yml` (plus `.env` wie oben). **Nicht** die
-normale `docker-compose.yml` mit `WATCHSWIFTY_VERSION=beta` kopieren: Container- und Volume-Name sind dort fest,
-die Beta würde sonst die echten Daten ändern – und Datenbank-Änderungen einer Beta lassen sich nicht zurücknehmen.
-
-```yaml
-services:
-  watchswifty-beta:
-    image: ghcr.io/paddxy95/watchswifty:beta
-    container_name: watchswifty-beta
-    restart: unless-stopped
-    ports:
-      - "8081:8080"
-    environment:
-      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY fehlt in .env (openssl rand -base64 32)}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      TZ: ${TZ:-Europe/Berlin}
-      TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
-    volumes:
-      - watchswifty-beta-data:/data
-
-volumes:
-  watchswifty-beta-data:
-    name: watchswifty-beta-data
-```
-
-Neuen Beta-Stand holen: `docker compose pull && docker compose up -d` im Beta-Ordner.
-
-**Mit einer Kopie der echten Daten testen:** In der Beta-`.env` denselben `TOKEN_KEY` eintragen wie in der
-normalen, sonst lassen sich TMDB-Tokens, E-Mail-Adressen und Mail-Einstellungen nicht entschlüsseln. Dann beide
-Container stoppen und das Volume kopieren:
-
-```bash
-docker run --rm -v watchswifty-data:/from:ro -v watchswifty-beta-data:/to ubuntu:noble cp -a /from/. /to/
-```
-
-Danach beide wieder starten. Die Kopie enthält auch die Mail-Einstellungen: Die Beta verschickt dann echte Mails
-an die Benutzer (z. B. „Anmeldung von neuem Gerät“). Wer das nicht will, löscht in der Beta unter **System** die
-E-Mail-Einstellungen.
-
-Browser trennen Cookies nicht nach Port: Laufen beide Instanzen unter demselben Hostnamen, meldet ein Login in der
-Beta dich in der normalen Instanz ab. Abhilfe: die Beta über einen anderen Namen aufrufen (eigene Subdomain oder
-die IP-Adresse statt des Hostnamens).
-
-## Update
-
-Mit Compose:
-
-```bash
-docker compose pull && docker compose up -d
-```
-
-Mit `docker run`:
-
-```bash
-docker pull ghcr.io/paddxy95/watchswifty:latest
-```
-
-```bash
-docker rm -f watchswifty
-```
-
-Danach den `docker run`-Befehl von oben erneut ausführen (das Volume bleibt erhalten).
-Datenbank-Änderungen neuer Versionen werden beim Start automatisch angewendet.
-
-## App-API
-
-WatchSwifty hat eine JSON-API für Apps unter `/api/v1`. Die vollständige Beschreibung (OpenAPI) liegt unter
-`http://<server>:8080/api/openapi.yaml`, eine Doku-Seite zum Ausprobieren unter `http://<server>:8080/api`.
-
-- **Anmeldung einer App:** Die App öffnet im System-Browser-Fenster
-  `/api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
-  (PKCE). Nach Login und „Verbinden“ springt der Browser zu `dev.patmei.watchswifty:/auth?code=…&state=…`; die App tauscht den
-  Code über `POST /api/v1/auth/token` gegen ein Geräte-Token.
-- **Aufrufe:** mit Header `Authorization: Bearer ws_…`. Tokens gelten 90 Tage, danach verbindet sich die App neu.
-- **Geräte verwalten:** unter **Konto → Geräte** – abmelden oder ein Token für Skripte bzw. die Doku erstellen
-  (wird nur einmal angezeigt). Ein in der Doku eingefügtes Token merkt sich der Browser nicht, nach dem Neuladen also
-  neu einfügen.
-- **Neues Gerät:** Ist [E-Mail](#e-mail-optional) eingerichtet und unter **Konto** eine Adresse hinterlegt, kommt bei
-  jeder neu verbundenen App eine Mail mit Gerätename, Zeitpunkt und Link zum Abmelden.
-- Die API nimmt keine Session-Cookies an; Fehler kommen als `{"code": …, "message": …}`.
-- **Umfang** (alles wie im Web): Weiterschauen und Hinweise, Suche, Serien und Filme (abhaken, bewerten,
-  kommentieren, beobachten, ausblenden), Verlauf, Bibliothek, Statistik, Konto und Geräte, Netflix-Import und
-  Filmliste, für Admins Benutzerverwaltung und System. Details und „Ausprobieren“ unter `/api`.
-
-## TMDB-Token
-
-Jeder Benutzer hinterlegt unter **Konto** seinen eigenen kostenlosen TMDB *Read Access Token*:
-
-1. Kostenloses Konto anlegen: https://www.themoviedb.org/signup (E-Mail bestätigen).
-2. Angemeldet zu **Einstellungen → API** gehen: https://www.themoviedb.org/settings/api
-3. Einen API-Schlüssel anfordern (private, nicht-kommerzielle Nutzung), Bedingungen akzeptieren, Formular ausfüllen.
-4. Den langen **„API Read Access Token“** kopieren (beginnt mit `eyJ`) – **nicht** den kurzen „API Key“.
-5. In WatchSwifty unter **Konto** einfügen und speichern.
- Ohne Token funktionieren Suche und Netflix-Zuordnung nicht;
-bereits bekannte Titel, Weiterschauen, Verlauf und Bibliothek schon. Der Token wird beim Speichern bei
-TMDB geprüft, verschlüsselt gespeichert und danach nur noch mit den letzten vier Zeichen angezeigt – auch
-Admins sehen ihn nicht.
-
-### TMDB-Tokens verschlüsselt
-
-Die Tokens liegen mit AES-GCM verschlüsselt in der Datenbank. Eine abhandengekommene Datenbankdatei oder ein
-SQLite-Backup enthält sie damit nicht lesbar. Der Schlüssel kommt aus:
-
-1. `TOKEN_KEY` – 32 Byte als Base64 (`openssl rand -base64 32`), **empfohlen**;
-2. sonst `TOKEN_KEY_FILE` – Pfad zu einer Datei mit diesem Wert (z. B. ein Docker-Secret);
-3. sonst wird beim ersten Start `token.key` neben der Datenbank im Volume erzeugt (Hinweis im Log). Das schützt
-   ein reines SQLite-Backup, aber nicht eine Kopie des ganzen Volumes.
-
-Schlüssel getrennt von den Daten aufbewahren. Geht er verloren oder ändert er sich, sind die gespeicherten
-Tokens nicht mehr lesbar: jeder trägt seinen Token unter **Konto** neu ein, alle anderen Daten bleiben erhalten.
-Tokens aus älteren Versionen werden beim Start automatisch verschlüsselt.
-
-## Anmeldung über OIDC (SSO, optional)
-
-Wer schon einen Identity-Provider betreibt (Authentik, Keycloak, Authelia, Pocket ID, Zitadel, Kanidm …), meldet
-sich darüber an – ein Button „Mit SSO anmelden“ auf der Anmeldeseite. Wer WatchSwifty nutzen darf, regelt der
-Provider (Freigabe der Application für Benutzer bzw. Gruppen). Es gibt genau einen Provider.
-
-**Beim Provider einrichten** (allgemein): einen OAuth2/OpenID-Client vom Typ *confidential* anlegen, Redirect-URI
-`https://<watchswifty>/auth/oidc/callback`, Scopes `openid profile email`, ID-Tokens **asymmetrisch** signieren
-(RS256, ES256, EdDSA …; HS256 wird abgelehnt).
-
-**In WatchSwifty:** als Admin unter **System → Anmeldung über OIDC (SSO)** Anzeigename (z. B. „Authentik“), Issuer,
-Client-ID, Client-Secret und die **Adresse von WatchSwifty** eintragen und speichern. Die Seite zeigt die
-Rücksprung-URL zum Kopieren (Adresse + `/auth/oidc/callback`), prüft die Verbindung gleich mit und hat einen Knopf
-„Verbindung testen“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`) und wirkt sofort, ohne Neustart; das
-Secret wird nie wieder angezeigt und muss neu eingegeben werden, wenn sich Issuer oder Client-ID ändern.
-Umgebungsvariablen braucht es dafür nicht.
-
-Alle Anmeldungen über den Provider laufen über die eingetragene Adresse. Hinter einem Reverse-Proxy muss dieser den
-**Host-Header samt Port** (oder `X-Forwarded-Host`/`X-Forwarded-Port`) weitergeben; sonst funktioniert es zwar auch,
-aber WatchSwifty schreibt bei jeder SSO-Anmeldung eine Warnung ins Log. WatchSwifty muss den Provider unter der
-Issuer-Adresse erreichen (öffentlich vertrauenswürdiges Zertifikat); die App startet aber auch, wenn er gerade nicht
-erreichbar ist.
-
-- **Authentik:** Provider „OAuth2/OpenID“, beim Provider einen **Signing Key** wählen (ohne Key signiert Authentik
-  mit HS256), Subject-Modus auf dem Standard lassen, Application anlegen und freigeben. Issuer ist die
-  „OpenID Configuration Issuer“-Adresse des Providers (mit `/application/o/<slug>/`).
-- **Keycloak:** Issuer `https://kc.example.de/realms/<realm>`, Client mit „Client authentication“ an.
-- **Pocket ID:** OIDC-Client anlegen (nicht „public“); Issuer ist die `APP_URL` von Pocket ID (z. B.
-  `https://id.example.de`). Die Callback-URL muss https sein (sonst `ALLOW_INSECURE_CALLBACK_URLS=true` in Pocket ID);
-  ist dort `INTERNAL_APP_URL` gesetzt, muss WatchSwifty diese interne Adresse erreichen (z. B. gleiches Docker-Netz).
-  Mit Gruppenbeschränkung zeigt Pocket ID Nicht-Mitgliedern eine eigene Fehlerseite.
-
-**Erster Login:** Meldet sich jemand zum ersten Mal über den Provider an, fragt WatchSwifty nach, ob ein neues Konto
-angelegt werden soll (Name vorbelegt) – wer schon ein Konto hat, verknüpft stattdessen (siehe Umstieg). Über SSO
-angelegte Konten haben kein Passwort; ihre E-Mail-Adresse kommt vom Provider.
-
-### Umstieg einer bestehenden Installation
-
-1. OIDC wie oben unter **System** einrichten, **Passwort-Login an lassen** (kein Neustart nötig).
-2. Jeder meldet sich wie gewohnt an und klickt unter **Konto** auf „Mit SSO verknüpfen“. Wer sein Passwort nicht
-   mehr weiß: „Passwort vergessen?“ oder ein **Verknüpfungslink** vom Admin (Benutzer-Seite, per Mail oder zum
-   Weitergeben, 7 Tage gültig). Offene Einladungen lassen sich direkt über SSO annehmen.
-3. Auf der Benutzer-Seite prüfen: „x von y Konten verknüpft · Admin verknüpft: ja“.
-4. Unter **System** „Passwort-Login abschalten“ (geht nur, wenn dein eigenes Konto verknüpft ist). Dann gibt es nur
-   noch den SSO-Button; „Passwort vergessen“, Startpasswörter und „Passwort setzen“ entfallen, neue Konten entstehen
-   per Einladung oder beim ersten SSO-Login. **Notschalter:** `PASSWORD_LOGIN=true` in der `.env` setzen und neu
-   starten – dann bleibt der Passwort-Login an, bis die Variable wieder entfernt ist.
-5. Verbundene Apps laufen weiter (Tokens bis 90 Tage); beim nächsten Verbinden – und für ein von Hand erstelltes
-   Token – geht es einmal über den Provider, ein dort gesperrter Benutzer bekommt kein neues Token. Eine bestehende
-   Web-Sitzung bleibt aber angemeldet, solange sie benutzt wird (jede Nutzung verlängert sie um 30 Tage); wer
-   jemanden sofort aussperren will, löscht das Konto unter **Benutzer**.
-
-Hinweis: Setzt ein Admin einem über SSO angelegten Konto später ein Passwort, behält es die vom Provider übernommene
-Adresse – „Passwort vergessen“ ginge dann an sie.
-
-### Notausgang und Provider-Wechsel
-
-Kommt jemand nicht mehr hinein (Benutzer beim Provider neu angelegt, Passwort-Login zu früh abgeschaltet), gibt es
-einen Verknüpfungslink direkt vom Server (1 Stunde gültig, löst die alte Verknüpfung):
-
-```bash
-docker exec -it watchswifty /app/docker-entrypoint.sh link-oidc <benutzername>
-```
-
-Ändert sich nur die Adresse des Providers (neue Domain, umbenannter Slug), schreibt dieser Befehl alle
-Verknüpfungen um – vorher unter **System** den neuen Issuer eintragen, `<neu>` muss genau der Issuer der neuen
-Discovery sein:
-
-```bash
-docker exec -it watchswifty /app/docker-entrypoint.sh oidc-move-issuer <alt> <neu>
-```
-
-Bei einem **echten Wechsel** des Providers ändern sich die Benutzer-IDs: dann mit eingeschaltetem Passwort-Login neu
-verknüpfen (wie beim Umstieg) oder Verknüpfungslinks verschicken. Eine zufällig gleiche ID beim neuen Provider öffnet
-kein altes Konto.
-
-**Zurück ohne OIDC:** Passwort-Login einschalten und unter **System** „Anmelde-Einstellungen löschen“. Konten mit Passwort melden sich normal an; über
-SSO angelegte Konten gelten wieder als Einladung – „Einladung erneut senden“ oder „Passwort setzen“ auf der
-Benutzer-Seite (bzw. `reset-password`). Schaltet man OIDC später mit demselben Issuer wieder ein, gelten die alten
-Verknüpfungen wieder.
-
-## E-Mail (optional)
-
-Mit eingerichteter Mail lädt der Admin neue Personen per Mail ein (sie legen ihr Passwort selbst fest, der Link gilt
-7 Tage), jeder kann sein Passwort über „Passwort vergessen?“ selbst zurücksetzen, und wer eine Adresse hinterlegt
-hat, erfährt per Mail, wenn sich eine App mit seinem Konto verbindet. Ohne Mail funktioniert alles wie bisher.
-
-**Einrichten:** als Admin unter **System → E-Mail** die Daten des SMTP-Servers eintragen, speichern und
-„Testmail senden“. Alles wird verschlüsselt gespeichert (Schlüssel `TOKEN_KEY`, wie die TMDB-Tokens); das Passwort
-wird nie wieder angezeigt. Ändern sich Server, Port, Verschlüsselung oder Benutzer, muss das Passwort neu eingegeben
-werden. Umgebungsvariablen braucht es dafür nicht.
-
-**Adresse von WatchSwifty** ist die Adresse, unter der Browser die App erreichen (hinter einem Reverse-Proxy dessen
-https-Adresse, z. B. `https://watch.example.lan`). Links in Mails werden nur daraus gebaut.
-
-**Mit [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay):** in der `docker-compose.yml` die auskommentierten
-Zeilen für `swifty-relay` aktivieren (Netzwerk und Volume `swifty-relay-certs`; SwiftyRelay muss vorher einmal
-gelaufen sein), dann:
-
-| Feld | Wert |
-|---|---|
-| Server | `swifty-relay` |
-| Port | `2525` |
-| Verschlüsselung | STARTTLS |
-| Benutzer | `watchswifty` (App-Name im Relay) |
-| Passwort | `SMTP_IN_PASSWORD` des Relays |
-| CA-Datei | `/certs/swifty-relay/ca/ca-bundle.pem` |
-
-SwiftyRelay ersetzt den Absender durch seine eigene Adresse; „Absender-Name“ wirkt dort nicht.
-
-**Anderer Anbieter** (z. B. Mailbox, Gmail mit App-Passwort): Server des Anbieters, Port `587` mit STARTTLS (oder
-`465` mit SSL/TLS), Benutzer und Passwort des Postfachs, CA-Datei leer lassen.
-
-Jeder trägt seine eigene Adresse unter **Konto** ein (Ändern nur mit aktuellem Passwort). Admins sehen fremde
-Adressen nur gekürzt, z. B. `p•••@example.org`.
-
-## Netflix-Verlauf importieren
-
-1. Auf netflix.com: Profil → Konto → Profil wählen → **Wiedergabeaktivität** → **Alle herunterladen**.
-2. In WatchSwifty unter **Import** die Datei `NetflixViewingHistory.csv` hochladen.
-3. Eindeutige Serien/Filme werden automatisch zugeordnet. Unklare Namen erscheinen unter
-   **Zu prüfen**, nicht gefundene Folgen unter **Nicht zugeordnet**. Falsche Treffer lassen sich unter
-   **Zuordnungen** ändern oder zurücksetzen.
-
-Eine eigene Filmliste (CSV aus Numbers/Excel mit den Spalten Filmname, Erscheinungsjahr, Datum, „Mit …“,
-Streamingdienst, Übeltäter, Bewertung, Detail, Bemerkung) lässt sich unter **Import → Filmliste importieren**
-übernehmen: „Mit …“, Übeltäter und Bemerkung landen im Kommentar, Detail (0–100) wird zur Bewertung 1–10, und
-jede Zeile wird eine Sichtung. Unklare Filme lassen sich dort aus Vorschlägen auswählen.
-
-Ein erneuter Import desselben (oder eines neueren) Exports legt keine Duplikate an. Auch eine in Excel
-(deutsch) neu gespeicherte Datei mit `;` und `TT.MM.JJJJ` wird erkannt.
-
-## Konfiguration
-
-| Variable | Pflicht | Bedeutung |
-|---|---|---|
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | nur erster Start | Erster Admin (Passwort mindestens 8 Zeichen) |
-| `TZ` | empfohlen | Zeitzone für „heute“, z. B. `Europe/Berlin` |
-| `TMDB_LANGUAGE` | nein | Sprache der TMDB-Daten, Standard `de-DE` |
-| `TOKEN_KEY` | empfohlen | Schlüssel für die gespeicherten TMDB-Tokens (Base64, 32 Byte) |
-| `TOKEN_KEY_FILE` | nein | Datei mit dem Schlüssel statt `TOKEN_KEY` (z. B. Docker-Secret) |
-| `PUBLIC_ORIGIN` | nein | Öffentliche Adresse(n) hinter einem Reverse-Proxy, kommagetrennt, z. B. `https://nas.lan:8443` |
-| `PASSWORD_LOGIN` | nein | Nur `true`: Notschalter, erzwingt den Passwort-Login (SSO wird unter **System** eingerichtet, siehe [Anmeldung über OIDC](#anmeldung-über-oidc-sso-optional)) |
-| `DATABASE_PATH` | nein | Standard `/data/watchswifty.sqlite` |
-| `HOST` / `PORT` | nein | Standard `0.0.0.0` / `8080` |
-
-## Backup und Wiederherstellung
-
-Alle Daten liegen in einer SQLite-Datei im Volume (`/data/watchswifty.sqlite`). Die TMDB-Tokens darin sind
-verschlüsselt; Verlauf, Bewertungen und Kommentare nicht – Backups entsprechend geschützt aufbewahren. Ohne
-`TOKEN_KEY` liegt der Schlüssel als `/data/token.key` im Volume; ihn bei Bedarf mitsichern, sonst müssen die
-Tokens nach einer Wiederherstellung neu eingetragen werden.
-
-Backup (Container kurz stoppen, damit die Datei konsistent ist):
-
-```bash
-docker compose stop watchswifty
-```
-
-```bash
-docker run --rm -v watchswifty-data:/data -v "$PWD":/backup ubuntu:noble \
-  cp /data/watchswifty.sqlite /backup/watchswifty-$(date +%F).sqlite
-```
-
-```bash
-docker compose start watchswifty
-```
-
-Wiederherstellen: Container stoppen, die Sicherung als `/data/watchswifty.sqlite` zurückkopieren
-(gleicher `docker run … cp`-Befehl mit vertauschten Pfaden), Container starten.
-
-## Zugriff von außerhalb (Reverse-Proxy)
-
-Die App spricht kein TLS. Für Zugriff außerhalb des Heimnetzes einen Reverse-Proxy (z. B. Caddy,
-Traefik, nginx) mit HTTPS davorsetzen. Zum Schutz vor CSRF muss die Adresse, die der Browser
-aufruft, bei der App ankommen – entweder über den `Host`-Header inklusive Port oder über
-`PUBLIC_ORIGIN`. Beispiel nginx:
-
-```nginx
-location / {
-    proxy_pass http://watchswifty:8080;
-    proxy_set_header Host $http_host;          # behält den Port, anders als $host
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-Alternativ `PUBLIC_ORIGIN=https://nas.lan:8443` setzen.
-
-## Image selbst bauen
-
-```bash
-git clone https://github.com/PaddXy95/watchswifty.git
-```
-
-```bash
-cd watchswifty && docker build -t watchswifty .
-```
-
-Danach in `docker-compose.yml` `image: watchswifty` eintragen bzw. bei `docker run` `watchswifty`
-statt `ghcr.io/paddxy95/watchswifty:latest` verwenden. Das Image wird für die Architektur des
-bauenden Rechners erzeugt; die GitHub Action baut `linux/amd64`.
-
-## Entwicklung
-
-Voraussetzung: Swift 6.3 oder neuer.
-
-```bash
-swift test
-```
-
-```bash
-DATABASE_PATH=./dev.sqlite ADMIN_USERNAME=admin ADMIN_PASSWORD=adminpass123 swift run App serve
-```
+Open `http://<server>:8080`, sign in as the admin and paste your TMDB token under **Konto** (account). For HTTPS, put a
+reverse proxy in front, see [Installation](docs/installation.md#reverse-proxy-https).
+
+## Documentation
+
+- [Installation](docs/installation.md): Docker Compose, `docker run`, data directory, reverse proxy, own image
+- [Configuration](docs/configuration.md): environment variables and the encryption key
+- [Operations](docs/operations.md): updates, update check, backup and restore, command line
+- [Accounts](docs/accounts.md): users, invitations, forgotten passwords
+- [TMDB](docs/tmdb.md): getting a token, cached data
+- [Single sign-on](docs/sso.md): OIDC setup, moving an existing installation, emergency access
+- [Mail](docs/email.md): SMTP setup, SwiftyRelay
+- [Notifications](docs/notifications.md): new episodes by mail or KNot webhook, daily run time
+- [Import](docs/import.md): Netflix viewing history and your own film list
+- [App API](docs/app-api.md): connecting apps, tokens, Swift client
+- [Releases](docs/releases.md): versions, image tags, testing a beta
+- [Development](docs/development.md): build, tests, project layout
+- [Changelog](CHANGELOG.md) · Privacy policy of the iOS app: [English](docs/privacy-ios-app.md),
+  [Deutsch](docs/datenschutz-ios-app.md)
+
+## TMDB
+
+Movie and series data come from [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed
+or certified by TMDB. Cached data is refreshed after 60 days at the latest and deleted when nobody uses it any more,
+see [TMDB](docs/tmdb.md#cached-data).
+
+## Written with AI
+
+WatchSwifty is written with AI. Code, tests and documentation were created with Claude by Anthropic and fully
+reviewed by me.
+
+## License
+
+[MIT](LICENSE), Copyright (c) 2026 PaddXy95.

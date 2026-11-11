@@ -56,7 +56,7 @@ enum TokenKeyLoader {
         guard FileManager.default.createFile(atPath: path, contents: Data(encoded.utf8), attributes: [.posixPermissions: 0o600]) else {
             throw ConfigError.invalid("Schlüsseldatei \(path) konnte nicht angelegt werden – TOKEN_KEY setzen.")
         }
-        logger.notice("TOKEN_KEY nicht gesetzt – Schlüssel für die TMDB-Tokens in \(path) erzeugt. Für besseren Schutz TOKEN_KEY setzen (siehe README).")
+        logger.notice("TOKEN_KEY nicht gesetzt – Schlüssel für die TMDB-Tokens in \(path) erzeugt. Für besseren Schutz TOKEN_KEY setzen (siehe docs/configuration.md).")
         return generated
     }
 

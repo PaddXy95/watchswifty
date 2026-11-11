@@ -133,12 +133,18 @@ struct WatchService {
 
     // MARK: Follow („Beobachten“)
 
-    func setFollowed(userID: UUID, titleID: UUID, followed: Bool) async throws {
+    func setFollowed(userID: UUID, titleID: UUID, followed: Bool, now: Date = .now) async throws {
         guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
         let entry = try await userTitle(userID: userID, titleID: titleID)
+        if followed && !(entry.isFollowed && entry.followedOn != nil) {
+            entry.followedOn = today()
+            entry.followedAt = now
+        }
         entry.followed = followed
-        if followed && !(entry.isFollowed && entry.followedOn != nil) { entry.followedOn = today() }
-        if !followed { entry.followedOn = nil }
+        if !followed {
+            entry.followedOn = nil
+            entry.followedAt = nil
+        }
         try await entry.save(on: db)
     }
 

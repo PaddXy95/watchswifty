@@ -53,7 +53,7 @@ struct CatalogService {
             let episodes = seasons.flatMap { $0 }
             try await db.transaction { db in
                 try await title.save(on: db)
-                try await upsertEpisodes(episodes, titleID: title.requireID(), on: db)
+                try await upsertEpisodes(episodes, titleID: title.requireID(), now: now, on: db)
             }
         }
     }
@@ -68,7 +68,8 @@ struct CatalogService {
             .sort(\.$season).sort(\.$number).all()
     }
 
-    private func upsertEpisodes(_ fetched: [TMDBEpisode], titleID: UUID, on db: any Database) async throws {
+    /// Inserts or updates the fetched episodes; new rows get `firstSeenAt`, every returned row `lastSeenAt` = `now`.
+    private func upsertEpisodes(_ fetched: [TMDBEpisode], titleID: UUID, now: Date, on db: any Database) async throws {
         let existing = try await Episode.query(on: db).filter(\.$title.$id == titleID).all()
         var byKey = Dictionary(existing.map { ("\($0.season)/\($0.number)", $0) }, uniquingKeysWith: { first, _ in first })
         for item in fetched {
@@ -89,9 +90,16 @@ struct CatalogService {
                                       airDate: item.airDate, tmdbEpisodeID: item.id)
                 episode.overview = overview
                 episode.runtime = runtime
+                episode.firstSeenAt = now
+                episode.lastSeenAt = now
                 try await episode.save(on: db)
                 byKey[key] = episode
             }
+        }
+        let returned = Set(fetched.map { "\($0.season)/\($0.number)" }).compactMap { byKey[$0]?.id }
+        if !returned.isEmpty {
+            try await Episode.query(on: db).filter(\.$title.$id == titleID).filter(\.$id ~~ returned)
+                .set(\.$lastSeenAt, to: now).update()
         }
     }
 }

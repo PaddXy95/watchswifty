@@ -73,8 +73,7 @@ struct PasswordResetController {
             return try await page(token: input.token, purpose: record.tokenPurpose, status: error.status, error: error.message,
                                   config: req.application.loginSettings.current).encodeResponse(for: req)
         }
-        req.auth.login(user)
-        req.session.authenticate(user)
+        try await req.signInWithNewSession(user)
         let response = req.redirect(to: purpose == .invite ? "/account?welcome=1" : "/", redirectType: .normal)
         for (name, value) in Self.headers { response.headers.replaceOrAdd(name: name, value: value) }
         return response

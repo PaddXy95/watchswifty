@@ -4,7 +4,12 @@ import PackageDescription
 let package = Package(
     name: "watchswifty",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v26),
+    ],
+    products: [
+        // Client for the iOS app, generated from the same openapi.yaml (growing enums are open, see OpenValues.swift).
+        .library(name: "WatchSwiftyClient", targets: ["WatchSwiftyClient"]),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.122.3"),
@@ -21,11 +26,18 @@ let package = Package(
         .package(url: "https://github.com/PaddXy95/SwiftySMTPClient.git", .upToNextMinor(from: "0.1.0")),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.5"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.8.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.37.0"),
     ],
     targets: [
         // Types and server protocol generated from openapi.yaml (the App API's single source).
         .target(
             name: "WatchSwiftyAPI",
+            dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
+        ),
+        // Types and client for the iOS app, from the same openapi.yaml (symlink); public, no Vapor.
+        .target(
+            name: "WatchSwiftyClient",
             dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
             plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
         ),
@@ -47,7 +59,14 @@ let package = Package(
                 .product(name: "SwiftySMTPClient", package: "SwiftySMTPClient"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "JWTKit", package: "jwt-kit"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
             ],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "WatchSwiftyClientTests",
+            dependencies: [.target(name: "WatchSwiftyClient")],
             swiftSettings: swiftSettings
         ),
         .testTarget(

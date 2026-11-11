@@ -130,3 +130,28 @@ extension Application {
         set { storage[OIDCIdentityLockKey.self] = newValue }
     }
 }
+
+extension Application {
+    private struct DailyRunTriggerKey: StorageKey { typealias Value = DailyRunTrigger }
+
+    /// Wakes the daily loop when the admin changes its time.
+    var dailyRunTrigger: DailyRunTrigger {
+        get {
+            guard let trigger = storage[DailyRunTriggerKey.self] else { fatalError("Daily run trigger not configured") }
+            return trigger
+        }
+        set { storage[DailyRunTriggerKey.self] = newValue }
+    }
+}
+
+extension Application {
+    private struct WebhookSenderKey: StorageKey { typealias Value = any WebhookSender }
+
+    var webhookSender: any WebhookSender {
+        get {
+            guard let sender = storage[WebhookSenderKey.self] else { fatalError("Webhook sender not configured") }
+            return sender
+        }
+        set { storage[WebhookSenderKey.self] = newValue }
+    }
+}

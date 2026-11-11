@@ -1,5 +1,5 @@
-# WatchSwifty auf einem Server im Heimnetz.
-# Neben diese Datei gehört eine `.env` (Vorlage: `.env.example`). Start: `docker compose up -d`.
+# WatchSwifty on a server in your home network.
+# Put a `.env` next to this file (template: `.env.example`). Start: `docker compose up -d`.
 services:
   watchswifty:
     image: ghcr.io/paddxy95/watchswifty:${WATCHSWIFTY_VERSION:-latest}
@@ -8,33 +8,33 @@ services:
     ports:
       - "${WATCHSWIFTY_PORT:-8080}:8080"
     environment:
-      # Schlüssel für die gespeicherten TMDB-Tokens – getrennt von den Daten aufbewahren.
-      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY fehlt in .env (openssl rand -base64 32)}
-      # Nur beim allerersten Start nötig: legt den ersten Admin an.
+      # Key for the stored TMDB tokens and other secrets – keep it separate from the data.
+      TOKEN_KEY: ${TOKEN_KEY:?TOKEN_KEY is missing in .env (openssl rand -base64 32)}
+      # Only needed on the very first start: creates the first admin.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       TZ: ${TZ:-Europe/Berlin}
       TMDB_LANGUAGE: ${TMDB_LANGUAGE:-de-DE}
-      # Nur hinter einem Reverse-Proxy nötig, z. B. https://watch.example.lan
+      # Only needed behind a reverse proxy, for example https://watch.example.lan
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
-      # SSO wird unter System eingerichtet. Notschalter (erzwingt den Passwort-Login): PASSWORD_LOGIN=true in der .env
+      # SSO is set up under System. Emergency switch (forces password login): PASSWORD_LOGIN=true in .env
       # PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
     volumes:
       - watchswifty-data:/data
-      # Optional – Mail über SwiftyRelay (README, „E-Mail (optional)“): CA des Relays read-only einbinden.
+      # Optional – mail through SwiftyRelay (docs/email.md): mount the relay's CA read-only.
       # - swifty-relay-certs:/certs/swifty-relay:ro
-    # Optional – Mail über SwiftyRelay: ins Docker-Netz des Relays (SwiftyRelay muss vorher einmal gestartet sein).
+    # Optional – mail through SwiftyRelay: join the relay's Docker network (SwiftyRelay must have been started once).
     # networks: [default, swifty-relay]
 
 volumes:
   watchswifty-data:
-    # Fester Name, damit `docker run -v watchswifty-data:/data …` (Backup im README) dasselbe Volume trifft.
+    # Fixed name, so `docker run -v watchswifty-data:/data …` (backup, docs/operations.md) hits the same volume.
     name: watchswifty-data
-  # Optional – Mail über SwiftyRelay:
+  # Optional – mail through SwiftyRelay:
   # swifty-relay-certs:
   #   external: true
 
-# Optional – Mail über SwiftyRelay:
+# Optional – mail through SwiftyRelay:
 # networks:
 #   swifty-relay:
 #     external: true

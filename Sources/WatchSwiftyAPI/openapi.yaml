@@ -2,30 +2,33 @@ openapi: 3.1.0
 info:
   title: WatchSwifty API
   version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
   description: |
-    JSON-API für die WatchSwifty-App. Anmeldung über das Browser-Fenster (Authorization Code + PKCE),
-    danach mit Geräte-Token im Header `Authorization: Bearer ws_…` (90 Tage gültig).
+    JSON API for the WatchSwifty app. Sign-in happens in a browser window (Authorization Code + PKCE);
+    afterwards, send the device token in the header `Authorization: Bearer ws_…` (valid for 90 days).
 servers:
   - url: /api
 tags:
   - name: Meta
-  - name: Konto
-  - name: Start
-  - name: Suche
-  - name: Serien
-  - name: Filme
-  - name: Verlauf
-  - name: Bibliothek
-  - name: Statistik
-  - name: Netflix-Import
-  - name: Filmliste
+  - name: Account
+  - name: Home
+  - name: Search
+  - name: Series
+  - name: Movies
+  - name: History
+  - name: Library
+  - name: Statistics
+  - name: Netflix import
+  - name: Movie list
   - name: Admin
 paths:
   /v1/version:
     get:
       operationId: getVersion
       tags: [Meta]
-      summary: Version des Servers
+      summary: Server version
       responses:
         "200":
           description: Version
@@ -36,12 +39,12 @@ paths:
   /v1/auth/token:
     post:
       operationId: createToken
-      tags: [Konto]
-      summary: Einmal-Code aus dem Browser-Login gegen ein Geräte-Token tauschen
+      tags: [Account]
+      summary: Exchange the one-time code from the browser login for a device token
       description: |
-        Ablauf: Die App öffnet `/api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
-        im System-Browser-Fenster. Nach Anmeldung und „Verbinden“ springt der Browser zu `dev.patmei.watchswifty:/auth?code=…&state=…`.
-        Den Code (60 s gültig, einmal einlösbar) hier mit dem PKCE-`codeVerifier` einlösen.
+        Flow: the app opens `/api/auth/authorize?redirect_uri=dev.patmei.watchswifty:/auth&state=…&code_challenge=…&code_challenge_method=S256&device_name=…`
+        in the system browser window. After signing in and confirming with **Verbinden** (connect), the browser jumps to `dev.patmei.watchswifty:/auth?code=…&state=…`.
+        Redeem the code (valid for 60 s, single use) here together with the PKCE `codeVerifier`.
       requestBody:
         required: true
         content:
@@ -50,36 +53,36 @@ paths:
               $ref: "#/components/schemas/TokenRequest"
       responses:
         "200":
-          description: Geräte-Token (wird nur hier einmal ausgegeben)
+          description: Device token (issued only once, here)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/TokenGrant"
         "400":
-          description: Code ungültig, abgelaufen oder Verifier falsch (`invalidGrant`)
+          description: Code invalid, expired or verifier wrong (`invalidGrant`)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
       operationId: revokeCurrentToken
-      tags: [Konto]
-      summary: Dieses Gerät abmelden
+      tags: [Account]
+      summary: Sign out this device
       security: [{ bearerAuth: [] }]
       responses:
         "204":
-          description: Token widerrufen
+          description: Token revoked
         "401":
           $ref: "#/components/responses/Unauthorized"
   /v1/me:
     get:
       operationId: getMe
-      tags: [Konto]
-      summary: Angemeldeter Benutzer
+      tags: [Account]
+      summary: Signed-in user
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Benutzer
+          description: User
           content:
             application/json:
               schema:
@@ -89,12 +92,12 @@ paths:
   /v1/me/devices:
     get:
       operationId: listDevices
-      tags: [Konto]
-      summary: Geräte und manuell erstellte Tokens
+      tags: [Account]
+      summary: Devices and manually created tokens
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Geräte (ohne Token-Werte)
+          description: Devices (without token values)
           content:
             application/json:
               schema:
@@ -106,8 +109,8 @@ paths:
   /v1/me/devices/{id}:
     delete:
       operationId: revokeDevice
-      tags: [Konto]
-      summary: Gerät abmelden
+      tags: [Account]
+      summary: Sign out a device
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -118,7 +121,7 @@ paths:
             format: uuid
       responses:
         "204":
-          description: Abgemeldet
+          description: Signed out
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -126,14 +129,14 @@ paths:
   /v1/tv/{tmdbID}:
     get:
       operationId: getSeries
-      tags: [Serien]
-      summary: Serie mit Staffeln, Folgen und eigenen Sichtungen
+      tags: [Series]
+      summary: Series with seasons, episodes and own watches
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -147,8 +150,8 @@ paths:
   /v1/tv/{tmdbID}/episodes/{season}/{number}/watch:
     post:
       operationId: markEpisode
-      tags: [Serien]
-      summary: Folge als gesehen markieren
+      tags: [Series]
+      summary: Mark an episode as watched
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -161,7 +164,7 @@ paths:
               $ref: "#/components/schemas/WatchInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -174,8 +177,8 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     delete:
       operationId: unmarkEpisode
-      tags: [Serien]
-      summary: Folge als ungesehen markieren (alle Sichtungen)
+      tags: [Series]
+      summary: Mark an episode as unwatched (all watches)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -183,7 +186,7 @@ paths:
         - $ref: "#/components/parameters/Episode"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -197,8 +200,8 @@ paths:
   /v1/tv/{tmdbID}/episodes/{season}/{number}/watch-up-to:
     post:
       operationId: markUpTo
-      tags: [Serien]
-      summary: Alle Folgen bis hier gesehen (ohne Datum)
+      tags: [Series]
+      summary: Mark all episodes up to here as watched (no date)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -211,7 +214,7 @@ paths:
               $ref: "#/components/schemas/WatchInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -225,8 +228,8 @@ paths:
   /v1/tv/{tmdbID}/seasons/{season}/watch:
     post:
       operationId: markSeason
-      tags: [Serien]
-      summary: Ganze Staffel gesehen (ohne Datum)
+      tags: [Series]
+      summary: Mark a whole season as watched (no date)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -238,7 +241,7 @@ paths:
               $ref: "#/components/schemas/WatchInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -252,8 +255,8 @@ paths:
   /v1/tv/{tmdbID}/watch-all:
     post:
       operationId: markSeries
-      tags: [Serien]
-      summary: Gesamte Serie gesehen (ohne Datum)
+      tags: [Series]
+      summary: Mark a whole series as watched (no date)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -264,7 +267,7 @@ paths:
               $ref: "#/components/schemas/WatchInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -278,8 +281,8 @@ paths:
   /v1/tv/{tmdbID}/hidden:
     put:
       operationId: setHidden
-      tags: [Serien]
-      summary: Serie aus- oder einblenden
+      tags: [Series]
+      summary: Hide or show a series
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -290,7 +293,7 @@ paths:
               $ref: "#/components/schemas/HiddenInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -304,8 +307,8 @@ paths:
   /v1/tv/{tmdbID}/follow:
     put:
       operationId: setFollowed
-      tags: [Serien]
-      summary: Serie beobachten (Hinweis auf neue Folgen)
+      tags: [Series]
+      summary: Follow a series (notice about new episodes)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -316,7 +319,7 @@ paths:
               $ref: "#/components/schemas/FollowInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -330,8 +333,8 @@ paths:
   /v1/tv/{tmdbID}/rating:
     put:
       operationId: setSeriesRating
-      tags: [Serien]
-      summary: Bewertung 1–10 setzen; ohne `rating` löschen
+      tags: [Series]
+      summary: Set a rating of 1–10; delete it if `rating` is omitted
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -342,7 +345,7 @@ paths:
               $ref: "#/components/schemas/RatingInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -356,8 +359,8 @@ paths:
   /v1/tv/{tmdbID}/comment:
     put:
       operationId: setSeriesComment
-      tags: [Serien]
-      summary: Kommentar zur Serie; ohne `comment` löschen
+      tags: [Series]
+      summary: Comment on the series; delete it if `comment` is omitted
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -368,7 +371,7 @@ paths:
               $ref: "#/components/schemas/CommentInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -382,8 +385,8 @@ paths:
   /v1/tv/{tmdbID}/seasons/{season}/comment:
     put:
       operationId: setSeasonComment
-      tags: [Serien]
-      summary: Kommentar zur Staffel
+      tags: [Series]
+      summary: Comment on the season
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -395,7 +398,7 @@ paths:
               $ref: "#/components/schemas/CommentInput"
       responses:
         "200":
-          description: Serie mit Staffeln und Folgen
+          description: Series with seasons and episodes
           content:
             application/json:
               schema:
@@ -409,8 +412,8 @@ paths:
   /v1/continue-watching:
     get:
       operationId: getContinueWatching
-      tags: [Start]
-      summary: Weiterschauen (Serien der letzten 3 Monate; mit `all=true` alle)
+      tags: [Home]
+      summary: "**Weiterschauen** (continue watching) – series of the last 3 months; all of them with `all=true`"
       security: [{ bearerAuth: [] }]
       parameters:
         - name: all
@@ -419,7 +422,7 @@ paths:
             type: boolean
       responses:
         "200":
-          description: Karten
+          description: Cards
           content:
             application/json:
               schema:
@@ -429,12 +432,12 @@ paths:
   /v1/notes:
     get:
       operationId: getNotes
-      tags: [Start]
-      summary: Neue Folgen beobachteter Serien und Folgen der nächsten 14 Tage
+      tags: [Home]
+      summary: New episodes of followed series and episodes of the next 14 days
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Hinweise
+          description: Notices
           content:
             application/json:
               schema:
@@ -444,8 +447,8 @@ paths:
   /v1/tv/{tmdbID}/next:
     post:
       operationId: markNextEpisode
-      tags: [Start]
-      summary: Nächste Folge der Karte gesehen (heute, zuletzt genutzter Dienst)
+      tags: [Home]
+      summary: Mark the card's next episode as watched (today, most recently used service)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -456,13 +459,13 @@ paths:
               $ref: "#/components/schemas/NextInput"
       responses:
         "200":
-          description: Aktualisierte Karte
+          description: Updated card
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ContinueCard"
         "204":
-          description: Serie ist aufgeholt (keine Karte mehr)
+          description: Series is caught up (no card any more)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -472,14 +475,14 @@ paths:
   /v1/tv/{tmdbID}/new-episodes/dismiss:
     post:
       operationId: dismissNewEpisodes
-      tags: [Start]
-      summary: Hinweis „Neue Folgen“ erledigen
+      tags: [Home]
+      summary: Dismiss a “new episodes” notice
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
       responses:
         "204":
-          description: Erledigt
+          description: Done
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -487,8 +490,8 @@ paths:
   /v1/search:
     get:
       operationId: search
-      tags: [Suche]
-      summary: Serien und Filme bei TMDB suchen (mindestens 2 Zeichen)
+      tags: [Search]
+      summary: Search TMDB for series and films (at least 2 characters)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: q
@@ -498,7 +501,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Treffer mit eigenem Stand
+          description: Results with the user's own status
           content:
             application/json:
               schema:
@@ -512,14 +515,14 @@ paths:
   /v1/movies/{tmdbID}:
     get:
       operationId: getMovie
-      tags: [Filme]
-      summary: Film mit eigenen Sichtungen
+      tags: [Movies]
+      summary: Film with own watches
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
       responses:
         "200":
-          description: Film mit eigenen Sichtungen
+          description: Film with own watches
           content:
             application/json:
               schema:
@@ -533,8 +536,8 @@ paths:
   /v1/movies/{tmdbID}/watch:
     post:
       operationId: markMovie
-      tags: [Filme]
-      summary: Film gesehen (mit `rewatch` erneut gesehen)
+      tags: [Movies]
+      summary: Mark a film as watched (watched again with `rewatch`)
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -545,7 +548,7 @@ paths:
               $ref: "#/components/schemas/WatchInput"
       responses:
         "200":
-          description: Film mit eigenen Sichtungen
+          description: Film with own watches
           content:
             application/json:
               schema:
@@ -558,14 +561,14 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     delete:
       operationId: unmarkMovie
-      tags: [Filme]
-      summary: Alle Sichtungen des Films löschen
+      tags: [Movies]
+      summary: Delete all watches of the film
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
       responses:
         "200":
-          description: Film mit eigenen Sichtungen
+          description: Film with own watches
           content:
             application/json:
               schema:
@@ -579,8 +582,8 @@ paths:
   /v1/movies/{tmdbID}/rating:
     put:
       operationId: setMovieRating
-      tags: [Filme]
-      summary: Bewertung 1–10; ohne `rating` löschen
+      tags: [Movies]
+      summary: Rating of 1–10; delete it if `rating` is omitted
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -591,7 +594,7 @@ paths:
               $ref: "#/components/schemas/RatingInput"
       responses:
         "200":
-          description: Film mit eigenen Sichtungen
+          description: Film with own watches
           content:
             application/json:
               schema:
@@ -605,8 +608,8 @@ paths:
   /v1/movies/{tmdbID}/comment:
     put:
       operationId: setMovieComment
-      tags: [Filme]
-      summary: Kommentar zum Film; ohne `comment` löschen
+      tags: [Movies]
+      summary: Comment on the film; delete it if `comment` is omitted
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/TmdbID"
@@ -617,7 +620,7 @@ paths:
               $ref: "#/components/schemas/CommentInput"
       responses:
         "200":
-          description: Film mit eigenen Sichtungen
+          description: Film with own watches
           content:
             application/json:
               schema:
@@ -631,8 +634,8 @@ paths:
   /v1/history:
     get:
       operationId: getHistory
-      tags: [Verlauf]
-      summary: Datierte Sichtungen, neueste zuerst
+      tags: [History]
+      summary: Dated watches, newest first
       security: [{ bearerAuth: [] }]
       parameters:
         - name: page
@@ -648,7 +651,7 @@ paths:
             maximum: 200
       responses:
         "200":
-          description: Eine Seite des Verlaufs
+          description: One page of the history
           content:
             application/json:
               schema:
@@ -658,8 +661,8 @@ paths:
   /v1/watches/{id}:
     put:
       operationId: updateWatch
-      tags: [Verlauf]
-      summary: Datum und Dienst einer Sichtung ändern (ersetzt beide)
+      tags: [History]
+      summary: Change the date and service of a watch (replaces both)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -675,7 +678,7 @@ paths:
               $ref: "#/components/schemas/WatchEdit"
       responses:
         "200":
-          description: Geänderte Sichtung
+          description: Changed watch
           content:
             application/json:
               schema:
@@ -688,8 +691,8 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     delete:
       operationId: deleteWatch
-      tags: [Verlauf]
-      summary: Sichtung löschen
+      tags: [History]
+      summary: Delete a watch
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -700,7 +703,7 @@ paths:
             format: uuid
       responses:
         "204":
-          description: Gelöscht
+          description: Deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -708,8 +711,8 @@ paths:
   /v1/library:
     get:
       operationId: getLibrary
-      tags: [Bibliothek]
-      summary: Gesehene, bewertete oder ausgeblendete Titel
+      tags: [Library]
+      summary: Watched, rated or hidden titles
       security: [{ bearerAuth: [] }]
       parameters:
         - name: filter
@@ -726,7 +729,7 @@ paths:
             default: recent
       responses:
         "200":
-          description: Titel
+          description: Titles
           content:
             application/json:
               schema:
@@ -738,21 +741,21 @@ paths:
   /v1/stats:
     get:
       operationId: getStats
-      tags: [Statistik]
-      summary: Filme, Serien, Folgen und Zeit – Zeitraum mit Diagramm, Diensten, Meistgesehen und Bewertungen
+      tags: [Statistics]
+      summary: Films, series, episodes and time – period with chart, services, most watched and ratings
       description: >-
-        `year` wählt den Zeitraum für `period`, `previous`, `chart`, `services`, `topSeries` und `ratings`.
-        `total`, `undated` und `years` umfassen immer alles.
+        `year` selects the period for `period`, `previous`, `chart`, `services`, `topSeries` and `ratings`.
+        `total`, `undated` and `years` always cover everything.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: year
           in: query
-          description: Zeitraum auf ein Jahr eingrenzen (fehlt = alle Jahre).
+          description: Limit the period to one year (missing = all years).
           schema:
             type: integer
       responses:
         "200":
-          description: Statistik
+          description: Statistics
           content:
             application/json:
               schema:
@@ -762,8 +765,8 @@ paths:
   /v1/me/password:
     put:
       operationId: changePassword
-      tags: [Konto]
-      summary: Passwort ändern (aktuelles Passwort nötig)
+      tags: [Account]
+      summary: Change the password (current password required)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -773,11 +776,11 @@ paths:
               $ref: "#/components/schemas/PasswordChange"
       responses:
         "204":
-          description: Geändert
+          description: Changed
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          description: Konto ohne Passwort (`noPassword`) oder Passwort-Login abgeschaltet (`passwordLoginDisabled`)
+          description: Account without a password (`noPassword`) or password login switched off (`passwordLoginDisabled`)
           content:
             application/json:
               schema:
@@ -787,8 +790,8 @@ paths:
   /v1/me/email:
     put:
       operationId: setEmail
-      tags: [Konto]
-      summary: Eigene E-Mail-Adresse setzen oder mit leerem Wert entfernen (aktuelles Passwort nötig, wird verschlüsselt gespeichert)
+      tags: [Account]
+      summary: Set your own e-mail address, or remove it with an empty value (current password required; stored encrypted)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -798,7 +801,7 @@ paths:
               $ref: "#/components/schemas/EmailChange"
       responses:
         "200":
-          description: Gespeichert
+          description: Saved
           content:
             application/json:
               schema:
@@ -806,7 +809,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          description: Konto ohne Passwort (`noPassword`) oder Adresse kommt vom OIDC-Provider (`emailFromProvider`)
+          description: Account without a password (`noPassword`) or the address comes from the OIDC provider (`emailFromProvider`)
           content:
             application/json:
               schema:
@@ -816,8 +819,8 @@ paths:
   /v1/me/tmdb-token:
     put:
       operationId: setTMDBToken
-      tags: [Konto]
-      summary: Eigenen TMDB-Token hinterlegen (wird bei TMDB geprüft, verschlüsselt gespeichert)
+      tags: [Account]
+      summary: Store your own TMDB token (verified with TMDB, stored encrypted)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -827,7 +830,7 @@ paths:
               $ref: "#/components/schemas/TMDBTokenInput"
       responses:
         "200":
-          description: Benutzer
+          description: User
           content:
             application/json:
               schema:
@@ -838,12 +841,12 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     delete:
       operationId: deleteTMDBToken
-      tags: [Konto]
-      summary: TMDB-Token entfernen
+      tags: [Account]
+      summary: Remove the TMDB token
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Benutzer
+          description: User
           content:
             application/json:
               schema:
@@ -853,12 +856,12 @@ paths:
   /v1/me/followed:
     get:
       operationId: getFollowed
-      tags: [Konto]
-      summary: Beobachtete Serien
+      tags: [Account]
+      summary: Followed series
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Serien
+          description: Series
           content:
             application/json:
               schema:
@@ -867,11 +870,112 @@ paths:
                   $ref: "#/components/schemas/FollowedSeries"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/me/notifications:
+    get:
+      operationId: getNotificationPrefs
+      tags: [Account]
+      summary: Your notification settings (new episodes of followed series, channel, KNot key state)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPrefs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: setNotificationPrefs
+      tags: [Account]
+      summary: Save the notification toggles and the preferred channel (no password needed)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPrefsUpdate"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPrefs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/me/notifications/webhook-key:
+    put:
+      operationId: setWebhookKey
+      tags: [Account]
+      summary: Store your KNot API key (encrypted, never returned); current password required for accounts with one
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookKeyChange"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPrefs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    delete:
+      operationId: deleteWebhookKey
+      tags: [Account]
+      summary: Remove your KNot API key; current password required for accounts with one
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookKeyRemove"
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPrefs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/me/notifications/test:
+    post:
+      operationId: sendTestNotification
+      tags: [Account]
+      summary: Send a test notification over your active channel
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Sent
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: No channel set up for this account (`notificationsNotConfigured`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/NotifyFailed"
   /v1/imports/netflix:
     post:
       operationId: uploadNetflix
-      tags: [Netflix-Import]
-      summary: Netflix-Wiedergabeaktivität (CSV, höchstens 10 MB) hochladen
+      tags: [Netflix import]
+      summary: Upload Netflix viewing activity (CSV, at most 10 MB)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -889,7 +993,7 @@ paths:
                 contentType: "*/*"
       responses:
         "200":
-          description: Neue, bekannte und übersprungene Zeilen
+          description: New, known and skipped rows
           content:
             application/json:
               schema:
@@ -897,7 +1001,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "413":
-          description: Datei zu groß (`payloadTooLarge`)
+          description: File too large (`payloadTooLarge`)
           content:
             application/json:
               schema:
@@ -906,20 +1010,20 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     get:
       operationId: getNetflixImport
-      tags: [Netflix-Import]
-      summary: Stand des Imports – Fortschritt, „Zu prüfen“, „Nicht zugeordnet“, Zuordnungen
+      tags: [Netflix import]
+      summary: Import status – progress, **Zu prüfen** (to review), **Nicht zugeordnet** (unmatched), mappings
       security: [{ bearerAuth: [] }]
       parameters:
         - name: mappings
           in: query
-          description: Filter der Zuordnungsliste (`all` = alle außer „Zu prüfen“)
+          description: Filter for the mapping list (`all` = all except **Zu prüfen** (to review))
           schema:
             type: string
             enum: [all, auto, confirmed, ignored]
             default: all
       responses:
         "200":
-          description: Stand
+          description: Status
           content:
             application/json:
               schema:
@@ -929,12 +1033,12 @@ paths:
   /v1/imports/netflix/retry:
     post:
       operationId: retryNetflix
-      tags: [Netflix-Import]
-      summary: Zuordnung jetzt erneut starten
+      tags: [Netflix import]
+      summary: Restart matching now
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Fortschritt
+          description: Progress
           content:
             application/json:
               schema:
@@ -944,8 +1048,8 @@ paths:
   /v1/imports/netflix/mappings/{id}/accept:
     post:
       operationId: acceptMapping
-      tags: [Netflix-Import]
-      summary: Vorschlag übernehmen (aus „Zu prüfen“)
+      tags: [Netflix import]
+      summary: Accept a suggestion (from **Zu prüfen** (to review))
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -962,7 +1066,7 @@ paths:
               $ref: "#/components/schemas/MappingDecision"
       responses:
         "200":
-          description: Zuordnung
+          description: Mapping
           content:
             application/json:
               schema:
@@ -976,8 +1080,8 @@ paths:
   /v1/imports/netflix/mappings/{id}/change:
     post:
       operationId: changeMapping
-      tags: [Netflix-Import]
-      summary: Zuordnung auf einen anderen Titel ändern
+      tags: [Netflix import]
+      summary: Change a mapping to a different title
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -994,7 +1098,7 @@ paths:
               $ref: "#/components/schemas/MappingDecision"
       responses:
         "200":
-          description: Zuordnung
+          description: Mapping
           content:
             application/json:
               schema:
@@ -1008,8 +1112,8 @@ paths:
   /v1/imports/netflix/mappings/{id}/ignore:
     post:
       operationId: ignoreMapping
-      tags: [Netflix-Import]
-      summary: Netflix-Namen ignorieren
+      tags: [Netflix import]
+      summary: Ignore a Netflix name
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1020,7 +1124,7 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Zuordnung
+          description: Mapping
           content:
             application/json:
               schema:
@@ -1032,8 +1136,8 @@ paths:
   /v1/imports/netflix/mappings/{id}/reset:
     post:
       operationId: resetMapping
-      tags: [Netflix-Import]
-      summary: Zuordnung zurücksetzen (neu zuordnen)
+      tags: [Netflix import]
+      summary: Reset a mapping (match again)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1044,7 +1148,7 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Zuordnung
+          description: Mapping
           content:
             application/json:
               schema:
@@ -1056,8 +1160,8 @@ paths:
   /v1/imports/netflix/mappings/{id}/search:
     get:
       operationId: searchMappingCandidates
-      tags: [Netflix-Import]
-      summary: Andere Treffer für eine Zuordnung suchen
+      tags: [Netflix import]
+      summary: Search other results for a mapping
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1073,7 +1177,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Treffer
+          description: Results
           content:
             application/json:
               schema:
@@ -1089,8 +1193,8 @@ paths:
   /v1/imports/netflix/rows/{id}/options:
     get:
       operationId: getRowOptions
-      tags: [Netflix-Import]
-      summary: Folgen, denen eine nicht zugeordnete Zeile zugewiesen werden kann
+      tags: [Netflix import]
+      summary: Episodes an unmatched row can be assigned to
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1101,7 +1205,7 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Folgen
+          description: Episodes
           content:
             application/json:
               schema:
@@ -1115,8 +1219,8 @@ paths:
   /v1/imports/netflix/rows/{id}/assign:
     post:
       operationId: assignRow
-      tags: [Netflix-Import]
-      summary: Zeile einer Folge zuweisen
+      tags: [Netflix import]
+      summary: Assign a row to an episode
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1133,7 +1237,7 @@ paths:
               $ref: "#/components/schemas/RowAssignment"
       responses:
         "204":
-          description: Erledigt
+          description: Done
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1141,8 +1245,8 @@ paths:
   /v1/imports/netflix/rows/{id}/ignore:
     post:
       operationId: ignoreRow
-      tags: [Netflix-Import]
-      summary: Zeile ignorieren
+      tags: [Netflix import]
+      summary: Ignore a row
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1153,7 +1257,7 @@ paths:
             format: uuid
       responses:
         "204":
-          description: Erledigt
+          description: Done
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1161,8 +1265,8 @@ paths:
   /v1/imports/films:
     post:
       operationId: uploadFilmList
-      tags: [Filmliste]
-      summary: Eigene Filmliste (CSV mit Kopfzeile „Filmname“, höchstens 2 MB) hochladen; ersetzt die bisherige Liste
+      tags: [Movie list]
+      summary: Upload your own movie list (CSV with the header “Filmname”, at most 2 MB); replaces the previous list
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1180,7 +1284,7 @@ paths:
                 contentType: "*/*"
       responses:
         "200":
-          description: Anzahl übernommener Filme (Zuordnung läuft im Hintergrund)
+          description: Number of imported films (matching runs in the background)
           content:
             application/json:
               schema:
@@ -1188,7 +1292,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "413":
-          description: Datei zu groß (`payloadTooLarge`)
+          description: File too large (`payloadTooLarge`)
           content:
             application/json:
               schema:
@@ -1197,12 +1301,12 @@ paths:
           $ref: "#/components/responses/Unprocessable"
     get:
       operationId: getFilmList
-      tags: [Filmliste]
-      summary: Stand der Filmliste
+      tags: [Movie list]
+      summary: Status of the movie list
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Stand
+          description: Status
           content:
             application/json:
               schema:
@@ -1212,12 +1316,12 @@ paths:
   /v1/imports/films/retry:
     post:
       operationId: retryFilmList
-      tags: [Filmliste]
-      summary: Zuordnung erneut versuchen (nach TMDB-Fehlern)
+      tags: [Movie list]
+      summary: Retry matching (after TMDB errors)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Stand
+          description: Status
           content:
             application/json:
               schema:
@@ -1227,8 +1331,8 @@ paths:
   /v1/imports/films/{id}/accept:
     post:
       operationId: acceptFilm
-      tags: [Filmliste]
-      summary: Film einem TMDB-Treffer zuordnen und Sichtungen anlegen
+      tags: [Movie list]
+      summary: Assign a film to a TMDB result and create watches
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1245,7 +1349,7 @@ paths:
               $ref: "#/components/schemas/FilmAccept"
       responses:
         "200":
-          description: Eintrag
+          description: Entry
           content:
             application/json:
               schema:
@@ -1259,8 +1363,8 @@ paths:
   /v1/imports/films/{id}/search:
     post:
       operationId: searchFilm
-      tags: [Filmliste]
-      summary: Mit anderem Suchbegriff Vorschläge holen
+      tags: [Movie list]
+      summary: Get suggestions with a different search term
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1277,7 +1381,7 @@ paths:
               $ref: "#/components/schemas/FilmSearch"
       responses:
         "200":
-          description: Eintrag
+          description: Entry
           content:
             application/json:
               schema:
@@ -1291,8 +1395,8 @@ paths:
   /v1/imports/films/{id}/skip:
     post:
       operationId: skipFilm
-      tags: [Filmliste]
-      summary: Film überspringen
+      tags: [Movie list]
+      summary: Skip a film
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1303,7 +1407,7 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Eintrag
+          description: Entry
           content:
             application/json:
               schema:
@@ -1316,11 +1420,11 @@ paths:
     get:
       operationId: listUsers
       tags: [Admin]
-      summary: Alle Benutzer (nur Admins)
+      summary: All users (admins only)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Benutzer (ohne Token-Werte)
+          description: Users (without token values)
           content:
             application/json:
               schema:
@@ -1334,7 +1438,7 @@ paths:
     post:
       operationId: createUser
       tags: [Admin]
-      summary: Benutzer anlegen (nur Admins)
+      summary: Create a user (admins only)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1344,7 +1448,7 @@ paths:
               $ref: "#/components/schemas/NewUser"
       responses:
         "201":
-          description: Angelegt (bei einer Einladung auch dann, wenn die Mail scheiterte – siehe `inviteMailError`)
+          description: Created (for an invitation also when the e-mail failed – see `inviteMailError`)
           content:
             application/json:
               schema:
@@ -1354,13 +1458,13 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: Startpasswort, obwohl der Passwort-Login abgeschaltet ist (`passwordLoginDisabled`) – dann nur Einladungen
+          description: Initial password although password login is switched off (`passwordLoginDisabled`) – only invitations are possible then
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: Ungültige Angaben (`validation`) oder Einladung ohne eingerichtete Mail (`mailNotConfigured`)
+          description: Invalid input (`validation`) or invitation without e-mail set up (`mailNotConfigured`)
           content:
             application/json:
               schema:
@@ -1369,7 +1473,7 @@ paths:
     post:
       operationId: resendInvite
       tags: [Admin]
-      summary: Einladung erneut senden (neuer Link, der alte gilt nicht mehr)
+      summary: Resend the invitation (new link; the old one stops working)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1379,7 +1483,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Gesendet
+          description: Sent
           content:
             application/json:
               schema:
@@ -1391,7 +1495,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
-          description: Konto hat schon ein Passwort, keine lesbare Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          description: Account already has a password, no readable address (`validation`) or e-mail not set up (`mailNotConfigured`)
           content:
             application/json:
               schema:
@@ -1402,7 +1506,7 @@ paths:
     put:
       operationId: resetUserPassword
       tags: [Admin]
-      summary: Passwort eines anderen Benutzers setzen (nicht das eigene – dafür PUT /v1/me/password)
+      summary: Set another user's password (not your own – use PUT /v1/me/password for that)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1419,7 +1523,7 @@ paths:
               $ref: "#/components/schemas/AdminPassword"
       responses:
         "204":
-          description: Gesetzt
+          description: Set
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1427,7 +1531,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Passwort-Login abgeschaltet (`passwordLoginDisabled`)
+          description: Password login switched off (`passwordLoginDisabled`)
           content:
             application/json:
               schema:
@@ -1438,8 +1542,8 @@ paths:
     post:
       operationId: createSSOLink
       tags: [Admin]
-      summary: Verknüpfungslink für ein anderes, noch nicht mit dem OIDC-Provider verknüpftes Konto (7 Tage, einmalig)
-      description: Mit eingerichteter Mail und lesbarer Adresse geht der Link per Mail (`mailed`), sonst kommt er einmalig als `url` zurück.
+      summary: Linking link for another account not yet linked to the OIDC provider (valid 7 days, single use)
+      description: With e-mail set up and a readable address, the link is sent by e-mail (`mailed`); otherwise it is returned once as `url`.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1450,7 +1554,7 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Erstellt
+          description: Created
           content:
             application/json:
               schema:
@@ -1460,13 +1564,13 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          description: Benutzer unbekannt oder OIDC nicht eingerichtet (`notFound`)
+          description: User unknown or OIDC not set up (`notFound`)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: Eigenes Konto (`selfAction`) oder schon verknüpft (`validation`)
+          description: Own account (`selfAction`) or already linked (`validation`)
           content:
             application/json:
               schema:
@@ -1475,7 +1579,7 @@ paths:
     put:
       operationId: setUserAdmin
       tags: [Admin]
-      summary: Admin-Recht eines anderen Benutzers setzen
+      summary: Set the admin right of another user
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1492,7 +1596,7 @@ paths:
               $ref: "#/components/schemas/AdminFlag"
       responses:
         "200":
-          description: Benutzer
+          description: User
           content:
             application/json:
               schema:
@@ -1509,7 +1613,7 @@ paths:
     delete:
       operationId: deleteUser
       tags: [Admin]
-      summary: Anderen Benutzer samt Daten löschen
+      summary: Delete another user including their data
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1520,7 +1624,7 @@ paths:
             format: uuid
       responses:
         "204":
-          description: Gelöscht
+          description: Deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1533,7 +1637,7 @@ paths:
     get:
       operationId: getSystem
       tags: [Admin]
-      summary: Version und Update-Prüfung (nur Admins)
+      summary: Version and update check (admins only)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
@@ -1550,7 +1654,7 @@ paths:
     put:
       operationId: setUpdateCheck
       tags: [Admin]
-      summary: Automatische Update-Prüfung (alle 12 Stunden bei GitHub) ein- oder ausschalten; Einschalten prüft sofort
+      summary: Switch the automatic update check (every 12 hours against GitHub) on or off; switching it on checks immediately
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1573,7 +1677,7 @@ paths:
     post:
       operationId: checkUpdatesNow
       tags: [Admin]
-      summary: Jetzt bei GitHub nach einer neuen Version fragen
+      summary: Ask GitHub for a new version now
       security: [{ bearerAuth: [] }]
       responses:
         "200":
@@ -1590,11 +1694,11 @@ paths:
     get:
       operationId: getOIDCSettings
       tags: [Admin]
-      summary: Anmeldung über OIDC (SSO) – Einstellungen (nur Admins; das Client-Secret wird nie ausgegeben)
+      summary: OIDC (SSO) login – settings (admins only; the client secret is never returned)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Einstellungen
+          description: Settings
           content:
             application/json:
               schema:
@@ -1606,7 +1710,7 @@ paths:
     put:
       operationId: setOIDCSettings
       tags: [Admin]
-      summary: SSO-Einstellungen speichern (verschlüsselt, wirken sofort). Ohne `clientSecret` bleibt das gespeicherte – außer Issuer oder Client-ID ändern sich. Danach wird die Verbindung geprüft (`checkError`).
+      summary: Save the SSO settings (encrypted, effective immediately). Without `clientSecret` the stored one is kept – unless the issuer or client ID changes. The connection is checked afterwards (`checkError`).
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1616,7 +1720,7 @@ paths:
               $ref: "#/components/schemas/OIDCSettingsUpdate"
       responses:
         "200":
-          description: Gespeichert (auch wenn die Prüfung fehlschlug – siehe `checkError`)
+          description: Saved (even if the check failed – see `checkError`)
           content:
             application/json:
               schema:
@@ -1630,11 +1734,11 @@ paths:
     delete:
       operationId: deleteOIDCSettings
       tags: [Admin]
-      summary: SSO-Einstellungen löschen (nur bei eingeschaltetem Passwort-Login)
+      summary: Delete the SSO settings (only while password login is on)
       security: [{ bearerAuth: [] }]
       responses:
         "204":
-          description: Gelöscht
+          description: Deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1645,11 +1749,11 @@ paths:
     post:
       operationId: testOIDCSettings
       tags: [Admin]
-      summary: Verbindung zum Provider testen (Discovery und Schlüssel neu laden)
+      summary: Test the connection to the provider (reload discovery and keys)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Verbindung in Ordnung
+          description: Connection OK
           content:
             application/json:
               schema:
@@ -1659,13 +1763,13 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "422":
-          description: SSO nicht eingerichtet (`validation`)
+          description: SSO not set up (`validation`)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: Prüfung fehlgeschlagen (`oidcCheckFailed`, Ursache in `message`)
+          description: Check failed (`oidcCheckFailed`, reason in `message`)
           content:
             application/json:
               schema:
@@ -1674,7 +1778,7 @@ paths:
     put:
       operationId: setPasswordLogin
       tags: [Admin]
-      summary: Passwort-Login ein- oder ausschalten (aus nur mit eingerichtetem SSO und eigenem verknüpftem Konto)
+      summary: Switch password login on or off (off only with SSO set up and your own linked account)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1684,7 +1788,7 @@ paths:
               $ref: "#/components/schemas/PasswordLoginUpdate"
       responses:
         "200":
-          description: Gespeichert
+          description: Saved
           content:
             application/json:
               schema:
@@ -1699,11 +1803,11 @@ paths:
     get:
       operationId: getMailSettings
       tags: [Admin]
-      summary: E-Mail-Einstellungen (nur Admins; das SMTP-Passwort wird nie ausgegeben)
+      summary: E-mail settings (admins only; the SMTP password is never returned)
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          description: Einstellungen
+          description: Settings
           content:
             application/json:
               schema:
@@ -1715,7 +1819,7 @@ paths:
     put:
       operationId: setMailSettings
       tags: [Admin]
-      summary: E-Mail-Einstellungen speichern (verschlüsselt). Ohne `password` bleibt das gespeicherte – außer Server, Port, Verschlüsselung oder Benutzer ändern sich.
+      summary: Save the e-mail settings (encrypted). Without `password` the stored one is kept – unless server, port, encryption or user change.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1725,7 +1829,7 @@ paths:
               $ref: "#/components/schemas/MailSettingsUpdate"
       responses:
         "200":
-          description: Gespeichert
+          description: Saved
           content:
             application/json:
               schema:
@@ -1739,11 +1843,11 @@ paths:
     delete:
       operationId: deleteMailSettings
       tags: [Admin]
-      summary: E-Mail-Einstellungen löschen (Mail aus)
+      summary: Delete the e-mail settings (e-mail off)
       security: [{ bearerAuth: [] }]
       responses:
         "204":
-          description: Gelöscht
+          description: Deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1752,7 +1856,7 @@ paths:
     post:
       operationId: sendTestMail
       tags: [Admin]
-      summary: Testmail mit den gespeicherten Einstellungen senden
+      summary: Send a test e-mail with the stored settings
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1762,19 +1866,60 @@ paths:
               $ref: "#/components/schemas/TestMail"
       responses:
         "204":
-          description: Vom Mailserver angenommen
+          description: Accepted by the mail server
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "422":
-          description: Ungültige Adresse (`validation`) oder Mail nicht eingerichtet (`mailNotConfigured`)
+          description: Invalid address (`validation`) or e-mail not set up (`mailNotConfigured`)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
           $ref: "#/components/responses/MailFailed"
+  /v1/admin/notifications:
+    get:
+      operationId: getNotificationSettings
+      tags: [Admin]
+      summary: Time of the daily pass (server time zone) and the KNot webhook address (admins only)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminNotificationSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: setNotificationSettings
+      tags: [Admin]
+      summary: Save the time of the daily pass and the webhook address (missing or empty `webhookUrl` turns the webhook off)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminNotificationSettingsUpdate"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminNotificationSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
 components:
   parameters:
     TmdbID:
@@ -1796,32 +1941,38 @@ components:
       schema:
         type: integer
   responses:
+    NotifyFailed:
+      description: The notification could not be sent – mail server or webhook (`notifyFailed`, message with the reason)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     MailFailed:
-      description: Der Mailserver hat nicht angenommen oder war nicht erreichbar (`mailFailed`, Meldung mit Ursache)
+      description: The mail server rejected the message or was unreachable (`mailFailed`, message with the reason)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Forbidden:
-      description: Nur für Admins (`forbidden`)
+      description: Admins only (`forbidden`)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Unprocessable:
-      description: "Ungültige Eingabe (`validation`) oder kein TMDB-Token (`missingTMDBToken`)"
+      description: "Invalid input (`validation`) or no TMDB token (`missingTMDBToken`)"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     NotFound:
-      description: Nicht gefunden (`notFound`)
+      description: Not found (`notFound`)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
     Unauthorized:
-      description: Kein oder ungültiges Token (`unauthorized`) bzw. abgelaufen (`tokenExpired`)
+      description: No token or an invalid one (`unauthorized`), or expired (`tokenExpired`)
       content:
         application/json:
           schema:
@@ -1830,7 +1981,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Geräte-Token (`ws_…`)
+      description: Device token (`ws_…`)
   schemas:
     Error:
       type: object
@@ -1838,10 +1989,10 @@ components:
       properties:
         code:
           type: string
-          description: Maschinenlesbarer Fehlercode, z. B. `notFound`, `unauthorized`, `tokenExpired`.
+          description: Machine-readable error code, e.g. `notFound`, `unauthorized`, `tokenExpired`.
         message:
           type: string
-          description: Deutsche Meldung wie in der Weboberfläche.
+          description: German message, as shown in the web UI.
     NextEpisode:
       type: object
       required: [episodeId, season, number, name]
@@ -1863,7 +2014,7 @@ components:
       properties:
         label:
           type: string
-          description: z. B. „Auf Netflix suchen“, „Disney+ öffnen“
+          description: e.g. “Auf Netflix suchen”, “Disney+ öffnen” (German, as in the web UI)
         url:
           type: string
     ContinueCard:
@@ -1898,7 +2049,7 @@ components:
             $ref: "#/components/schemas/ContinueCard"
         olderCount:
           type: integer
-          description: Serien, die länger als 3 Monate pausieren (mit `all=true` enthalten).
+          description: Series paused for more than 3 months (included with `all=true`).
     NewEpisodesNote:
       type: object
       required: [tmdbId, name, count, first]
@@ -1943,7 +2094,7 @@ components:
         episodeId:
           type: string
           format: uuid
-          description: Folge, die die App als nächste angezeigt hat (verhindert Doppelklicks).
+          description: Episode the app showed as next (prevents double clicks).
     SearchResult:
       type: object
       required: [kind, tmdbId, name]
@@ -1998,7 +2149,7 @@ components:
           type: string
         runtime:
           type: integer
-          description: Minuten
+          description: Minutes
         links:
           $ref: "#/components/schemas/Links"
         rating:
@@ -2030,8 +2181,7 @@ components:
         service:
           $ref: "#/components/schemas/Service"
         origin:
-          type: string
-          enum: [manual, import]
+          $ref: "#/components/schemas/WatchOrigin"
     EpisodeRef:
       type: object
       required: [season, number, name]
@@ -2061,7 +2211,7 @@ components:
       properties:
         day:
           type: string
-          description: Tag `yyyy-MM-dd`; fehlt er, ist die Sichtung danach ohne Datum.
+          description: Day `yyyy-MM-dd`; if missing, the watch is undated afterwards.
         service:
           $ref: "#/components/schemas/Service"
     LibraryEntry:
@@ -2095,7 +2245,7 @@ components:
           type: integer
         unknownRuntime:
           type: integer
-          description: Sichtungen ohne bekannte Laufzeit (nicht in `minutes`).
+          description: Watches without a known runtime (not counted in `minutes`).
     StatsMonth:
       type: object
       required: [month, stats]
@@ -2122,7 +2272,7 @@ components:
       properties:
         rating:
           type: integer
-          description: 10 … 1; fehlt = ohne Bewertung
+          description: 10 … 1; missing = unrated
         movies:
           type: integer
         series:
@@ -2131,12 +2281,12 @@ components:
           type: integer
     ChartBar:
       type: object
-      description: Ein Monat des gewählten Jahres oder ein Jahr (bei allen Jahren).
+      description: One month of the selected year, or one year (when all years are shown).
       required: [label, seriesMinutes, movieMinutes, episodes, movies]
       properties:
         label:
           type: string
-          description: '"Jan" … "Dez" oder die Jahreszahl'
+          description: '"Jan" … "Dec" or the year number'
         seriesMinutes:
           type: integer
         movieMinutes:
@@ -2153,7 +2303,7 @@ components:
           $ref: "#/components/schemas/Service"
         minutes:
           type: integer
-          description: Fehlt `service`, sind es Sichtungen ohne Dienst.
+          description: If `service` is missing, these are watches without a service.
     TopSeries:
       type: object
       required: [tmdbId, name, episodes, minutes]
@@ -2176,24 +2326,24 @@ components:
       properties:
         year:
           type: integer
-          description: Gewähltes Jahr; fehlt = alle Jahre.
+          description: Selected year; missing = all years.
         period:
           $ref: "#/components/schemas/Period"
         previous:
           $ref: "#/components/schemas/Period"
         chart:
           type: array
-          description: Monate des Jahres (bis heute) bzw. ein Eintrag pro Jahr, aufsteigend; ohne Datum fehlt hier.
+          description: Months of the year (up to today), or one entry per year in ascending order; undated watches are not included here.
           items:
             $ref: "#/components/schemas/ChartBar"
         services:
           type: array
-          description: Zeit je Dienst, größte zuerst.
+          description: Time per service, largest first.
           items:
             $ref: "#/components/schemas/ServiceShare"
         topSeries:
           type: array
-          description: Bis zu 5 Serien nach Zeit.
+          description: Up to 5 series by watch time.
           items:
             $ref: "#/components/schemas/TopSeries"
         total:
@@ -2225,7 +2375,7 @@ components:
       properties:
         token:
           type: string
-          description: TMDB „API Read Access Token“ (beginnt mit `eyJ`).
+          description: TMDB “API Read Access Token” (starts with `eyJ`).
     FollowedSeries:
       type: object
       required: [tmdbId, name]
@@ -2246,7 +2396,7 @@ components:
           type: integer
         skipped:
           type: integer
-          description: Zeilen ohne Titel
+          description: Rows without a title
     ImportProgress:
       type: object
       required: [running, pendingRows, waitingForReview]
@@ -2290,7 +2440,7 @@ components:
           type: string
         canAssign:
           type: boolean
-          description: Die Serie ist bekannt, die Zeile lässt sich einer Folge zuweisen.
+          description: The series is known; the row can be assigned to an episode.
     TitleRef:
       type: object
       required: [tmdbId, name]
@@ -2312,8 +2462,7 @@ components:
           type: string
           enum: [tv, movie]
         status:
-          type: string
-          enum: [pending, auto, confirmed, review, ignored]
+          $ref: "#/components/schemas/MappingStatus"
         title:
           $ref: "#/components/schemas/TitleRef"
     NetflixImport:
@@ -2385,8 +2534,7 @@ components:
         rating:
           type: integer
         status:
-          type: string
-          enum: [pending, imported, review, not_found, skipped]
+          $ref: "#/components/schemas/FilmStatus"
         tmdbId:
           type: integer
         candidates:
@@ -2417,7 +2565,7 @@ components:
           $ref: "#/components/schemas/FilmCounts"
         error:
           type: string
-          description: Fehler der Zuordnung (z. B. kein TMDB-Token); Einträge bleiben offen.
+          description: Matching error (e.g. no TMDB token); entries stay open.
         entries:
           type: array
           items:
@@ -2452,17 +2600,17 @@ components:
           format: date-time
         emailHint:
           type: string
-          description: E-Mail-Adresse nur maskiert, z. B. `p•••@example.org` (fehlt ohne lesbare Adresse)
+          description: E-mail address, masked only, e.g. `p•••@example.org` (missing without a readable address)
         invitePending:
           type: boolean
-          description: Konto ohne Passwort, dessen Einladung noch gilt (für mit dem OIDC-Provider verknüpfte Konten immer `false`)
+          description: Account without a password whose invitation is still valid (always `false` for accounts linked to the OIDC provider)
         ssoLinked:
           type: boolean
-          description: Mit dem konfigurierten OIDC-Provider verknüpft
+          description: Linked to the configured OIDC provider
         inviteExpiresAt:
           type: string
           format: date-time
-          description: Ablauf der offenen Einladung
+          description: Expiry of the open invitation
     OIDCSettings:
       type: object
       required: [configured, unreadable, hasClientSecret, passwordLogin, passwordLoginForced]
@@ -2471,7 +2619,7 @@ components:
           type: boolean
         unreadable:
           type: boolean
-          description: Gespeichert, aber mit dem Server-Schlüssel nicht lesbar (SSO dann aus)
+          description: Stored, but not readable with the server key (SSO is then off)
         displayName:
           type: string
         issuer:
@@ -2482,21 +2630,21 @@ components:
           type: boolean
         baseUrl:
           type: string
-          description: Adresse von WatchSwifty
+          description: Address of WatchSwifty
         redirectUrl:
           type: string
-          description: Rücksprung-URL für den Provider (`baseUrl` + `/auth/oidc/callback`)
+          description: Redirect URL for the provider (`baseUrl` + `/auth/oidc/callback`)
         passwordLogin:
           type: boolean
         passwordLoginForced:
           type: boolean
-          description: Per `PASSWORD_LOGIN=true` erzwungen (Notschalter)
+          description: Forced by `PASSWORD_LOGIN=true` (emergency switch)
         passwordLoginStored:
           type: boolean
-          description: Gespeicherter Schalter (gilt wieder, sobald der Notschalter entfernt ist); fehlt ohne SSO-Einstellungen
+          description: Stored switch (applies again once the emergency switch is removed); missing without SSO settings
         checkError:
           type: string
-          description: Nur nach dem Speichern – warum die Prüfung der Verbindung fehlschlug
+          description: Only after saving – why the connection check failed
     OIDCSettingsUpdate:
       type: object
       required: [issuer, clientId, baseUrl]
@@ -2509,7 +2657,7 @@ components:
           type: string
         clientSecret:
           type: string
-          description: Leer oder weggelassen = gespeichertes behalten (nicht, wenn sich Issuer oder Client-ID ändern)
+          description: Empty or omitted = keep the stored one (not if the issuer or client ID changes)
         baseUrl:
           type: string
     OIDCCheck:
@@ -2532,16 +2680,16 @@ components:
       properties:
         mailed:
           type: boolean
-          description: Link ging per Mail an die hinterlegte Adresse
+          description: The link was e-mailed to the stored address
         emailHint:
           type: string
-          description: Maskierte Adresse, an die gesendet wurde (bzw. werden sollte)
+          description: Masked address the e-mail was sent (or should have been sent) to
         url:
           type: string
-          description: Der Link zum Weitergeben, nur wenn er nicht gemailt wurde – wird nie wieder angezeigt
+          description: The link to hand on, only if it was not e-mailed – never shown again
         mailError:
           type: string
-          description: Warum die Mail nicht rausging
+          description: Why the e-mail was not sent
     CreatedUser:
       allOf:
         - $ref: "#/components/schemas/UserSummary"
@@ -2549,11 +2697,11 @@ components:
           properties:
             inviteMailError:
               type: string
-              description: Konto angelegt, aber die Einladung ging nicht raus (Ursache); erneut senden über POST /v1/admin/users/{id}/invite
+              description: Account created, but the invitation was not sent (reason); resend via POST /v1/admin/users/{id}/invite
     NewUser:
       type: object
       required: [username]
-      description: Mit `password` ein normales Konto; ohne Passwort, aber mit `email` eine Einladung per Mail (Mail muss eingerichtet sein).
+      description: With `password`, a regular account; without a password but with `email`, an invitation by e-mail (e-mail must be set up).
       properties:
         username:
           type: string
@@ -2594,7 +2742,7 @@ components:
           type: string
         updateAvailable:
           type: boolean
-          description: Fehlt bei Entwicklerversionen (kein Vergleich möglich).
+          description: Missing for development builds (no comparison possible).
     System:
       type: object
       required: [version, updateCheck]
@@ -2620,7 +2768,7 @@ components:
           type: boolean
         unreadable:
           type: boolean
-          description: Gespeichert, aber mit dem aktuellen TOKEN_KEY nicht lesbar – neu eintragen.
+          description: Stored, but not readable with the current TOKEN_KEY – enter it again.
         host:
           type: string
         port:
@@ -2639,7 +2787,7 @@ components:
           type: string
         baseUrl:
           type: string
-          description: Adresse von WatchSwifty für Links in Mails
+          description: Address of WatchSwifty used for links in e-mails
     MailSettingsUpdate:
       type: object
       required: [host, encryption, fromAddress, baseUrl]
@@ -2671,19 +2819,121 @@ components:
     Service:
       type: string
       enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other]
+    WatchOrigin:
+      type: string
+      description: Origin of a watch.
+      enum: [manual, import]
+    MappingStatus:
+      type: string
+      description: Status of a Netflix mapping.
+      enum: [pending, auto, confirmed, review, ignored]
+    FilmStatus:
+      type: string
+      description: Status of a movie list entry.
+      enum: [pending, imported, review, not_found, skipped]
+    NotifyChannel:
+      type: string
+      description: How notifications are sent.
+      enum: [mail, webhook]
+    NotificationPrefs:
+      type: object
+      required: [announced, soon, today, channel, availableChannels, webhookConfigured, hasWebhookKey, dailyRunTime]
+      properties:
+        announced:
+          type: boolean
+          description: Notify as soon as a new episode of a followed series is known.
+        soon:
+          type: boolean
+          description: Notify 1–3 days before an episode airs.
+        today:
+          type: boolean
+          description: Notify on the air date.
+        channel:
+          $ref: "#/components/schemas/NotifyChannel"
+        activeChannel:
+          $ref: "#/components/schemas/NotifyChannel"
+        availableChannels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotifyChannel"
+          description: Channels set up for this account (mail needs mail settings and an own address, webhook the admin's address and an own key).
+        webhookConfigured:
+          type: boolean
+          description: The admin set up a webhook address (only then a key can be used).
+        hasWebhookKey:
+          type: boolean
+        dailyRunTime:
+          type: string
+          description: Time of the daily check, `HH:MM` in the server's time zone.
+    NotificationPrefsUpdate:
+      type: object
+      required: [announced, soon, today, channel]
+      properties:
+        announced:
+          type: boolean
+        soon:
+          type: boolean
+        today:
+          type: boolean
+        channel:
+          $ref: "#/components/schemas/NotifyChannel"
+    WebhookKeyChange:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          description: KNot API key (at least 16 printable characters, no spaces); empty removes it.
+        currentPassword:
+          type: string
+    WebhookKeyRemove:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+    AdminNotificationSettings:
+      type: object
+      required: [dailyRunTime, timeZone, nextRunAt]
+      properties:
+        dailyRunTime:
+          type: string
+          description: "`HH:MM`"
+        timeZone:
+          type: string
+          description: The server's time zone (`TZ`), e.g. `Europe/Berlin`.
+        webhookUrl:
+          type: string
+        lastRunAt:
+          type: string
+          format: date-time
+        nextRunAt:
+          type: string
+          format: date-time
+    AdminNotificationSettingsUpdate:
+      type: object
+      required: [dailyRunTime]
+      properties:
+        dailyRunTime:
+          type: string
+        webhookUrl:
+          type: string
+    DeviceKind:
+      type: string
+      description: Device token from the browser login or created by hand.
+      enum: [device, manual]
     WatchInput:
       type: object
       properties:
         day:
           type: string
-          description: Tag `yyyy-MM-dd`; fehlt er, gilt heute. (Ohne Datum markieren „bis hier“, Staffel und Serie.)
+          description: Day `yyyy-MM-dd`; if missing, today applies. (Marking “up to here”, a season or a series is done without a date.)
         service:
           type: string
           enum: [netflix, prime_video, disney_plus, apple_tv, hbo_max, paramount_plus, wow, cinema, purchased, other, unknown]
-          description: Fehlt er, gilt der zuletzt genutzte Dienst dieser Serie; `unknown` = ohne Dienst.
+          description: If missing, the most recently used service for this series applies; `unknown` = no service.
         rewatch:
           type: boolean
-          description: Erneut gesehen (zusätzliche Sichtung statt Ersetzen).
+          description: Watched again (an additional watch instead of replacing).
     HiddenInput:
       type: object
       required: [hidden]
@@ -2733,8 +2983,7 @@ components:
         service:
           $ref: "#/components/schemas/Service"
         origin:
-          type: string
-          enum: [manual, import]
+          $ref: "#/components/schemas/WatchOrigin"
     Episode:
       type: object
       required: [season, number, name, aired, watches]
@@ -2751,7 +3000,7 @@ components:
           type: string
         runtime:
           type: integer
-          description: Minuten
+          description: Minutes
         aired:
           type: boolean
         watches:
@@ -2770,6 +3019,9 @@ components:
           type: integer
         comment:
           type: string
+        isOpen:
+          type: boolean
+          description: Season the web UI shows expanded (the one with the next episode, or the first without a watch).
         episodes:
           type: array
           items:
@@ -2792,7 +3044,7 @@ components:
           type: string
         runtime:
           type: integer
-          description: Typische Folgenlänge in Minuten
+          description: Typical episode length in minutes
         links:
           $ref: "#/components/schemas/Links"
         rating:
@@ -2805,6 +3057,8 @@ components:
           type: boolean
         lastService:
           $ref: "#/components/schemas/Service"
+        next:
+          $ref: "#/components/schemas/NextEpisode"
         seasons:
           type: array
           items:
@@ -2819,14 +3073,14 @@ components:
           type: string
         redirectUri:
           type: string
-          description: Muss `dev.patmei.watchswifty:/auth` sein.
+          description: Must be `dev.patmei.watchswifty:/auth`.
     TokenGrant:
       type: object
       required: [token, expiresAt, device, user]
       properties:
         token:
           type: string
-          description: "Geräte-Token `ws_…` für den Header `Authorization: Bearer`."
+          description: "Device token `ws_…` for the `Authorization: Bearer` header."
         expiresAt:
           type: string
           format: date-time
@@ -2844,8 +3098,7 @@ components:
         name:
           type: string
         kind:
-          type: string
-          enum: [device, manual]
+          $ref: "#/components/schemas/DeviceKind"
         createdAt:
           type: string
           format: date-time
@@ -2873,25 +3126,25 @@ components:
           type: boolean
         hasPassword:
           type: boolean
-          description: Konto hat ein Passwort; über SSO angelegte Konten haben keins.
+          description: The account has a password; accounts created via SSO have none.
         ssoLinked:
           type: boolean
-          description: Konto ist mit dem konfigurierten OIDC-Provider verknüpft.
+          description: The account is linked to the configured OIDC provider.
         passwordLogin:
           type: boolean
-          description: Der Server erlaubt den Passwort-Login („Passwort ändern“ nur bei `hasPassword` und `passwordLogin`).
+          description: The server allows password login (**Passwort ändern** (change password) only with `hasPassword` and `passwordLogin`).
         tmdbToken:
           $ref: "#/components/schemas/TMDBTokenState"
         email:
           type: string
-          description: Eigene E-Mail-Adresse (fehlt, wenn keine hinterlegt oder nicht lesbar ist)
+          description: Own e-mail address (missing if none is stored or it is unreadable)
     EmailChange:
       type: object
       required: [email, currentPassword]
       properties:
         email:
           type: string
-          description: Leer entfernt die Adresse
+          description: Empty removes the address
         currentPassword:
           type: string
     TMDBTokenState:
@@ -2903,7 +3156,7 @@ components:
           enum: [none, stored, unreadable]
         suffix:
           type: string
-          description: Letzte vier Zeichen, z. B. `…abcd` (der Token selbst wird nie ausgegeben).
+          description: Last four characters, e.g. `…abcd` (the token itself is never returned).
     Version:
       type: object
       required: [version]

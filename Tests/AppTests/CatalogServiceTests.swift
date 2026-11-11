@@ -45,6 +45,44 @@ struct CatalogServiceTests {
         }
     }
 
+    @Test func refreshStampsFirstAndLastSeen() async throws {
+        let tmdb = fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let title = try await catalog.title(kind: .tv, tmdbID: 1399)
+            // Rows that existed before this version have no first-seen time.
+            let old = try await catalog.episodes(of: title.requireID())[0]
+            old.firstSeenAt = nil
+            try await old.save(on: app.db)
+            tmdb.addSeries(Self.series, episodes: [1: ["Eins", "Zwei"], 2: ["Drei", "Vier", "Fünf"]])
+            let t1 = Date(timeIntervalSince1970: 1_800_000_000)
+            try await catalog.refresh(title, now: t1)
+            let after = try await catalog.episodes(of: title.requireID())
+            let e1 = after[0], e5 = try #require(after.last)
+            #expect(e5.firstSeenAt == t1)
+            #expect(e1.firstSeenAt == nil)
+            #expect(after.allSatisfy { $0.lastSeenAt == t1 })
+            #expect(e1.isCurrent(titleRefreshedAt: title.refreshedAt))
+        }
+    }
+
+    @Test func episodeMissingFromRefreshBecomesStale() async throws {
+        let tmdb = fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let title = try await catalog.title(kind: .tv, tmdbID: 1399)
+            tmdb.addSeries(Self.series, episodes: [1: ["Eins"], 2: ["Drei", "Vier"]])
+            let t2 = Date(timeIntervalSince1970: 1_800_000_000)
+            try await catalog.refresh(title, now: t2)
+            let after = try await catalog.episodes(of: title.requireID())
+            let e1 = after[0], e2 = after[1]
+            #expect(e2.number == 2 && e2.season == 1)
+            #expect(e2.lastSeenAt != t2)
+            #expect(!e2.isCurrent(titleRefreshedAt: t2))
+            #expect(e1.isCurrent(titleRefreshedAt: t2))
+        }
+    }
+
     @Test func refreshUpsertsKeepingIDs() async throws {
         let tmdb = fake()
         try await withTestApp(tmdb: tmdb) { app in

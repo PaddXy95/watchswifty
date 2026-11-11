@@ -13,8 +13,16 @@ final class FakeMailSender: MailSender, @unchecked Sendable {
 
         /// Header value, e.g. `header("Subject")` (encoded words decoded).
         func header(_ name: String) -> String? {
-            splitMessage(Data(message.utf8)).headers.first { $0.hasPrefix("\(name): ") }
-                .map { decodeEncodedWord(String($0.dropFirst(name.count + 2))) }
+            // Long encoded subjects are folded over several lines (continuations start with a space).
+            var unfolded: [String] = []
+            for line in splitMessage(Data(message.utf8)).headers {
+                if line.hasPrefix(" "), !unfolded.isEmpty { unfolded[unfolded.count - 1] += line } else { unfolded.append(line) }
+            }
+            return unfolded.first { $0.hasPrefix("\(name): ") }.map { line in
+                let raw = String(line.dropFirst(name.count + 2))
+                let words = raw.split(separator: " ").map(String.init)
+                return words.allSatisfy { $0.hasPrefix("=?UTF-8?B?") } ? words.map(decodeEncodedWord).joined() : raw
+            }
         }
 
         /// Decoded body text.

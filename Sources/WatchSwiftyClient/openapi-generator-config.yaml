@@ -1,0 +1,14 @@
+generate:
+  - types
+  - client
+accessModifier: public
+# Growing enums become open types (OpenValues.swift): a value added by a newer server must not make older apps fail
+# to decode whole responses. Only the client gets these; the server keeps its closed enums and rejects unknown input.
+typeOverrides:
+  schemas:
+    Service: ServiceValue
+    WatchOrigin: WatchOriginValue
+    MappingStatus: MappingStatusValue
+    FilmStatus: FilmStatusValue
+    DeviceKind: DeviceKindValue
+    NotifyChannel: NotifyChannelValue

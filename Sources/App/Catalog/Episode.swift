@@ -17,6 +17,10 @@ final class Episode: Model, @unchecked Sendable {
     @OptionalField(key: "overview") var overview: String?
     /// Minutes; 0 = unknown, nil = not fetched yet.
     @OptionalField(key: "runtime") var runtime: Int?
+    /// When a refresh first stored this episode (nil for rows from before notifications existed).
+    @OptionalField(key: "first_seen_at") var firstSeenAt: Date?
+    /// Time of the last refresh in which TMDB still returned this episode.
+    @OptionalField(key: "last_seen_at") var lastSeenAt: Date?
 
     init() {}
 
@@ -27,6 +31,12 @@ final class Episode: Model, @unchecked Sendable {
         self.name = name
         self.airDate = airDate
         self.tmdbEpisodeID = tmdbEpisodeID
+    }
+
+    /// Still returned by the title's latest refresh (renumbered or dropped rows are not: refreshes never delete rows).
+    func isCurrent(titleRefreshedAt: Date?) -> Bool {
+        guard let lastSeenAt, let titleRefreshedAt else { return true }
+        return lastSeenAt >= titleRefreshedAt
     }
 
     /// `S04E15`

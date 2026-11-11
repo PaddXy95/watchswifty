@@ -22,6 +22,7 @@ struct AccountPage: HTML {
     var passwordChange = true
     /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
     var tokenNeedsReauth = false
+    var notifications: AccountNotifications? = nil
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -72,6 +73,8 @@ struct AccountPage: HTML {
                     }
                 }
             }
+
+            if let notifications { AccountNotificationsSection(state: notifications) }
 
             h2 { "Geräte" }
             p(.class("muted")) {
@@ -221,5 +224,114 @@ struct TokenHelp: HTML {
             }
         }
         .attributes(.custom(name: "open", value: ""), when: open)
+    }
+}
+
+/// What Konto → Benachrichtigungen shows.
+struct AccountNotifications: Sendable {
+    var announced: Bool
+    var soon: Bool
+    var today: Bool
+    var available: [NotifyChannel]
+    var active: NotifyChannel?
+    var preferred: NotifyChannel
+    /// The admin set up a webhook address (only then the key field appears).
+    var webhookConfigured: Bool
+    var keyState: WebhookKeyState
+    var dailyRunTime: String
+    /// Changing the key asks for the current password (accounts with a password).
+    var needsPassword: Bool
+}
+
+struct AccountNotificationsSection: HTML, Sendable {
+    let state: AccountNotifications
+
+    private func channelName(_ channel: NotifyChannel) -> String {
+        switch channel {
+        case .mail: "E-Mail"
+        case .webhook: "Webhook (KNot)"
+        }
+    }
+
+    var body: some HTML {
+        h2 { "Benachrichtigungen" }
+        form(.method(.post), .action("/account/notifications"), .class("notification-prefs")) {
+            p { "Neue Folgen beobachteter Serien:" }
+            label(.class("checkbox")) {
+                input(.type(.checkbox), .name("announced")).attributes(.checked, when: state.announced)
+                " sobald eine neue Folge bekannt wird"
+            }
+            label(.class("checkbox")) {
+                input(.type(.checkbox), .name("soon")).attributes(.checked, when: state.soon)
+                " 3 Tage vor der Ausstrahlung"
+            }
+            label(.class("checkbox")) {
+                input(.type(.checkbox), .name("today")).attributes(.checked, when: state.today)
+                " am Tag der Ausstrahlung"
+            }
+            p(.class("muted")) {
+                "Geprüft wird täglich um \(state.dailyRunTime) Uhr; alles Neue kommt in einer Nachricht. "
+                "Der Hinweis auf neu verbundene Geräte geht immer über denselben Weg. "
+                DocsLink(page: "notifications.md", label: "Mehr dazu")
+                "."
+            }
+            if state.available.count > 1 {
+                p { "Senden per" }
+                for channel in state.available {
+                    label(.class("checkbox")) {
+                        input(.type(.radio), .name("channel"), .value(channel.rawValue))
+                            .attributes(.checked, when: channel == (state.active ?? state.preferred))
+                        " \(channelName(channel))"
+                    }
+                }
+            } else if let only = state.available.first {
+                // Keeps the stored choice: a channel that is gone for a while must not be replaced for good.
+                input(.type(.hidden), .name("channel"), .value(state.preferred.rawValue))
+                p { "Senden per \(channelName(only))" }
+            } else {
+                input(.type(.hidden), .name("channel"), .value(state.preferred.rawValue))
+                p(.class("muted")) {
+                    "Noch kein Versandweg: hinterlege eine Mail-Adresse oder einen Webhook-Schlüssel – oder der Admin hat den "
+                    "Versand noch nicht eingerichtet."
+                }
+            }
+            button(.type(.submit), .class("primary")) { "Speichern" }
+        }
+        if state.webhookConfigured {
+            h3 { "Webhook-Schlüssel (KNot)" }
+            switch state.keyState {
+            case .key: p { "Schlüssel gespeichert." }
+            case .unreadable: p(.class("error")) { "Schlüssel nicht lesbar – bitte neu eintragen." }
+            case .none: p(.class("muted")) { "Kein Schlüssel hinterlegt. Den Schlüssel bekommst du vom Admin." }
+            }
+            form(.method(.post), .action("/account/notifications/webhook-key")) {
+                label {
+                    "Webhook-Schlüssel"
+                    input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "off"))
+                }
+                if state.needsPassword {
+                    label {
+                        "Aktuelles Passwort"
+                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
+                    }
+                }
+                button(.type(.submit)) { "Schlüssel speichern" }
+            }
+            if state.keyState != .none {
+                form(.method(.post), .action("/account/notifications/webhook-key/remove"), .class("inline-form")) {
+                    if state.needsPassword {
+                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"),
+                              .custom(name: "placeholder", value: "Aktuelles Passwort"), .custom(name: "aria-label", value: "Aktuelles Passwort"))
+                    }
+                    button(.type(.submit)) { "Schlüssel entfernen" }
+                }
+            }
+        }
+        if let active = state.active {
+            form(.method(.post), .action("/account/notifications/test"), .class("inline-form")) {
+                button(.type(.submit)) { "Testnachricht senden" }
+                span(.class("muted")) { " (per \(channelName(active)))" }
+            }
+        }
     }
 }
