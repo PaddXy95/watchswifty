@@ -2,7 +2,7 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.4.0] – 2026-11-11
 
 ### Added
 - **Notifications about new episodes:** for followed series, every user can be told as soon as a new episode is
