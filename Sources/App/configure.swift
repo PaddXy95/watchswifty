@@ -14,6 +14,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.authCodes = AuthCodeStore()
     app.mailSender = mailSender ?? LiveMailSender()
     app.backgroundTasks = BackgroundTasks()
+    app.dailyRunTrigger = DailyRunTrigger()
     app.oidcIdentityLock = AsyncMutex()
     app.oidcUsedStates = OIDCUsedStates()
     app.loginSettings = LoginSettingsStore()
@@ -77,6 +78,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddOIDCConfig())
     app.migrations.add(AddEpisodeSeenTimes())
     app.migrations.add(AddFollowedAt())
+    app.migrations.add(AddNotificationSettings())
 
     try routes(app)
     try await app.autoMigrate()
