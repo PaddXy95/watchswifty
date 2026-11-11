@@ -1,181 +1,189 @@
 # Changelog
 
-Alle nennenswerten Änderungen an WatchSwifty. Versionen folgen [SemVer](https://semver.org/lang/de/).
+All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
-## [Unveröffentlicht]
+## [Unreleased]
 
-### Neu
-- **App-API: nächste Folge einer Serie:** `GET /api/v1/tv/{id}` liefert zusätzlich die nächste Folge (`next`, wie bei
-  „Weiterschauen“) und je Staffel, ob die Weboberfläche sie aufgeklappt zeigt (`isOpen`).
-- **Client-Bibliothek für die iOS-App:** Das Swift-Paket bietet zusätzlich die Bibliothek `WatchSwiftyClient`, aus
-  derselben API-Beschreibung erzeugt wie der Server. Werte, die mit neuen Versionen wachsen können (Streaming-Dienste,
-  Status von Import und Zuordnungen, Geräte-Art), sind dort offen – ältere Apps verstehen neuere Server weiterhin.
-- **Anmeldung über OIDC (SSO):** Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia,
-  Pocket ID …) per „Mit SSO anmelden“. Bestehende Konten werden unter **Konto** verknüpft, neue entstehen nach
-  Bestätigung beim ersten Login, Einladungen lassen sich über SSO annehmen. Die Benutzer-Seite zeigt, wer schon
-  verknüpft ist, und erzeugt Verknüpfungslinks. Eingerichtet wird alles unter **System → Anmeldung über OIDC (SSO)**
-  (verschlüsselt gespeichert, mit „Verbindung testen“); dort lässt sich der Passwort-Login danach auch abschalten.
-  Notschalter `PASSWORD_LOGIN=true`, Notausgang `link-oidc`, Adresswechsel des Providers mit `oidc-move-issuer`.
-- **App-API:** `Me` und `UserSummary` melden `ssoLinked`, `Me` zusätzlich `passwordLogin`; neuer Endpunkt
-  `POST /v1/admin/users/{id}/sso-link`, SSO-Einstellungen unter `/v1/admin/oidc` (inkl. Test und Passwort-Login-Schalter);
-  neue Fehlercodes `passwordLoginDisabled`, `emailFromProvider` und `oidcCheckFailed`.
-- **Mail bei neuem Gerät:** Verbindet sich eine App mit einem Konto, geht eine Mail an die unter **Konto** hinterlegte
-  Adresse – mit Gerätename, Zeitpunkt und Link zum Abmelden (nur mit eingerichteter E-Mail).
-- **Lizenz:** WatchSwifty steht unter der MIT-Lizenz (`LICENSE`), ebenso die Client-Bibliothek `WatchSwiftyClient`
-  und die API-Beschreibung. Das Docker-Image trägt die Lizenz als Label.
+### Added
+- **App API: next episode of a series:** `GET /api/v1/tv/{id}` now also returns the next episode (`next`, as in
+  „Weiterschauen“ (continue watching)) and, per season, whether the web UI shows it expanded (`isOpen`).
+- **Client library for the iOS app:** The Swift package now also offers the `WatchSwiftyClient` library, generated from
+  the same API description as the server. Values that can grow with new versions (streaming services, import and
+  matching status, device kind) are open there, so older apps keep understanding newer servers.
+- **Login via OIDC (SSO):** Sign in through your own identity provider (Authentik, Keycloak, Authelia, Pocket ID …)
+  with „Mit SSO anmelden“ (sign in with SSO). Existing accounts are linked under **Konto** (account), new ones are
+  created after confirmation on first login, and invitations can be accepted via SSO. The **Benutzer** (users) page
+  shows who is already linked and generates linking URLs. Everything is set up under
+  **System → Anmeldung über OIDC (SSO)** (stored encrypted, with „Verbindung testen“ (test connection)); password login
+  can be switched off there afterwards. Emergency switch `PASSWORD_LOGIN=true`, emergency exit `link-oidc`, provider
+  address change with `oidc-move-issuer`.
+- **App API:** `Me` and `UserSummary` report `ssoLinked`, `Me` additionally `passwordLogin`; new endpoint
+  `POST /v1/admin/users/{id}/sso-link`, SSO settings under `/v1/admin/oidc` (incl. test and password login switch);
+  new error codes `passwordLoginDisabled`, `emailFromProvider` and `oidcCheckFailed`.
+- **Mail for a new device:** When an app connects to an account, a mail goes to the address stored under **Konto**,
+  with device name, time and a link to sign out (only if e-mail is set up).
+- **License:** WatchSwifty is released under the MIT license (`LICENSE`), as are the `WatchSwiftyClient` client library
+  and the API description. The Docker image carries the license as a label.
 
-### Geändert
-- **App-Anmeldung:** Die Rücksprung-Adresse heißt jetzt `dev.patmei.watchswifty:/auth` statt `watchswifty://auth`
-  (Schema nach Reverse-DNS, RFC 8252). Apps müssen sie anpassen, die alte Adresse wird abgelehnt.
-- App-API: Fehlgeschlagener Mailversand antwortet mit **503** `mailFailed` statt 502.
+### Changed
+- **Documentation in English:** The README is now short (features, quick start, links); setup and operation are
+  described in topic pages under `docs/`. CHANGELOG, API description (`/api`), `docker-compose.yml` and `.env.example`
+  are English as well; the web UI stays German. Hints on the **System** page link to the matching page. The privacy
+  policy of the iOS app is also available in English (`docs/privacy-ios-app.md`).
+- **App login:** The redirect URI is now `dev.patmei.watchswifty:/auth` instead of `watchswifty://auth` (scheme in
+  reverse-DNS form, RFC 8252). Apps must be updated; the old URI is rejected.
+- App API: A failed mail delivery responds with **503** `mailFailed` instead of 502.
 
-### Behoben
-- **Hinter Cloudflare** zeigt eine fehlgeschlagene Testmail oder Einladung wieder die Meldung mit der Ursache statt
-  Cloudflares „Bad gateway“-Seite. Cloudflare ersetzt jede 502-Antwort; WatchSwifty antwortet in solchen Fällen
-  jetzt mit 503. Dasselbe gilt für „TMDB nicht erreichbar“.
-- **System → E-Mail:** Ein Passwort ohne Benutzer wurde beim Speichern stillschweigend verworfen, die Mails gingen dann
-  ohne Anmeldung raus. Jetzt erscheint ein Hinweis, und nichts wird gespeichert.
+### Fixed
+- **Behind Cloudflare**, a failed test mail or invitation shows the message with the cause again instead of
+  Cloudflare's „Bad gateway“ page. Cloudflare replaces every 502 response; WatchSwifty now responds with 503 in such
+  cases. The same applies to „TMDB nicht erreichbar“ (TMDB unreachable).
+- **System → E-Mail:** A password without a user name was silently discarded on save, and mails then went out without
+  authentication. Now a notice appears and nothing is saved.
 
-### Sicherer
-- **Neue Sitzung bei jeder Anmeldung:** Passwort-Login, SSO und das Setzen eines Passworts über Reset- oder
-  Einladungslink vergeben jetzt eine neue Sitzungs-ID und löschen die alte. Eine vorher im Browser untergeschobene
-  Sitzung (etwa durch einen anderen Dienst auf demselben Server) wird so nie zu einer angemeldeten (Session Fixation).
-- **SSO-Konten und Apps:** Konten, die nur über den Provider hineinkommen, gehen vor dem Verbinden einer App und vor
-  einem von Hand erstellten Token einmal durch den Provider – wer dort gesperrt ist, bekommt kein neues Token.
-- Keine Seite lässt sich mehr in fremde Seiten einbetten (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). Das
-  schützt vor Clickjacking, auch durch andere Dienste auf demselben Server oder unter derselben Domain.
-- Die API-Doku unter `/api` speichert ein eingefügtes Token nicht mehr im Browser; ein früher gespeichertes wird beim
-  Öffnen gelöscht.
+### Security
+- **New session on every login:** Password login, SSO and setting a password via a reset or invitation link now issue a
+  new session ID and delete the old one. A session planted in the browser beforehand (for example by another service on
+  the same server) can therefore never become a logged-in one (session fixation).
+- **SSO accounts and apps:** Accounts that can only sign in through the provider go through the provider once before an
+  app is connected and before a manually created token; anyone blocked there gets no new token.
+- No page can be embedded in other sites any more (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). This protects
+  against clickjacking, including by other services on the same server or under the same domain.
+- The API docs under `/api` no longer store a pasted token in the browser; a previously stored one is deleted on
+  opening.
 
 ## [0.3.0] – 2026-11-09
 
-### Neu
-- **E-Mail (optional):** SMTP-Versand, eingerichtet als Admin unter **System → E-Mail** und verschlüsselt gespeichert;
-  mit „Testmail senden“. Funktioniert mit [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay) (CA-Datei aus dessen
-  Volume) und normalen Anbietern.
-- **Einladungen:** Der Admin legt ein Konto mit Benutzername und E-Mail-Adresse an, die Person setzt ihr Passwort über
-  den Link selbst (7 Tage gültig, erneut senden möglich). Admins sehen Adressen nur gekürzt.
-- **Passwort vergessen** auf der Anmeldeseite: Link per Mail an die unter **Konto** hinterlegte Adresse (1 Stunde gültig).
-- **Konto:** eigene E-Mail-Adresse hinterlegen (verschlüsselt gespeichert, Ändern nur mit aktuellem Passwort).
-- App-API: Mail-Einstellungen, Einladungen und die eigene Adresse (`/api/v1/admin/mail`, `/api/v1/admin/users/{id}/invite`,
+### Added
+- **E-mail (optional):** SMTP delivery, set up as admin under **System → E-Mail** (system → e-mail) and stored
+  encrypted; with „Testmail senden“ (send test mail). Works with [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
+  (CA file from its volume) and ordinary providers.
+- **Invitations:** The admin creates an account with a user name and e-mail address, and the person sets their own
+  password via the link (valid for 7 days, can be resent). Admins only see addresses in abbreviated form.
+- **Passwort vergessen** (forgot password) on the login page: link by mail to the address stored under **Konto**
+  (account), valid for 1 hour.
+- **Konto:** store your own e-mail address (stored encrypted, changing it requires the current password).
+- App API: mail settings, invitations and your own address (`/api/v1/admin/mail`, `/api/v1/admin/users/{id}/invite`,
   `/api/v1/me/email`).
 
-### Sicherer
-- Die Anmeldung verrät über die Antwortzeit nicht mehr, ob es einen Benutzernamen gibt.
+### Security
+- Login no longer reveals through the response time whether a user name exists.
 
 ## [0.2.6] – 2026-11-08
 
-### Neu
-- **App-Icon:** „WS“ mit einem startenden Mauersegler – als Favicon im Browser-Tab, im Kopf der Seite, als Icon auf
-  dem Homescreen (iPhone/Android) und im README.
-- **Passwort vergessen:** `reset-password <benutzer>` setzt ein Passwort auf dem Server neu, auch für den
-  einzigen Admin (`docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <benutzer>`, Passwort wird
-  verdeckt abgefragt).
+### Added
+- **App icon:** „WS“ with a swift taking off – as the favicon in the browser tab, in the page header, as the icon on
+  the home screen (iPhone/Android) and in the README.
+- **Forgot password:** `reset-password <user>` resets a password on the server, even for the only admin
+  (`docker exec -it watchswifty /app/docker-entrypoint.sh reset-password <user>`, the password is prompted for without
+  echo).
 
 ## [0.2.5] – 2026-11-08
 
-### Neu
-- **Statistik übersichtlicher:** Zeitraum oben wählen (alle Jahre oder ein Jahr) – Kennzahlen mit Veränderung zum
-  Vorjahr, Diagramm „Zeit pro Monat“ (Serien und Filme gestapelt, Werte beim Drüberfahren), Anteil je Dienst,
-  „Meistgesehen“ (Top-5-Serien) und Bewertungen als Diagramm. Die bisherigen Tabellen liegen unter „Alle Zahlen“.
-  Die App-API liefert dieselben Felder (`GET /api/v1/stats?year=` filtert jetzt alles).
+### Added
+- **Clearer statistics:** Pick the period at the top (all years or one year) – key figures with change from the
+  previous year, a „Zeit pro Monat“ (time per month) chart (series and movies stacked, values on hover), share per
+  service, „Meistgesehen“ (most watched, top 5 series) and ratings as a chart. The previous tables are under
+  „Alle Zahlen“ (all figures). The App API returns the same fields (`GET /api/v1/stats?year=` now filters everything).
 
-### Schneller
-- Poster werden in passender Größe, verzögert und asynchron geladen.
-- „Weiterschauen“ öffnet deutlich schneller.
+### Performance
+- Posters are loaded in a suitable size, lazily and asynchronously.
+- „Weiterschauen“ (continue watching) opens much faster.
 
-### Behoben
-- App-API: keine Tokens, Cookies oder Passwörter mehr in Fehler-Logs; fehlerhafte Anfragen ergeben 4xx statt 500;
-  Größenlimits für Anfragen; riesige Seitenzahlen bringen den Server nicht mehr zum Absturz.
+### Fixed
+- App API: no more tokens, cookies or passwords in error logs; malformed requests give 4xx instead of 500; size limits
+  for requests; huge page numbers no longer crash the server.
 
 ## [0.2.4] – 2026-11-08
 
-### Neu
-- **App-API (Phase 5):** Benutzerverwaltung (nie für das eigene Konto) und System (Version, Update-Prüfung) –
-  damit kann die API alles, was die Weboberfläche kann.
+### Added
+- **App API (phase 5):** user management (never for your own account) and system (version, update check) – so the API
+  can do everything the web UI can.
 
-### Geändert
-- **Benutzer (Web):** Admins können ihr eigenes Passwort und Admin-Recht nicht mehr über die Benutzerverwaltung
-  ändern (eigenes Passwort unter **Konto**).
+### Changed
+- **Benutzer (web)** (users): Admins can no longer change their own password and admin right through user management
+  (own password under **Konto**, account).
 
 ## [0.2.3] – 2026-11-08
 
-### Neu
-- **App-API (Phase 4):** Netflix-Import (Upload bis 10 MB, Stand, „Zu prüfen“, Zuordnungen ändern, nicht
-  zugeordnete Zeilen zuweisen) und Filmliste (Upload bis 2 MB, Vorschläge, Suchen, Überspringen).
+### Added
+- **App API (phase 4):** Netflix import (upload up to 10 MB, status, „Zu prüfen“ (to review), change matches, assign
+  unmatched rows) and movie list (upload up to 2 MB, suggestions, search, skip).
 
 ## [0.2.2] – 2026-11-08
 
-### Neu
-- **App-API (Phase 3):** Verlauf (blättern, Sichtung ändern/löschen), Bibliothek, Statistik und Konto (Passwort,
-  TMDB-Token, beobachtete Serien).
+### Added
+- **App API (phase 3):** history (paging, change/delete a viewing), library, statistics and account (password, TMDB
+  token, watched series).
 
 ## [0.2.1] – 2026-11-08
 
-### Neu
-- **App-API (Phase 2):** Weiterschauen inkl. „nächste Folge gesehen“ und Dienst-Link, Hinweise (neue Folgen,
-  demnächst), Suche, Serien (Details, Folgen/Staffel/Serie abhaken, Bewertung, Kommentare, Beobachten,
-  Ausblenden) und Filme.
+### Added
+- **App API (phase 2):** „Weiterschauen“ (continue watching) incl. „next episode watched“ and service link, notices
+  (new episodes, upcoming), search, series (details, check off episodes/season/series, rating, comments, watching,
+  hiding) and movies.
 
 ## [0.2.0] – 2026-11-08
 
-### Neu
-- **App-API (Phase 1):** JSON-API unter `/api/v1`, beschrieben in einer OpenAPI-Datei (Server-Code wird daraus
-  erzeugt), Doku mit „Ausprobieren“ unter `/api`.
-- **App-Anmeldung:** Login im Browser-Fenster mit Bestätigung („App verbinden“), danach ein Geräte-Token
-  (90 Tage gültig, nur als Hash gespeichert). Unter **Konto → Geräte** alle Geräte sehen und abmelden sowie
-  Tokens für Skripte erstellen.
+### Added
+- **App API (phase 1):** JSON API under `/api/v1`, described in an OpenAPI file (the server code is generated from it),
+  docs with „Ausprobieren“ (try it out) under `/api`.
+- **App login:** Login in the browser window with confirmation („App verbinden“ (connect app)), followed by a device
+  token (valid for 90 days, stored only as a hash). Under **Konto → Geräte** (account → devices) see all devices and
+  sign them out, and create tokens for scripts.
 
 ## [0.1.2] – 2026-11-08
 
-### Neu
-- **Weiterschauen:** Button für den zuletzt genutzten Dienst statt nur „Auf Netflix suchen“ – Suche bei Netflix,
-  Prime Video, Apple TV+ und Paramount+; „Disney+ / HBO Max / WOW öffnen“ (dort gibt es ohne Login keine Websuche).
-- **TMDB-Bedingungen:** tägliche Cache-Pflege – jeder Titel wird spätestens nach 60 Tagen mit dem Token eines
-  Benutzers, der ihn nutzt, neu geholt; ungenutzte Titel werden gelöscht, alte Vorschlagslisten verworfen. Footer
-  rechts zeigt TMDB-Logo und -Hinweis (statt „GitHub“).
+### Added
+- **Weiterschauen** (continue watching)**:** Button for the most recently used service instead of only „Auf Netflix
+  suchen“ (search on Netflix) – search on Netflix, Prime Video, Apple TV+ and Paramount+; „Disney+ / HBO Max / WOW
+  öffnen“ (open; there is no web search there without login).
+- **TMDB terms:** daily cache maintenance – every title is re-fetched after 60 days at the latest with the token of a
+  user who uses it; unused titles are deleted, old suggestion lists are discarded. The footer on the right shows the
+  TMDB logo and notice (instead of „GitHub“).
 
 ## [0.1.1] – 2026-11-07
 
-### Neu
-- **Filmliste importieren:** eigene CSV (z. B. aus Numbers) mit Datum, Dienst, Bewertung 0–100 → 1–10 und
-  Kommentar aus „Mit …“, Übeltäter und Bemerkung; unklare Filme werden zur Auswahl vorgeschlagen.
-- **Update-Hinweis:** Admin-Seite „System“ mit optionaler Prüfung auf neue Releases bei GitHub
-  (alle 12 Stunden, standardmäßig aus) und „Jetzt prüfen“.
-- **Betrieb:** `docker-compose.yml` liest alle Einstellungen aus einer `.env` (Vorlage `.env.example`);
-  ohne `TOKEN_KEY` startet Compose nicht.
+### Added
+- **Import movie list:** your own CSV (e.g. from Numbers) with date, service, rating 0–100 → 1–10 and comment from
+  „Mit …“ (with …), „Übeltäter“ (culprit) and „Bemerkung“ (remark); unclear movies are suggested for selection.
+- **Update notice:** admin page „System“ with an optional check for new releases on GitHub (every 12 hours, off by
+  default) and „Jetzt prüfen“ (check now).
+- **Operations:** `docker-compose.yml` reads all settings from an `.env` (template `.env.example`); without
+  `TOKEN_KEY`, Compose does not start.
 
 
-### Behoben
-- Datenordner als Bind-Mount (z. B. `/home/docker/watchswifty:/data`): Der Container übergibt den Ordner beim
-  Start dem App-Benutzer (UID 999) statt mit „cantOpen“ abzustürzen; ist das nicht möglich, erklärt eine Meldung,
-  was zu tun ist.
+### Fixed
+- Data folder as a bind mount (e.g. `/home/docker/watchswifty:/data`): At start, the container hands the folder to the
+  app user (UID 999) instead of crashing with „cantOpen“; if that is not possible, a message explains what to do.
 
-### Geändert
-- CI: GitHub Actions auf Node-24-Versionen; Image-Build läuft parallel zu den Tests, Abhängigkeiten werden im
-  Docker-Build zwischengespeichert – ein Push baut nur noch die App neu.
+### Changed
+- CI: GitHub Actions on Node 24 versions; the image build runs in parallel with the tests, dependencies are cached in
+  the Docker build – a push now only rebuilds the app.
 
 ## [0.1.0] – 2026-11-07
 
-Erste Version.
+First version.
 
-### Neu
-- **Weiterschauen:** eine Karte pro Serie mit der nächsten Folge, „✓ gesehen“, Ausblenden, Link „Auf Netflix suchen“;
-  nur Serien der letzten 3 Monate (ältere per „N ältere Serien anzeigen“).
-- **Beobachten:** Serien auf der Serienseite beobachten; Kasten „Neue Folgen“ (mit „Erledigt“) und „Demnächst“
-  (Folgen der nächsten 14 Tage) auf der Startseite; Liste der beobachteten Serien unter Konto.
-- **Manuelles Tracking:** Folgen/Filme abhaken mit Datum und Dienst (Netflix, Prime Video, Disney+, Apple TV+, HBO Max,
-  Paramount+, WOW, Kino, Gekauft, Sonstiges), erneut gesehen, „Ganze Staffel“, „bis hier“ und „Gesamte Serie gesehen“,
-  Bewertung 1–10, private Kommentare zu Serie, Staffel und Film.
-- **Detailseiten:** Klappentext zu Serie, Film und jeder Folge; Links zu TMDB, IMDb, Rotten Tomatoes und SeriesGraph.
-- **Netflix-Import:** Wiedergabeaktivität als CSV (auch Excel-Varianten), automatische TMDB-Zuordnung, „Zu prüfen“,
-  „Nicht zugeordnet“, „Zuordnungen“, „Erneut versuchen“ und automatische Wiederholung.
-- **Verlauf** und **Bibliothek** mit Filter und Sortierung.
-- **Statistik:** Filme, Serien, Folgen und verbrachte Zeit (TMDB-Laufzeiten) – insgesamt, pro Jahr und Monat
-  sowie nach Bewertung.
-- **Benutzer:** mehrere Konten mit getrennten Daten, Admin-Verwaltung, eigener TMDB-Token pro Benutzer
-  (in der Datenbank mit AES-GCM verschlüsselt, Schlüssel über `TOKEN_KEY`).
-- **Oberfläche:** WatchSwifty-Branding, Smartphone-Layout mit Burger-Menü, Ladebalken und Lade-Animation auf Kacheln,
-  deutsche Fehlerseiten.
-- **Betrieb:** Docker-Image über GitHub Actions (`ghcr.io/paddxy95/watchswifty`), Compose-Datei, SQLite-Datenbank im
-  Volume, Version im Footer und unter `/version`.
+### Added
+- **Weiterschauen** (continue watching)**:** one card per series with the next episode, „✓ gesehen“ (watched), hide,
+  link „Auf Netflix suchen“ (search on Netflix); only series from the last 3 months (older ones via „N ältere Serien
+  anzeigen“ (show N older series)).
+- **Watching:** watch series on the series page; box „Neue Folgen“ (new episodes, with „Erledigt“ (done)) and
+  „Demnächst“ (upcoming, episodes of the next 14 days) on the home page; list of watched series under Konto (account).
+- **Manual tracking:** check off episodes/movies with date and service (Netflix, Prime Video, Disney+, Apple TV+,
+  HBO Max, Paramount+, WOW, Kino (cinema), Gekauft (bought), Sonstiges (other)), watched again, „Ganze Staffel“
+  (whole season), „bis hier“ (up to here) and „Gesamte Serie gesehen“ (whole series watched), rating 1–10, private
+  comments on series, season and movie.
+- **Detail pages:** synopsis for series, movie and every episode; links to TMDB, IMDb, Rotten Tomatoes and SeriesGraph.
+- **Netflix import:** viewing activity as CSV (including Excel variants), automatic TMDB matching, „Zu prüfen“ (to
+  review), „Nicht zugeordnet“ (unmatched), „Zuordnungen“ (matches), „Erneut versuchen“ (retry) and automatic retry.
+- **Verlauf** (history) and **Bibliothek** (library) with filter and sorting.
+- **Statistics:** movies, series, episodes and time spent (TMDB runtimes) – overall, per year and month, and by
+  rating.
+- **Users:** multiple accounts with separate data, admin management, own TMDB token per user (encrypted in the
+  database with AES-GCM, key via `TOKEN_KEY`).
+- **UI:** WatchSwifty branding, smartphone layout with burger menu, loading bar and loading animation on tiles, German
+  error pages.
+- **Operations:** Docker image via GitHub Actions (`ghcr.io/paddxy95/watchswifty`), Compose file, SQLite database in
+  the volume, version in the footer and at `/version`.

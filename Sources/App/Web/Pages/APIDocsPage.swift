@@ -3,7 +3,7 @@ import Elementary
 /// `/api`: Swagger UI for the App API (assets vendored under `Public/api-docs`, no CDN).
 struct APIDocsPage: HTMLDocument {
     var title: String { "WatchSwifty API" }
-    var lang: String { "de" }
+    var lang: String { "en" }
 
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))

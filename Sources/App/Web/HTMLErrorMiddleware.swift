@@ -57,7 +57,7 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
             case 403:
                 let base = custom ?? "Kein Zugriff."
                 if base.contains("Herkunft") {
-                    return (status, base + " Läuft WatchSwifty hinter einem Reverse-Proxy? Dann PUBLIC_ORIGIN setzen (siehe README).")
+                    return (status, base + " Läuft WatchSwifty hinter einem Reverse-Proxy? Dann PUBLIC_ORIGIN setzen (siehe docs/installation.md, „Reverse proxy“).")
                 }
                 return (status, base)
             case 413 where path.hasPrefix("/import"):

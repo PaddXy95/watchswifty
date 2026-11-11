@@ -1,6 +1,6 @@
 # Datenschutzerklärung – WatchSwifty für iOS
 
-Stand: 11.11.2026
+Stand: 11.11.2026 · [English version](privacy-ios-app.md)
 
 WatchSwifty für iOS ist die App zu einem **selbst gehosteten** WatchSwifty-Server. Sie hat keinen eigenen Dienst im
 Hintergrund und keinen Betreiber, der Daten sammelt.

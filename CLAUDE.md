@@ -8,9 +8,16 @@ WatchSwifty is a self-hosted series and movie tracker: Swift 6.3+, Vapor 4, Flue
 with Elementary + htmx (no JS build step), plus a JSON App API. Data comes from TMDB; Netflix viewing history can be
 imported.
 
-**Languages:** everything a user sees (UI text, error messages, flash messages), the README, CHANGELOG and design
-docs are **German**. Code identifiers and code comments are English. Commit messages are English Conventional
+**Languages:** everything a user sees in the app (UI text, error messages, flash messages) is **German**. The README,
+`docs/*.md`, CHANGELOG, the OpenAPI descriptions, code identifiers and code comments are **English**; English docs
+quote German UI labels verbatim with the English meaning in parentheses, e.g. **Konto** (account). Design specs and
+plans under `docs/superpowers/` stay German, and so does `docs/datenschutz-ios-app.md` (the German privacy policy,
+linked from App Store Connect; keep `docs/privacy-ios-app.md` in sync). Commit messages are English Conventional
 Commits (`feat(mail): …`, `fix(auth): …`, `docs: …`, `perf: …`).
+
+**Documentation:** the README stays short (features, quick start, links). Details go into the topic pages under
+`docs/` (installation, configuration, operations, accounts, tmdb, sso, email, import, app-api, releases, development).
+UI hints point to those pages with `DocsLink` (`Web/Components/DocsLink.swift`), not to the README.
 
 ## Commands
 
@@ -117,10 +124,10 @@ get deleted.
   "Run workflow" on any branch) pushes only `:beta` / `:beta-<sha7>` with `APP_VERSION=<next>-beta`; no tag, no
   release.
 - `VERSION` holds the intended version; `scripts/next-version.sh` releases it if the tag doesn't exist yet, else
-  bumps the patch. Release notes come from the matching `## [X.Y.Z] – date` section of `CHANGELOG.md` (German,
-  sections like `### Neu`, `### Sicherer`, `### Schneller`) via `scripts/release-notes.sh`.
-- A release commit bumps `VERSION`, adds the CHANGELOG section and updates the README where user-facing behavior
-  changed.
+  bumps the patch. Release notes come from the matching `## [X.Y.Z] – date` section of `CHANGELOG.md` (English,
+  sections `### Added`, `### Changed`, `### Fixed`, `### Security`, `### Performance`) via `scripts/release-notes.sh`.
+- A release commit bumps `VERSION`, adds the CHANGELOG section and updates the README and `docs/` where user-facing
+  behavior changed.
 
 ## Design docs
 

@@ -98,7 +98,11 @@ struct UpdateResult: HTML {
                             }
                             p { "So aktualisierst du (im Verzeichnis mit der docker-compose.yml):" }
                             pre { code { "docker compose pull && docker compose up -d" } }
-                            p(.class("muted")) { "Mit docker run: siehe README, Abschnitt „Update“. Vorher ein Backup machen schadet nicht." }
+                            p(.class("muted")) {
+                                "Mit docker run: siehe "
+                                DocsLink(page: "operations.md#updating", label: "Anleitung zum Aktualisieren")
+                                ". Vorher ein Backup machen schadet nicht."
+                            }
                         }
                     case false?:
                         p(.class("notice")) { "Du nutzt die neueste Version (v\(latest))." }
@@ -167,7 +171,8 @@ struct MailSection: HTML {
                 "Optional: Damit verschickt WatchSwifty Einladungen, Links für „Passwort vergessen“ und Hinweise auf neu "
                 "verbundene Geräte. Die Einstellungen "
                 "werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). Beispiel für SwiftyRelay und andere Anbieter: "
-                "README, Abschnitt „E-Mail (optional)“."
+                DocsLink(page: "email.md", label: "Anleitung zur E-Mail")
+                "."
             }
             switch state {
             case .notConfigured: p { "Nicht eingerichtet." }
@@ -292,7 +297,9 @@ struct OIDCSection: HTML, Sendable {
             h2 { "Anmeldung über OIDC (SSO)" }
             p(.class("muted")) {
                 "Optional: Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia, Pocket ID …). "
-                "Die Einstellungen werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). Anleitung: README, Abschnitt „Anmeldung über OIDC“."
+                "Die Einstellungen werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). "
+                DocsLink(page: "sso.md", label: "Anleitung zu SSO")
+                "."
             }
             switch state {
             case .notConfigured: p { "Nicht eingerichtet." }
