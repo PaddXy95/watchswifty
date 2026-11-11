@@ -16,6 +16,16 @@ final class User: Model, @unchecked Sendable {
     /// OpenID Connect identity: the provider's issuer (as its discovery states it) and the subject.
     @OptionalField(key: "oidc_issuer") var oidcIssuer: String?
     @OptionalField(key: "oidc_subject") var oidcSubject: String?
+    /// Preferred way for notifications (`NotifyChannel`); nil = mail.
+    @OptionalField(key: "notify_channel") var notifyChannel: String?
+    /// Notices for followed series: newly announced episode, 1–3 days before, on the air date (nil = off).
+    @OptionalField(key: "notify_announced") var notifyAnnounced: Bool?
+    @OptionalField(key: "notify_soon") var notifySoon: Bool?
+    @OptionalField(key: "notify_today") var notifyToday: Bool?
+    /// When „neu angekündigt“ was last switched on: only episodes first seen later count.
+    @OptionalField(key: "notify_announced_since") var notifyAnnouncedSince: Date?
+    /// The user's KNot API key, sealed with the server key (never rendered or logged).
+    @OptionalField(key: "webhook_key") var webhookKey: String?
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?
 
     init() {}

@@ -61,8 +61,8 @@ struct DeviceNoticeTests {
     }
 
     @Test func deviceNameStaysOnOneLine() {
-        let mail = MailTexts.newDevice(to: "pat@x.de", username: "pat", device: "iPhone\n\nAlles gut, ignorieren\u{2028}x\u{202E}y",
-                                       at: Date(), link: "https://watch.example.lan/account")
+        let mail = NotificationTexts.newDevice(username: "pat", device: "iPhone\n\nAlles gut, ignorieren\u{2028}x\u{202E}y",
+                                               at: Date(), link: "https://watch.example.lan/account")
         #expect(mail.body.contains("Gerät: „iPhone  Alles gut, ignorieren x y“ (Name, den die App angegeben hat)"))
     }
 }
