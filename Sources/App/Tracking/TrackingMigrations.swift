@@ -76,3 +76,13 @@ struct AddFollowFields: AsyncMigration {
         try await database.schema(UserTitle.schema).deleteField("followed").update()
     }
 }
+
+struct AddFollowedAt: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(UserTitle.schema).field("followed_at", .datetime).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(UserTitle.schema).deleteField("followed_at").update()
+    }
+}

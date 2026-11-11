@@ -21,6 +21,24 @@ struct NewEpisodesTests {
         try await NewEpisodesService(db: app.db).notes(userID: user.requireID(), today: Self.today)
     }
 
+    @Test func followStampsAndClearsFollowedAt() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seed(app)
+            let t = Date(timeIntervalSince1970: 1_800_000_000)
+            let service = ws(app)
+            func entry() async throws -> UserTitle? {
+                try await UserTitle.query(on: app.db).filter(\.$user.$id == user.requireID()).filter(\.$title.$id == show.requireID()).first()
+            }
+            try await service.setFollowed(userID: user.requireID(), titleID: show.requireID(), followed: true, now: t)
+            #expect(try await entry()?.followedAt == t)
+            try await service.setFollowed(userID: user.requireID(), titleID: show.requireID(), followed: true, now: t.addingTimeInterval(60))
+            #expect(try await entry()?.followedAt == t)
+            try await service.setFollowed(userID: user.requireID(), titleID: show.requireID(), followed: false)
+            #expect(try await entry()?.followedAt == nil)
+        }
+    }
+
     @Test func followToggle() async throws {
         try await withTestApp(tmdb: TitlePagesTests.fake()) { app in
             let user = try await createUser(app, "pat")

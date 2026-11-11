@@ -75,6 +75,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddUserOIDC())
     app.migrations.add(CreateOIDCLinkToken())
     app.migrations.add(AddOIDCConfig())
+    app.migrations.add(AddEpisodeSeenTimes())
+    app.migrations.add(AddFollowedAt())
 
     try routes(app)
     try await app.autoMigrate()
