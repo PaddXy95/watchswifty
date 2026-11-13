@@ -1,0 +1,33 @@
+name: Image check
+
+# Pull requests that touch the Docker build: build the image once, nothing is pushed. Other pull requests only run
+# the tests (docker.yml); pushes to main and beta always build the image there before a release.
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - scripts/docker-entrypoint.sh
+      - Package.swift
+      - Package.resolved
+      - Public/api/**   # symlink to the OpenAPI spec, resolved by `cp -RL` in the Dockerfile
+      - .github/workflows/**
+
+concurrency:
+  group: image-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image (nothing is pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          # Read-only: a pull request's cache is invisible to main and would only compete with main's cache for space.
+          cache-from: type=gha

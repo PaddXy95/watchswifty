@@ -21,7 +21,9 @@ from this repository: `WATCHSWIFTY_VERSION=0.1.3` in `.env`).
 
 GitHub Actions:
 
-- Pull request: tests and a trial build of the image (nothing is uploaded).
+- Pull request: tests. A trial build of the image (nothing is uploaded) runs only when the pull request changes the
+  Docker build: `Dockerfile`, `.dockerignore`, `scripts/docker-entrypoint.sh`, `Package.swift`, `Package.resolved`,
+  `Public/api/` or the workflows.
 - Push to `main`: tests and image build run in parallel; only if the tests pass, the image is pushed to GHCR and a
   GitHub release `vX.Y.Z` is created.
 - Push to `beta`, or "Run workflow" (GitHub → Actions → CI/CD) on any branch: like `main`, but only the `beta` image
