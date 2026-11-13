@@ -2,6 +2,13 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.5.3] – 2026-11-13
+
+### Fixed
+- **Suche** (search): the results no longer stick to the search field; there is space between them, so the focus
+  ring no longer overlaps the first result. Typing a new search replaces the result list instead of nesting a second
+  one inside it.
+
 ## [0.5.2] – 2026-11-13
 
 ### Changed
