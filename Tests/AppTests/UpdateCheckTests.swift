@@ -107,7 +107,7 @@ struct UpdateCheckTests {
             try await app.testing().test(.GET, "/admin/system", headers: admin) { res async in
                 let body = res.body.string
                 #expect(!body.contains("Du nutzt die neueste Version"))
-                #expect(body.contains("Seit der letzten Prüfung aktualisiert (damals neueste Version: v0.1.3)"))
+                #expect(body.contains("Diese Installation ist neuer als das bei der letzten Prüfung gefundene Release (v0.1.3)."))
             }
         }
     }

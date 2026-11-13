@@ -119,9 +119,10 @@ struct UpdateResult: HTML {
                             }
                         }
                     case false? where isNewerVersion(current.version, than: latest) == true:
-                        // Updated since the last check: the stored release is older than what runs.
+                        // Updated since the last check, or GitHub has no release for this version yet: say only what
+                        // is always true.
                         p(.class("muted")) {
-                            "Seit der letzten Prüfung aktualisiert (damals neueste Version: v\(latest)) – „Jetzt prüfen“ zeigt den aktuellen Stand."
+                            "Diese Installation ist neuer als das bei der letzten Prüfung gefundene Release (v\(latest))."
                         }
                     case false?:
                         p(.class("notice")) { "Du nutzt die neueste Version (v\(latest))." }

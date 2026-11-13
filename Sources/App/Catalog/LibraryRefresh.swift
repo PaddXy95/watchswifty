@@ -68,6 +68,19 @@ actor LibraryRefreshWorker {
         return state
     }
 
+    /// Drops the last result (a new token makes an old „Token ungültig“ stale); a running reload keeps its state.
+    func forget(userID: UUID) {
+        if states[userID]?.running != true { states[userID] = nil }
+    }
+
+    /// Stops the user's reload (token removed: it must not be used any more), waits for it and drops its state.
+    func cancel(userID: UUID) async {
+        let task = tasks[userID]
+        task?.cancel()
+        await task?.value
+        states[userID] = nil
+    }
+
     /// Waits until the user's current run has finished (tests).
     func wait(userID: UUID) async {
         await tasks[userID]?.value
