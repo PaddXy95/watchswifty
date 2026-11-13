@@ -747,7 +747,7 @@ paths:
     get:
       operationId: getStats
       tags: [Statistics]
-      summary: Films, series, episodes and time – period with chart, services, most watched and ratings
+      summary: Films, series, episodes and time – period with chart, services, genres, longest and most watched titles, ratings
       description: >-
         `year` selects the period for `period`, `previous`, `chart`, `services`, `topSeries` and `ratings`.
         `total`, `undated` and `years` always cover everything.
@@ -2325,6 +2325,80 @@ components:
         minutes:
           type: integer
           description: If `service` is missing, these are watches without a service.
+        episodes:
+          type: integer
+          description: Episode watches on this service in the period.
+        movies:
+          type: integer
+          description: Movie watches on this service in the period.
+    MovieStat:
+      type: object
+      required: [tmdbId, name, watches, minutes]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        watches:
+          type: integer
+          description: Viewings in the period.
+        minutes:
+          type: integer
+          description: Time of all these viewings; 0 when the runtime is unknown.
+        rating:
+          type: integer
+    EpisodeStat:
+      type: object
+      required: [tmdbId, seriesName, season, number, name, watches]
+      properties:
+        tmdbId:
+          type: integer
+          description: TMDB id of the series.
+        seriesName:
+          type: string
+        posterPath:
+          type: string
+        season:
+          type: integer
+        number:
+          type: integer
+        name:
+          type: string
+        watches:
+          type: integer
+    CompletedSeries:
+      type: object
+      required: [tmdbId, name, completions]
+      properties:
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        posterPath:
+          type: string
+        completions:
+          type: integer
+          description: How often every aired regular episode (season ≥ 1, air date ≤ today) was watched.
+        rating:
+          type: integer
+    GenreStat:
+      type: object
+      required: [genre, seriesMinutes, movieMinutes, series, movies]
+      properties:
+        genre:
+          $ref: "#/components/schemas/Genre"
+        seriesMinutes:
+          type: integer
+        movieMinutes:
+          type: integer
+        series:
+          type: integer
+          description: Distinct series with this genre watched in the period.
+        movies:
+          type: integer
+          description: Distinct movies with this genre watched in the period.
     TopSeries:
       type: object
       required: [tmdbId, name, episodes, minutes]
@@ -2367,6 +2441,31 @@ components:
           description: Up to 5 series by watch time.
           items:
             $ref: "#/components/schemas/TopSeries"
+        longestMovies:
+          type: array
+          description: Up to 5 movies by the time of all their viewings (runtime known).
+          items:
+            $ref: "#/components/schemas/MovieStat"
+        mostWatchedMovies:
+          type: array
+          description: Up to 5 movies watched at least twice, most viewings first.
+          items:
+            $ref: "#/components/schemas/MovieStat"
+        mostWatchedEpisodes:
+          type: array
+          description: Up to 5 episodes watched at least twice, most viewings first.
+          items:
+            $ref: "#/components/schemas/EpisodeStat"
+        mostCompletedSeries:
+          type: array
+          description: Up to 5 series watched completely at least once; always over all years, independent of `year`.
+          items:
+            $ref: "#/components/schemas/CompletedSeries"
+        genres:
+          type: array
+          description: Time and titles per genre, largest first; a title counts for each of its genres.
+          items:
+            $ref: "#/components/schemas/GenreStat"
         total:
           $ref: "#/components/schemas/Period"
         undated:

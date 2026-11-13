@@ -32,6 +32,14 @@ import WatchSwiftyClient
         _ = try JSONDecoder().decode(Components.Schemas.MappingReview.self, from: Data(review.utf8))
     }
 
+    /// Statistics from a server without the newer lists still decode.
+    @Test func olderStatsDecode() throws {
+        let period = #"{"movies":0,"series":0,"episodes":0,"minutes":0,"unknownRuntime":0}"#
+        let json = #"{"period":\#(period),"chart":[],"services":[{"minutes":5}],"topSeries":[],"total":\#(period),"undated":\#(period),"years":[],"ratings":[],"missingRuntimeTitles":0}"#
+        let stats = try JSONDecoder().decode(Components.Schemas.Stats.self, from: Data(json.utf8))
+        #expect(stats.services.first?.minutes == 5)
+    }
+
     @Test func knownValuesMatchSpec() {
         #expect(ServiceValue.known.map(\.rawValue) == ["netflix", "prime_video", "disney_plus", "apple_tv", "hbo_max",
                                                         "paramount_plus", "wow", "cinema", "purchased", "other"])
