@@ -75,14 +75,14 @@ table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var(--line); vertical-align: top; }
 details { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); }
 summary { cursor: pointer; font-weight: 600; }
-.episode-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-3); padding: var(--space-1) 0; border-top: 1px solid var(--line); }
+.episode-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 .episode-row > input[type=checkbox] { margin: 0.2rem 0 0; }
 .episode-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
 .episode-summary .episode-title { flex: 1 1 10rem; }
 details.episode { background: none; border: none; padding: 0; margin: 0; }
 details.episode > summary { list-style: none; font-weight: 400; }
 details.episode > summary::-webkit-details-marker { display: none; }
-details.episode .episode-title { color: var(--ink); text-decoration: underline dotted var(--ink-3); text-underline-offset: 3px; }
+details.episode .episode-title { color: var(--ink); }
 details.episode .episode-title::before { content: "▸ "; color: var(--ink-3); }
 details.episode[open] .episode-title::before { content: "▾ "; }
 details.episode > summary:hover .episode-title { color: var(--accent); }
