@@ -4,7 +4,7 @@ import Foundation
 import Testing
 import VaporTesting
 
-struct WatchFormInput: Content { var day: String?; var service: String?; var rewatch: String? }
+struct WatchFormInput: Content { var day: String?; var service: String?; var rewatch: String?; var open: String? }
 struct RatingInput: Content { var rating: String }
 struct HiddenInput: Content { var hidden: Bool }
 
@@ -82,6 +82,58 @@ struct TitlePagesTests {
                 #expect(body.contains("Staffel 1 · 0/2 gesehen"))
                 #expect(body.contains("Ganze Staffel gesehen"))
                 #expect(body.contains("bis hier gesehen"))
+            }
+        }
+    }
+
+    /// The markup of one episode row (from its id to the next row or the end).
+    func row(_ body: String, _ id: String) -> Substring {
+        guard let start = body.range(of: #"id="\#(id)""#) else { return "" }
+        let rest = body[start.upperBound...]
+        let end = rest.range(of: #"class="episode-row""#)?.lowerBound ?? rest.endIndex
+        return rest[..<end]
+    }
+
+    @Test func episodesStartClosed() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains(#"<details class="episode">"#))
+                #expect(!body.contains(#"<details class="episode" open"#))
+                #expect(row(body, "ep-1-1").contains(#"<summary class="episode-summary">"#))
+                #expect(!body.contains(">Details<"))
+            }
+        }
+    }
+
+    @Test func watchFromFormKeepsEpisodeOpen() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-05", service: "netflix", open: "1"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let body = res.body.string
+                #expect(row(body, "ep-1-1").contains(#"<details class="episode" open"#))
+                #expect(!row(body, "ep-1-2").contains(#"<details class="episode" open"#))
+                #expect(body.components(separatedBy: #"<details class="episode" open"#).count == 2)
+            })
+        }
+    }
+
+    @Test func checkboxLeavesAllClosed() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { res async in
+                #expect(res.body.string.contains("Staffel 1 · 1/2 gesehen"))
+                #expect(!res.body.string.contains(#"<details class="episode" open"#))
+            }
+        }
+    }
+
+    @Test func upToKeepsEpisodeOpen() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/2/watch-up-to", headers: headers) { res async in
+                let body = res.body.string
+                #expect(row(body, "ep-1-2").contains(#"<details class="episode" open"#))
+                #expect(body.components(separatedBy: #"<details class="episode" open"#).count == 2)
             }
         }
     }

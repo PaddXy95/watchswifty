@@ -9,6 +9,8 @@ struct WatchForm: HTML {
     let rewatch: Bool
     let today: String
     let defaultService: StreamingService?
+    /// Episode forms: the episode stays expanded after the swap.
+    var keepOpen = false
 
     var body: some HTML {
         form(.class("watch-form"), .hx.post(action), .hx.target(target), .hx.swap(.outerHTML)) {
@@ -27,6 +29,9 @@ struct WatchForm: HTML {
             }
             if rewatch {
                 input(.type(.hidden), .name("rewatch"), .value("true"))
+            }
+            if keepOpen {
+                input(.type(.hidden), .name("open"), .value("1"))
             }
             button(.type(.submit), .class("primary")) { submitLabel }
         }

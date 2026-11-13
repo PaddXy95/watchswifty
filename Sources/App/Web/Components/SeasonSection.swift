@@ -15,6 +15,8 @@ struct SeasonModel {
     let episodes: [EpisodeRowModel]
     var isOpen: Bool
     var comment: String? = nil
+    /// Episode number whose details stay open after marking it from its form („Gesehen“, „bis hier gesehen“).
+    var openEpisode: Int? = nil
 
     var watchedCount: Int { episodes.filter(\.watched).count }
     var title: String { number == 0 ? "Specials" : "Staffel \(number)" }
@@ -43,7 +45,8 @@ struct SeasonSection: HTML {
                        .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) { "Ganze Staffel gesehen" }
             }
             for episode in season.episodes {
-                EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService)
+                EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService,
+                           open: season.openEpisode == episode.info.number)
             }
             CommentBox(id: "season-comment-\(season.number)", action: "/tv/\(tmdbID)/seasons/\(season.number)/comment",
                        caption: "Kommentar zur Staffel", comment: season.comment)
@@ -57,9 +60,12 @@ struct EpisodeRow: HTML {
     let model: EpisodeRowModel
     let today: String
     let defaultService: StreamingService?
+    /// Details shown expanded (the episode was just marked from its form).
+    var open = false
 
     private var path: String { "/tv/\(tmdbID)/episodes/\(model.info.season)/\(model.info.number)" }
     private var target: String { "#season-\(model.info.season)" }
+    private var hasDetails: Bool { model.aired || !(model.info.overview ?? "").isEmpty }
 
     var body: some HTML {
         div(.class("episode-row"), .id("ep-\(model.info.season)-\(model.info.number)")) {
@@ -74,30 +80,39 @@ struct EpisodeRow: HTML {
             } else {
                 input(.type(.checkbox), .disabled, .custom(name: "aria-label", value: "\(model.info.code) noch nicht erschienen"))
             }
-            span(.class("code")) { model.info.code }
-            span(.class("name")) { model.info.name }
-            if let runtime = model.info.runtime, runtime > 0 {
-                span(.class("runtime")) { formatDuration(minutes: runtime) }
-            }
-            span(.class("meta")) {
-                if model.watched {
-                    watchSummary(model.watches)
-                } else if !model.aired {
-                    model.info.airDate.map { "erscheint \(CalendarDay.display($0))" } ?? "noch nicht erschienen"
-                }
-            }
-            if model.aired || !(model.info.overview ?? "").isEmpty {
-                details(.class("episode-menu")) {
-                    summary { "Details" }
-                    if let overview = model.info.overview, !overview.isEmpty {
-                        p(.class("episode-overview")) { overview }
-                    }
-                    if model.aired {
-                        WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
-                                  rewatch: model.watched, today: today, defaultService: defaultService)
-                        button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+            // The title opens the details (checkbox stays outside the summary: no control inside a summary).
+            if hasDetails {
+                details(.class("episode")) {
+                    summary(.class("episode-summary")) { summaryLine }
+                    div(.class("episode-panel")) {
+                        if let overview = model.info.overview, !overview.isEmpty {
+                            p(.class("episode-overview")) { overview }
+                        }
+                        if model.aired {
+                            WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
+                                      rewatch: model.watched, today: today, defaultService: defaultService, keepOpen: true)
+                            button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+                        }
                     }
                 }
+                .attributes(.custom(name: "open", value: ""), when: open)
+            } else {
+                div(.class("episode-summary")) { summaryLine }
+            }
+        }
+    }
+
+    @HTMLBuilder private var summaryLine: some HTML {
+        span(.class("code")) { model.info.code }
+        span(.class("name episode-title")) { model.info.name }
+        if let runtime = model.info.runtime, runtime > 0 {
+            span(.class("runtime")) { formatDuration(minutes: runtime) }
+        }
+        span(.class("meta")) {
+            if model.watched {
+                watchSummary(model.watches)
+            } else if !model.aired {
+                model.info.airDate.map { "erscheint \(CalendarDay.display($0))" } ?? "noch nicht erschienen"
             }
         }
     }
