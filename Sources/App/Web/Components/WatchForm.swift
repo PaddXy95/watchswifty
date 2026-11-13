@@ -30,7 +30,7 @@ struct WatchForm: HTML {
             button(.type(.submit), .class("primary")) { submitLabel }
             if let upToAction {
                 // Inside the form, so htmx sends its service along (the date is ignored: „bis hier“ is undated).
-                button(.type(.button), .hx.post(upToAction), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+                button(.type(.button), .class("up-to"), .hx.post(upToAction), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
             }
         }
     }

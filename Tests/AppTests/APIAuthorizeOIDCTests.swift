@@ -151,7 +151,7 @@ struct APIAuthorizeOIDCTests {
             let reauth = try await browserPost(app, "/account/oidc/reauth", form: [:], headers: headers)
             #expect(reauth.location == "/auth/oidc/start")
             let back = try await oidcFlow(app, fake, start: try #require(reauth.location), headers: reauth.headers)
-            #expect(back.location == "/account")
+            #expect(back.location == "/account?open=devices")
             let created = try await browserPost(app, "/account/devices", form: ["name": "Skript"], headers: back.headers)
             #expect(created.status == .ok)
             #expect(try await APIToken.query(on: app.db).count() == 1)

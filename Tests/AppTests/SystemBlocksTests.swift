@@ -13,7 +13,7 @@ struct SystemBlocksTests {
     }
 
     func openBlocks(_ body: String) -> [String] {
-        Self.blocks.filter { body.contains(#"<details class="system-block" id="block-\#($0)" open"#) }
+        Self.blocks.filter { body.contains(#"<details class="fold-block" id="block-\#($0)" open"#) }
     }
 
     func get(_ app: Application, _ path: String) async throws -> String {
@@ -34,7 +34,7 @@ struct SystemBlocksTests {
         try await withTestApp { app in
             let body = try await get(app, "/admin/system")
             for block in Self.blocks {
-                #expect(body.contains(#"<details class="system-block" id="block-\#(block)""#))
+                #expect(body.contains(#"<details class="fold-block" id="block-\#(block)""#))
             }
             #expect(openBlocks(body) == [])
             #expect(body.contains("Version &amp; Updates") || body.contains("Version & Updates"))

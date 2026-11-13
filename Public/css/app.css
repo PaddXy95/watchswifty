@@ -87,6 +87,8 @@ details.episode .episode-title::before { content: "▸ "; color: var(--ink-3); }
 details.episode[open] .episode-title::before { content: "▾ "; }
 details.episode > summary:hover .episode-title { color: var(--accent); }
 .episode-panel { background: var(--paper); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-top: var(--space-1); }
+.episode-panel .watch-form { gap: var(--space-4); }
+.episode-panel .watch-form .up-to { margin-left: var(--space-2); }
 .episode-row .meta { color: var(--ink-3); font-size: var(--text-sm); }
 
 .htmx-request { opacity: 0.6; }
@@ -184,6 +186,7 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
   .title-header { flex-direction: column; }
   .title-header .poster { width: 120px; }
   .watch-form { flex-direction: column; align-items: stretch; }
+  .episode-panel .watch-form .up-to { margin-left: 0; }
   label input, label select, .search-form input { max-width: none; }
   .inline-form { display: flex; flex-wrap: wrap; width: 100%; }
   .poster-grid { grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: var(--space-3); }
@@ -332,13 +335,13 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 
 /* System / update check */
 .update-note { max-width: 46rem; }
-.system-block { padding: var(--space-3) var(--space-4); }
-.system-block > summary { list-style: none; }
-.system-block > summary::-webkit-details-marker { display: none; }
-.system-block > summary h2 { display: inline; margin: 0; }
-.system-block > summary h2::before { content: "▸ "; color: var(--ink-3); }
-.system-block[open] > summary h2::before { content: "▾ "; }
-.system-block[open] > summary { margin-bottom: var(--space-3); }
+.fold-block { padding: var(--space-3) var(--space-4); }
+.fold-block > summary { list-style: none; }
+.fold-block > summary::-webkit-details-marker { display: none; }
+.fold-block > summary h2 { display: inline; margin: 0; }
+.fold-block > summary h2::before { content: "▸ "; color: var(--ink-3); }
+.fold-block[open] > summary h2::before { content: "▾ "; }
+.fold-block[open] > summary { margin-bottom: var(--space-3); }
 .update-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .update-actions .inline-form { align-items: center; gap: var(--space-3); margin: 0; }
 .update-result { margin-top: var(--space-3); }

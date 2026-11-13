@@ -30,29 +30,8 @@ func formatDateTime(_ date: Date) -> String {
 /// The foldable blocks of the System page; the block of the last action (or `?open=`) is shown open.
 enum SystemBlock: String, Sendable {
     case updates, mail, notifications, oidc
-}
 
-/// One foldable block: the title is the summary, the content follows.
-struct SystemBlockDetails<Content: HTML>: HTML {
-    let block: SystemBlock
-    let title: String
-    let open: Bool
-    let content: Content
-
-    init(_ block: SystemBlock, title: String, open: Bool, @HTMLBuilder content: () -> Content) {
-        self.block = block
-        self.title = title
-        self.open = open
-        self.content = content()
-    }
-
-    var body: some HTML {
-        details(.class("system-block"), .id("block-\(block.rawValue)")) {
-            summary { h2 { title } }
-            content
-        }
-        .attributes(.custom(name: "open", value: ""), when: open)
-    }
+    var id: String { "block-\(rawValue)" }
 }
 
 struct SystemPage: HTML {
@@ -72,7 +51,7 @@ struct SystemPage: HTML {
         PageLayout(title: "System", nav: nav) {
             h1 { "System" }
             Messages(error: error, notice: notice)
-            SystemBlockDetails(.updates, title: "Version & Updates", open: openBlock == .updates) {
+            FoldableBlock(id: SystemBlock.updates.id, title: "Version & Updates", open: openBlock == .updates) {
             section(.class("updates")) {
                 p { "Installiert: \(current.label)" }
                 p(.class("muted update-note")) {
@@ -96,14 +75,14 @@ struct SystemPage: HTML {
                 UpdateResult(current: current, state: state)
             }
             }
-            SystemBlockDetails(.mail, title: "E-Mail", open: openBlock == .mail) {
+            FoldableBlock(id: SystemBlock.mail.id, title: "E-Mail", open: openBlock == .mail) {
                 MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
             }
             if let notifications {
-                SystemBlockDetails(.notifications, title: "Benachrichtigungen", open: openBlock == .notifications) { notifications }
+                FoldableBlock(id: SystemBlock.notifications.id, title: "Benachrichtigungen", open: openBlock == .notifications) { notifications }
             }
             if let oidc {
-                SystemBlockDetails(.oidc, title: "Anmeldung über OIDC (SSO)", open: openBlock == .oidc) { oidc }
+                FoldableBlock(id: SystemBlock.oidc.id, title: "Anmeldung über OIDC (SSO)", open: openBlock == .oidc) { oidc }
             }
         }
     }
