@@ -518,6 +518,30 @@ struct StatsListsTests {
         #expect(html.contains("width: 0%"))
     }
 
+    @Test func serviceBarsShowFiveAndFoldTheRest() {
+        let services: [StreamingService?] = [.netflix, .primeVideo, .disneyPlus, .appleTV, .hboMax, .wow, nil]
+        let shares = services.enumerated().map { index, service in ServiceShare(service: service, minutes: 100 - index * 10, episodes: 1) }
+        let html = ServiceBars(services: shares).render()
+        guard let fold = html.range(of: "<details") else {
+            Issue.record("no fold for the services beyond the fifth")
+            return
+        }
+        let visible = String(html[..<fold.lowerBound])
+        let folded = String(html[fold.lowerBound...])
+        #expect(visible.components(separatedBy: #"class="service-row""#).count - 1 == 5)
+        #expect(!visible.contains("WOW"))
+        #expect(folded.contains("2 weitere Dienste"))
+        #expect(folded.contains("WOW") && folded.contains("ohne Dienst"))
+        #expect(folded.contains("50 Min. · 10 %"))   // shares stay relative to all services: WOW 50 of 490 minutes
+    }
+
+    @Test func serviceBarsWithFiveHaveNoFold() {
+        let services: [StreamingService] = [.netflix, .primeVideo, .disneyPlus, .appleTV, .hboMax]
+        let html = ServiceBars(services: services.map { ServiceShare(service: $0, minutes: 60) }).render()
+        #expect(!html.contains("<details"))
+        #expect(html.components(separatedBy: #"class="service-row""#).count - 1 == 5)
+    }
+
     @Test func listsCapAtFive() async throws {
         try await withTestApp { app in
             let user = try await createUser(app, "pat")

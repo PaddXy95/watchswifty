@@ -13,6 +13,8 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
 
 ### Changed
 - Episode titles on the series page are no longer underlined, and the episodes have more space between them.
+- **Statistics → Dienste** (services) shows the five services with the most time, like the other lists, so the panel
+  is no taller than its neighbours; the others fold out under „N weitere Dienste“ (N more services).
 
 ### Fixed
 - **System → Version & Updates:** after an update the page no longer claims „Du nutzt die neueste Version“ (you use
