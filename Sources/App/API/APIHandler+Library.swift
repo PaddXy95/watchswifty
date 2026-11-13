@@ -16,6 +16,25 @@ extension APIHandler {
         })))
     }
 
+    func startLibraryRefresh(_ input: Operations.startLibraryRefresh.Input) async throws -> Operations.startLibraryRefresh.Output {
+        let user = try APIContext.requireUser()
+        let request = try APIContext.request()
+        guard let token = request.application.tokenCipher.open(user.tmdbToken) else { throw TMDBError.missingToken }
+        let state = try await request.application.libraryRefresh.start(userID: user.requireID(), token: token)
+        return .accepted(.init(body: .json(Self.libraryRefresh(state))))
+    }
+
+    func getLibraryRefresh(_ input: Operations.getLibraryRefresh.Input) async throws -> Operations.getLibraryRefresh.Output {
+        let user = try APIContext.requireUser()
+        let state = try await APIContext.request().application.libraryRefresh.state(userID: user.requireID())
+        return .ok(.init(body: .json(Self.libraryRefresh(state))))
+    }
+
+    static func libraryRefresh(_ state: LibraryRefreshState) -> Components.Schemas.LibraryRefresh {
+        .init(running: state.running, done: state.done, total: state.total, failed: state.failed, finishedAt: state.finishedAt,
+              error: state.error)
+    }
+
     /// The title's genres for the API (empty while not loaded from TMDB).
     static func genres(_ title: Title) -> [Components.Schemas.Genre] {
         (title.genreList ?? []).compactMap { Components.Schemas.Genre(rawValue: $0.rawValue) }
