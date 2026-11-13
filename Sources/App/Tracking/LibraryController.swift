@@ -12,10 +12,10 @@ struct LibraryController {
         let filter = LibraryService.filters.contains(rawFilter) ? rawFilter : "all"
         let sort = LibraryService.sorts.contains(rawSort) ? rawSort : "recent"
         let genre = (try? req.query.get(String.self, at: "genre")).flatMap(Genre.init(rawValue:))   // unknown → no filter
-        let library = LibraryService(db: req.db, watches: req.watches)
+        let library = LibraryService(db: req.db)
         let userID = try req.userID
-        let items = try await library.items(userID: userID, filter: filter, sort: sort, genre: genre)
+        let (items, genres) = try await library.page(userID: userID, filter: filter, sort: sort, genre: genre)
         return HTMLResponse(LibraryPage(navContext: try req.nav(.library), items: items, filter: filter, sort: sort, genre: genre,
-                                        genres: try await library.availableGenres(userID: userID)))
+                                        genres: genres))
     }
 }

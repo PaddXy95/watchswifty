@@ -5,7 +5,6 @@ import Vapor
 /// Titles the user watched, rated or hid (web „Bibliothek“ and `GET /v1/library`).
 struct LibraryService {
     let db: any Database
-    let watches: WatchService
 
     static let filters = ["all", "tv", "movie", "hidden"]
     static let sorts = ["recent", "rating", "name"]
@@ -13,9 +12,17 @@ struct LibraryService {
     /// `filter`: all | tv | movie | hidden; `sort`: recent | rating | name (unknown values → defaults); `genre`: only
     /// titles with that genre (titles whose genres are not loaded yet never match).
     func items(userID: UUID, filter rawFilter: String, sort rawSort: String, genre: Genre? = nil) async throws -> [LibraryItem] {
+        try await page(userID: userID, filter: rawFilter, sort: rawSort, genre: genre).items
+    }
+
+    /// The items plus the genres of all titles in the user's library (hidden ones included, by German label) – the
+    /// choices of the filter – from one read of the library.
+    func page(userID: UUID, filter rawFilter: String, sort rawSort: String,
+              genre: Genre? = nil) async throws -> (items: [LibraryItem], genres: [Genre]) {
         let filter = Self.filters.contains(rawFilter) ? rawFilter : "all"
         let sort = Self.sorts.contains(rawSort) ? rawSort : "recent"
         let (all, recency) = try await load(userID: userID)
+        let genres = Genre.sortedByLabel(Set(all.flatMap { $0.title.genreList ?? [] }))
         var items = all.filter { item in
             switch filter {
             case "hidden": item.hidden
@@ -32,24 +39,19 @@ struct LibraryService {
         default:
             items.sort { (recency[$0.title.id!] ?? ("", .distantPast)) > (recency[$1.title.id!] ?? ("", .distantPast)) }
         }
-        return items
-    }
-
-    /// Genres of all titles in the user's library (hidden ones included), by German label – the choices of the filter.
-    func availableGenres(userID: UUID) async throws -> [Genre] {
-        Genre.sortedByLabel(Set(try await load(userID: userID).items.flatMap { $0.title.genreList ?? [] }))
+        return (items, genres)
     }
 
     /// Every title the user watched, rated or hid, with the latest watch per title for „Zuletzt gesehen“.
     private func load(userID: UUID) async throws -> (items: [LibraryItem], recency: [UUID: (String, Date)]) {
-        let watchList = try await watches.watchesQuery(userID: userID).all()
+        let watchList = try await WatchRow.all(userID: userID, on: db)
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).all()
         let entryByTitle = Dictionary(entries.map { ($0.$title.id, $0) }, uniquingKeysWith: { a, _ in a })
         var recency: [UUID: (String, Date)] = [:]
         for watch in watchList {
             let key = (watch.watchedOn ?? "", watch.createdAt ?? .distantPast)
-            if let current = recency[watch.$title.id], current >= key { continue }
-            recency[watch.$title.id] = key
+            if let current = recency[watch.titleID], current >= key { continue }
+            recency[watch.titleID] = key
         }
         let ratedIDs = entries.filter { $0.rating != nil || $0.hidden }.map(\.$title.id)
         let titleIDs = Array(Set(recency.keys).union(ratedIDs))

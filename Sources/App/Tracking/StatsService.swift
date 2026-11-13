@@ -139,38 +139,6 @@ struct StatsService {
 
     static let listLimit = 5
 
-    /// The columns of a watch the statistics need.
-    private struct WatchRow: Sendable {
-        let titleID: UUID
-        let episodeID: UUID?
-        let watchedOn: String?
-        let service: StreamingService?
-    }
-
-    /// The user's watches as a plain SQL projection: building thousands of Fluent models took most of the page's time.
-    private func watchRows(userID: UUID) async throws -> [WatchRow] {
-        guard let sql = db as? any SQLDatabase else {
-            return try await Watch.query(on: db).filter(\.$user.$id == userID).all().map {
-                WatchRow(titleID: $0.$title.id, episodeID: $0.$episode.id, watchedOn: $0.watchedOn, service: $0.streamingService)
-            }
-        }
-        struct Row: Decodable {
-            let title_id: UUID
-            let episode_id: UUID?
-            let watched_on: String?
-            let service: String?
-        }
-        return try await sql.select()
-            .columns("title_id", "episode_id", "watched_on", "service")
-            .from(Watch.schema)
-            .where(SQLColumn("user_id"), .equal, SQLBind(userID))
-            .all(decoding: Row.self)
-            .map { row in
-                WatchRow(titleID: row.title_id, episodeID: row.episode_id, watchedOn: row.watched_on,
-                         service: row.service.flatMap(StreamingService.init(rawValue:)))
-            }
-    }
-
     private struct Viewing {
         let titleID: UUID
         let episodeID: UUID?
@@ -208,7 +176,7 @@ struct StatsService {
     /// `year` (nil = all years) selects the range for period, chart, services, ratings and top series; the yearly table
     /// (`years`, `undated`, `total`) always covers everything.
     func stats(userID: UUID, year selectedYear: Int?) async throws -> Stats {
-        let watches = try await watchRows(userID: userID)
+        let watches = try await WatchRow.all(userID: userID, on: db)
         let titleIDs = Array(Set(watches.map(\.titleID)))
         let titles = titleIDs.isEmpty ? [] : try await Title.query(on: db).filter(\.$id ~~ titleIDs).all()
         let titleByID = Dictionary(titles.compactMap { title in title.id.map { ($0, title) } }, uniquingKeysWith: { a, _ in a })

@@ -24,7 +24,7 @@ struct ContinueWatchingService {
 
     /// Later of the newest dated watch and the day the newest undated (bulk-marked) watch was made,
     /// so catching up after an old import keeps the series on the shelf.
-    static func lastActivity(_ watches: [Watch]) -> String? {
+    static func lastActivity(_ watches: [WatchRow]) -> String? {
         let dated = watches.compactMap(\.watchedOn).max()
         let undatedDay = watches.filter { $0.watchedOn == nil }.compactMap(\.createdAt).max().map { CalendarDay.today(now: $0) }
         return [dated, undatedDay].compactMap { $0 }.max()
@@ -39,10 +39,8 @@ struct ContinueWatchingService {
     }
 
     private func build(userID: UUID, onlyTitle: UUID?, today: String) async throws -> [ContinueCard] {
-        var watchQuery = Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$episode.$id != nil)
-        if let onlyTitle { watchQuery = watchQuery.filter(\.$title.$id == onlyTitle) }
-        let watches = try await watchQuery.all()
-        let watchesByTitle = Dictionary(grouping: watches, by: { $0.$title.id })
+        let watches = try await WatchRow.all(userID: userID, episodesOnly: true, titleID: onlyTitle, on: db)
+        let watchesByTitle = Dictionary(grouping: watches, by: \.titleID)
         let titleIDs = Array(watchesByTitle.keys)
         guard !titleIDs.isEmpty else { return [] }
 
@@ -56,7 +54,7 @@ struct ContinueWatchingService {
             let titleID = try title.requireID()
             if entryByTitle[titleID]?.hidden == true { continue }
             let titleWatches = watchesByTitle[titleID] ?? []
-            let watched = Set(titleWatches.compactMap(\.$episode.id))
+            let watched = Set(titleWatches.compactMap(\.episodeID))
             let titleEpisodes = episodesByTitle[titleID] ?? []
             guard let next = nextEpisode(in: titleEpisodes, watched: watched, today: today) else { continue }
 
@@ -75,9 +73,9 @@ struct ContinueWatchingService {
                 rating: entryByTitle[titleID]?.rating, next: next,
                 remaining: remainingAiredCount(in: titleEpisodes, from: next, watched: watched, today: today),
                 lastWatchedOn: lastDated,
-                lastService: byRecency.lazy.compactMap(\.streamingService).first,
-                watchService: byRecency.lazy.compactMap(\.streamingService).first { $0.watchLink(for: title.name) != nil }
-                    ?? (titleWatches.contains { $0.watchOrigin == .import } ? .netflix : nil),
+                lastService: byRecency.lazy.compactMap(\.service).first,
+                watchService: byRecency.lazy.compactMap(\.service).first { $0.watchLink(for: title.name) != nil }
+                    ?? (titleWatches.contains { $0.origin == .import } ? .netflix : nil),
                 lastActivityOn: Self.lastActivity(titleWatches) ?? lastDated ?? CalendarDay.today(now: latestCreated)
             )
             // Dated series first (newest day first), then undated-only series by creation time.

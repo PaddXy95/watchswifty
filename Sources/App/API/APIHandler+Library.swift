@@ -7,7 +7,7 @@ extension APIHandler {
     func getLibrary(_ input: Operations.getLibrary.Input) async throws -> Operations.getLibrary.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
-        let items = try await LibraryService(db: request.db, watches: request.watches)
+        let items = try await LibraryService(db: request.db)
             .items(userID: user.requireID(), filter: input.query.filter?.rawValue ?? "all", sort: input.query.sort?.rawValue ?? "recent",
                    genre: input.query.genre.flatMap { Genre(rawValue: $0.rawValue) })
         return .ok(.init(body: .json(items.map { item in
