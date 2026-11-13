@@ -289,7 +289,7 @@ struct StatsDashboardTests {
                 #expect(body.contains("Zeit pro Monat"))
                 #expect(body.contains("<svg"))
                 #expect(body.contains("<title>Mär: 2 Std. 45 Min."))
-                #expect(body.contains("Dienste"))
+                #expect(body.contains(#"<section class="stats-panel stats-services"><h2>Dienste</h2>"#))   // fills its row (CSS)
                 #expect(body.contains("Kino"))
                 #expect(body.contains("Längste Serien"))
                 #expect(body.contains("Dark"))

@@ -93,7 +93,7 @@ struct StatsPage: HTML {
 
         div(.class("stats-grid")) {
             if !stats.services.isEmpty {
-                section(.class("stats-panel")) {
+                section(.class("stats-panel stats-services")) {
                     h2 { "Dienste" }
                     ServiceBars(services: stats.services)
                 }
