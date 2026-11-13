@@ -2411,7 +2411,7 @@ components:
           type: string
     MappingReview:
       type: object
-      required: [id, netflixName, kind, rowCount, candidates]
+      required: [id, netflixName, kind, rowCount, candidates, firstDay, lastDay, rows]
       properties:
         id:
           type: string
@@ -2427,6 +2427,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SearchResult"
+        firstDay:
+          type: string
+          description: Earliest day of the open rows (YYYY-MM-DD)
+        lastDay:
+          type: string
+          description: Latest day of the open rows (YYYY-MM-DD)
+        rows:
+          type: array
+          description: The open Netflix rows, newest first, at most 20
+          items:
+            $ref: "#/components/schemas/ReviewRow"
+    ReviewRow:
+      type: object
+      required: [rawTitle, day]
+      properties:
+        rawTitle:
+          type: string
+        day:
+          type: string
+          description: YYYY-MM-DD
     UnmatchedRow:
       type: object
       required: [id, rawTitle, day, canAssign]

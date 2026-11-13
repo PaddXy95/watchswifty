@@ -62,6 +62,56 @@ struct ImportPageTests {
         }
     }
 
+    @Test func reviewShowsWatchDate() async throws {
+        try await withImported { app, _, headers in
+            try await app.testing().test(.GET, "/import", headers: headers) { res async in
+                #expect(res.body.string.contains("1 Zeilen · Serie · gesehen am 06.11.2026"))
+            }
+        }
+    }
+
+    @Test func reviewShowsDateRange() async throws {
+        try await withTestApp(tmdb: Self.fake()) { app in
+            let user = try await createUser(app, "pat")
+            let csv = """
+            Title,Date
+            "Rick and Morty: Staffel 8: Papa-Morty","11/6/26"
+            "Rick and Morty: Staffel 8: Papa-Morty","3/2/25"
+            """
+            _ = try await ImportService(db: app.db).ingest(text: csv, filename: "a.csv", userID: user.requireID())
+            _ = try await app.matchingWorker.processAll()
+            try await app.testing().test(.GET, "/import", headers: try await login(app, "pat")) { res async in
+                let body = res.body.string
+                #expect(body.contains("2 Zeilen · Serie · gesehen 02.03.2025 – 06.11.2026"))
+                #expect(body.contains("Zeilen anzeigen"))
+                let newest = body.range(of: "Rick and Morty: Staffel 8: Papa-Morty · 06.11.2026")
+                let oldest = body.range(of: "Rick and Morty: Staffel 8: Papa-Morty · 02.03.2025")
+                #expect(newest != nil && oldest != nil)
+                if let newest, let oldest { #expect(newest.lowerBound < oldest.lowerBound) }
+            }
+        }
+    }
+
+    @Test func reviewListsAtMostTwentyRows() {
+        let mapping = NetflixMapping()
+        mapping.id = UUID()
+        mapping.netflixName = "Viel"
+        mapping.kind = TitleKind.tv.rawValue
+        let rows = (1...23).map { day -> NetflixRow in
+            let row = NetflixRow()
+            row.rawTitle = "Viel: Folge \(day)"
+            row.watchedOn = String(format: "2026-10-%02d", day)
+            return row
+        }
+        let item = ReviewItem(mapping: mapping, rows: rows)
+        #expect(item.rowCount == 23)
+        #expect(item.firstDay == "2026-10-01" && item.lastDay == "2026-10-23")
+        #expect(item.shownRows.count == 20)
+        #expect(item.shownRows.first?.watchedOn == "2026-10-23")
+        let html = MappingReviewItem(item: item).render()
+        #expect(html.contains("… und 3 weitere"))
+    }
+
     @Test func acceptMatchesRows() async throws {
         try await withImported { app, _, headers in
             let rick = try await mapping(app, "Rick and Morty")

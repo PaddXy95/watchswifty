@@ -30,7 +30,7 @@ struct ImportStateService {
         let pendingByMapping = Dictionary(grouping: rows.filter { $0.rowStatus == .pending }, by: { $0.$mapping.id })
 
         let review = mappings.filter { $0.mappingStatus == .review }
-            .map { ReviewItem(mapping: $0, rowCount: pendingByMapping[$0.id]?.count ?? 0) }
+            .map { ReviewItem(mapping: $0, rows: pendingByMapping[$0.id] ?? []) }
             .filter { $0.rowCount > 0 }
         let unmatchedRows = rows.filter { $0.rowStatus == .unmatched }.sorted { $0.watchedOn > $1.watchedOn }
         let mappingByID = Dictionary(mappings.compactMap { m in m.id.map { ($0, m) } }, uniquingKeysWith: { a, _ in a })

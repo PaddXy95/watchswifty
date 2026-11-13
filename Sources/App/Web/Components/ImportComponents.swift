@@ -92,8 +92,28 @@ struct CandidateSearch: HTML {
 }
 
 struct ReviewItem {
+    static let rowLimit = 20
+
     let mapping: NetflixMapping
-    let rowCount: Int
+    /// Open rows of the mapping, newest first.
+    let rows: [NetflixRow]
+
+    init(mapping: NetflixMapping, rows: [NetflixRow]) {
+        self.mapping = mapping
+        self.rows = rows.sorted { ($0.watchedOn, $1.rawTitle) > ($1.watchedOn, $0.rawTitle) }
+    }
+
+    var rowCount: Int { rows.count }
+    var firstDay: String { rows.last?.watchedOn ?? "" }
+    var lastDay: String { rows.first?.watchedOn ?? "" }
+    var shownRows: ArraySlice<NetflixRow> { rows.prefix(Self.rowLimit) }
+
+    /// „gesehen am 06.11.2026“ or „gesehen 02.03.2025 – 06.11.2026“.
+    var watchedText: String {
+        firstDay == lastDay
+            ? "gesehen am \(CalendarDay.display(lastDay))"
+            : "gesehen \(CalendarDay.display(firstDay)) – \(CalendarDay.display(lastDay))"
+    }
 }
 
 struct MappingReviewItem: HTML {
@@ -104,7 +124,21 @@ struct MappingReviewItem: HTML {
         article(.class("mapping-review card"), .id("mapping-\(id.uuidString)")) {
             div(.class("card-body")) {
                 h3 { item.mapping.netflixName }
-                p(.class("muted")) { "\(item.rowCount) Zeilen · \(item.mapping.titleKind == .tv ? "Serie" : "Film")" }
+                p(.class("muted")) {
+                    "\(item.rowCount) Zeilen · \(item.mapping.titleKind == .tv ? "Serie" : "Film")"
+                    if !item.rows.isEmpty { " · \(item.watchedText)" }
+                }
+                if !item.rows.isEmpty {
+                    details(.class("review-rows")) {
+                        summary { "Zeilen anzeigen" }
+                        ul {
+                            for row in item.shownRows { li { "\(row.rawTitle) · \(CalendarDay.display(row.watchedOn))" } }
+                            if item.rowCount > item.shownRows.count {
+                                li(.class("muted")) { "… und \(item.rowCount - item.shownRows.count) weitere" }
+                            }
+                        }
+                    }
+                }
                 CandidateList(mappingID: id, results: item.mapping.candidateResults, action: "accept", target: "closest .mapping-review")
                 details {
                     summary { "Eigene Suche" }

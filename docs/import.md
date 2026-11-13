@@ -6,8 +6,10 @@
    **Titelverlauf** (viewing history) → at the very bottom **Alle herunterladen** (download all).
 2. In WatchSwifty, upload the file `NetflixViewingHistory.csv` under **Import**.
 3. Unambiguous series and movies are matched to TMDB automatically. Unclear names appear under **Zu prüfen** (to
-   review), episodes that could not be found under **Nicht zugeordnet** (not matched). Wrong matches can be changed or
-   reset under **Zuordnungen** (matches).
+   review) with the days Netflix lists for them; the rows themselves fold out under „Zeilen anzeigen“ (show rows).
+   Each candidate links to its TMDB page, and clicking its poster shows it larger. Episodes that could not be found
+   appear under **Nicht zugeordnet** (not matched). Wrong matches can be changed or reset under **Zuordnungen**
+   (matches).
 
 Matching needs your [TMDB token](tmdb.md).
 
