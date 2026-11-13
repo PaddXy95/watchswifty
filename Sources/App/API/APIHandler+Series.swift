@@ -41,14 +41,15 @@ extension APIHandler {
         let (request, user, title) = try await seriesContext(input.path.tmdbID)
         let service = try await Self.service(request, Self.watchInput(input.body)?.service, user: user, title: title)
         _ = try await request.watches.markSeason(userID: user.requireID(), titleID: title.requireID(), season: input.path.season,
-                                                 service: service)
+                                                 service: service, rewatch: Self.watchInput(input.body)?.rewatch ?? false)
         return .ok(.init(body: .json(try await Self.seriesDetail(request, user: user, title: title))))
     }
 
     func markSeries(_ input: Operations.markSeries.Input) async throws -> Operations.markSeries.Output {
         let (request, user, title) = try await seriesContext(input.path.tmdbID)
         let service = try await Self.service(request, Self.watchInput(input.body)?.service, user: user, title: title)
-        _ = try await request.watches.markSeries(userID: user.requireID(), titleID: title.requireID(), service: service)
+        _ = try await request.watches.markSeries(userID: user.requireID(), titleID: title.requireID(), service: service,
+                                                 rewatch: Self.watchInput(input.body)?.rewatch ?? false)
         return .ok(.init(body: .json(try await Self.seriesDetail(request, user: user, title: title))))
     }
 

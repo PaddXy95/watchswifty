@@ -11,6 +11,8 @@ struct AccountService {
     let worker: MatchingWorker
     var oidc: OIDCConfig? = nil
     var passwordLogin = true
+    /// Reload from TMDB: a new token clears its last result, removing the token stops it.
+    var libraryRefresh: LibraryRefreshWorker? = nil
 
     func changePassword(user: User, current: String, new: String) async throws {
         guard passwordLogin else { throw APIError.passwordLoginDisabled() }
@@ -54,10 +56,12 @@ struct AccountService {
         }
         user.tmdbToken = try cipher.seal(token)
         try await user.save(on: db)
+        await libraryRefresh?.forget(userID: try user.requireID())
         await worker.kick()
     }
 
     func removeTMDBToken(user: User) async throws {
+        await libraryRefresh?.cancel(userID: try user.requireID())
         user.tmdbToken = nil
         try await user.save(on: db)
     }
@@ -67,6 +71,6 @@ extension Request {
     var account: AccountService {
         AccountService(db: db, hasher: password.async, tmdbProvider: application.tmdbProvider, cipher: application.tokenCipher,
                        worker: application.matchingWorker, oidc: application.loginSettings.current.oidc,
-                       passwordLogin: application.loginSettings.current.passwordLogin)
+                       passwordLogin: application.loginSettings.current.passwordLogin, libraryRefresh: application.libraryRefresh)
     }
 }

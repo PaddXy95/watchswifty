@@ -118,6 +118,12 @@ struct UpdateResult: HTML {
                                 ". Vorher ein Backup machen schadet nicht."
                             }
                         }
+                    case false? where isNewerVersion(current.version, than: latest) == true:
+                        // Updated since the last check, or GitHub has no release for this version yet: say only what
+                        // is always true.
+                        p(.class("muted")) {
+                            "Diese Installation ist neuer als das bei der letzten Prüfung gefundene Release (v\(latest))."
+                        }
                     case false?:
                         p(.class("notice")) { "Du nutzt die neueste Version (v\(latest))." }
                     case nil:

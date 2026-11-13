@@ -153,28 +153,49 @@ struct RatingChart: HTML {
 
 /// Share of watch time per service as horizontal bars.
 struct ServiceBars: HTML {
+    /// Like the other lists of the dashboard, so the panel is no taller than its neighbours; the rest folds out.
+    static let visible = 5
+
     let services: [ServiceShare]
 
     var body: some HTML {
         let total = services.reduce(0) { $0 + $1.minutes }
         let largest = services.first?.minutes ?? 0
         div(.class("service-bars service-shares")) {
-            for share in services {
-                let percent = total > 0 ? Int((Double(share.minutes) / Double(total) * 100).rounded()) : 0
-                div(.class("service-row")) {
-                    span(.class("service-name")) {
-                        share.service?.label ?? "ohne Dienst"
-                        let counts = (share.episodes > 0 ? [countLabel(share.episodes, "Folge", "Folgen")] : [])
-                            + (share.movies > 0 ? [countLabel(share.movies, "Film", "Filme")] : [])
-                        if !counts.isEmpty { span(.class("service-counts")) { counts.joined(separator: " · ") } }
-                    }
-                    span(.class("bar"), .custom(name: "aria-hidden", value: "true")) {
-                        span(.class("bar-fill"),
-                             .style("width: \(largest > 0 && share.minutes > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
-                    }
-                    span(.class("service-value")) { "\(formatDuration(minutes: share.minutes)) · \(percent) %" }
+            for share in services.prefix(Self.visible) { ServiceRow(share: share, total: total, largest: largest) }
+        }
+        if services.count > Self.visible {
+            let more = services.count - Self.visible
+            details(.class("service-more")) {
+                summary { more == 1 ? "1 weiterer Dienst" : "\(more) weitere Dienste" }
+                div(.class("service-bars service-shares")) {
+                    for share in services.dropFirst(Self.visible) { ServiceRow(share: share, total: total, largest: largest) }
                 }
             }
+        }
+    }
+}
+
+/// One service: name with episode and movie counts, bar relative to the largest service, time and share of all.
+struct ServiceRow: HTML {
+    let share: ServiceShare
+    let total: Int
+    let largest: Int
+
+    var body: some HTML {
+        let percent = total > 0 ? Int((Double(share.minutes) / Double(total) * 100).rounded()) : 0
+        div(.class("service-row")) {
+            span(.class("service-name")) {
+                share.service?.label ?? "ohne Dienst"
+                let counts = (share.episodes > 0 ? [countLabel(share.episodes, "Folge", "Folgen")] : [])
+                    + (share.movies > 0 ? [countLabel(share.movies, "Film", "Filme")] : [])
+                if !counts.isEmpty { span(.class("service-counts")) { counts.joined(separator: " · ") } }
+            }
+            span(.class("bar"), .custom(name: "aria-hidden", value: "true")) {
+                span(.class("bar-fill"),
+                     .style("width: \(largest > 0 && share.minutes > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
+            }
+            span(.class("service-value")) { "\(formatDuration(minutes: share.minutes)) · \(percent) %" }
         }
     }
 }

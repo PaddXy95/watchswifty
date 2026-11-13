@@ -80,6 +80,52 @@ struct UpdateCheckTests {
         }
     }
 
+    @Test func dueRightAfterAnUpdate() async throws {
+        let fetcher = FakeReleaseFetcher()
+        try await withTestApp(releases: fetcher) { app in
+            let now = Date(timeIntervalSince1970: 1_800_000_000)
+            try await service(app, fetcher).setEnabled(true)
+            _ = try await service(app, fetcher).checkNow(now: now)   // stores 0.1.3 while 0.1.0 runs
+            #expect(fetcher.calls == 1)
+
+            // Updated to 0.2.0 an hour later: the stored result predates the installed version.
+            #expect(try await service(app, fetcher, current: "0.2.0").checkIfDue(now: now.addingTimeInterval(3600)) == true)
+            #expect(fetcher.calls == 2)
+            // Same version as stored: the 12-hour interval applies again.
+            #expect(try await service(app, fetcher, current: "0.1.3").checkIfDue(now: now.addingTimeInterval(7200)) == false)
+        }
+    }
+
+    @Test func storedResultOlderThanInstalledIsNotCalledNewest() async throws {
+        let fetcher = FakeReleaseFetcher()
+        var config = AppConfig.testing
+        config.appVersion = AppVersion(version: "0.2.0", commit: nil)
+        try await withTestApp(config: config, releases: fetcher) { app in
+            _ = try await service(app, fetcher).checkNow()   // stored before the update: newest was 0.1.3
+            try await createUser(app, "chef", isAdmin: true)
+            let admin = try await login(app, "chef")
+            try await app.testing().test(.GET, "/admin/system", headers: admin) { res async in
+                let body = res.body.string
+                #expect(!body.contains("Du nutzt die neueste Version"))
+                #expect(body.contains("Diese Installation ist neuer als das bei der letzten Prüfung gefundene Release (v0.1.3)."))
+            }
+        }
+    }
+
+    @Test func storedResultEqualToInstalledIsNewest() async throws {
+        let fetcher = FakeReleaseFetcher()
+        var config = AppConfig.testing
+        config.appVersion = AppVersion(version: "0.1.3", commit: nil)
+        try await withTestApp(config: config, releases: fetcher) { app in
+            _ = try await service(app, fetcher, current: "0.1.3").checkNow()
+            try await createUser(app, "chef", isAdmin: true)
+            let admin = try await login(app, "chef")
+            try await app.testing().test(.GET, "/admin/system", headers: admin) { res async in
+                #expect(res.body.string.contains("Du nutzt die neueste Version (v0.1.3)."))
+            }
+        }
+    }
+
     @Test func systemPageIsAdminOnly() async throws {
         try await withTestApp(config: Self.releaseConfig) { app in
             try await createUser(app, "chef", isAdmin: true)

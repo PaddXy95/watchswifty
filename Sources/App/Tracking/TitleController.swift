@@ -70,8 +70,10 @@ struct TitleController {
             let title = try await resolve(req, .tv)
             guard let season = req.parameters.get("season", as: Int.self) else { throw Abort(.notFound) }
             let userID = try req.userID
-            let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
-            _ = try await req.watches.markSeason(userID: userID, titleID: title.requireID(), season: season, service: service)
+            let input = (try? req.content.decode(WatchInput.self)) ?? WatchInput()
+            let service = try await serviceChoice(req, input.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markSeason(userID: userID, titleID: title.requireID(), season: season, service: service,
+                                                 rewatch: input.rewatch == "true")
             return try await seasonResponse(req, title: title, season: season, userID: userID)
         }
     }
@@ -80,8 +82,9 @@ struct TitleController {
         try await handle(req) {
             let title = try await resolve(req, .tv)
             let userID = try req.userID
-            let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
-            _ = try await req.watches.markSeries(userID: userID, titleID: title.requireID(), service: service)
+            let input = (try? req.content.decode(WatchInput.self)) ?? WatchInput()
+            let service = try await serviceChoice(req, input.service, userID: userID, titleID: title.requireID())
+            _ = try await req.watches.markSeries(userID: userID, titleID: title.requireID(), service: service, rewatch: input.rewatch == "true")
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
             return try await seasonsResponse(req, title: title, seasons: seasons, userID: userID)
         }
@@ -260,7 +263,8 @@ struct TitleController {
         let service = try await req.watches.lastService(userID: userID, titleID: title.requireID())
         return HTMLResponse(SeasonUpdate(
             section: SeasonSection(tmdbID: title.tmdbID, season: model, today: req.watches.today(), defaultService: service),
-            refresh: BulkServiceRefresh(selected: service, seasons: seasons.map(\.number).filter { $0 != season })))
+            refresh: BulkServiceRefresh(tmdbID: title.tmdbID, selected: service, seriesRewatch: SeasonModel.seriesFullyWatched(seasons),
+                                        seasons: seasons.map(\.number).filter { $0 != season })))
     }
 
     /// All seasons swapped, plus the series form's service choice (it sits outside `#seasons`).
@@ -268,7 +272,8 @@ struct TitleController {
         let service = try await req.watches.lastService(userID: userID, titleID: title.requireID())
         return HTMLResponse(SeasonUpdate(
             section: SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(), defaultService: service),
-            refresh: BulkServiceRefresh(selected: service, seasons: [])))
+            refresh: BulkServiceRefresh(tmdbID: title.tmdbID, selected: service, seriesRewatch: SeasonModel.seriesFullyWatched(seasons),
+                                        seasons: [])))
     }
 
     func seasonModels(_ req: Request, title: Title, userID: UUID, open: Int?) async throws -> [SeasonModel] {

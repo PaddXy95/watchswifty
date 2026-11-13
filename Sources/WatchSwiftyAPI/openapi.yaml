@@ -743,6 +743,43 @@ paths:
                   $ref: "#/components/schemas/LibraryEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/library/refresh:
+    post:
+      operationId: startLibraryRefresh
+      tags: [Library]
+      summary: Reload all of your titles from TMDB in the background
+      description: >-
+        Reloads every series and movie of the caller (watched, rated, hidden or followed) from TMDB with the caller's
+        own TMDB token, one run per user at a time; while a run is going, its state is returned instead of starting a
+        new one. Poll `GET /v1/library/refresh` for the progress. The progress is kept in memory only and is gone after
+        a server restart.
+      security: [{ bearerAuth: [] }]
+      responses:
+        "202":
+          description: Run started (or already running)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibraryRefresh"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    get:
+      operationId: getLibraryRefresh
+      tags: [Library]
+      summary: Progress of the reload from TMDB
+      description: Without a run since the server started, `running` is false, the counts are 0 and `finishedAt` is missing.
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibraryRefresh"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/stats:
     get:
       operationId: getStats
@@ -2253,6 +2290,26 @@ components:
           description: Genres of the title; empty until loaded from TMDB (always sent; optional so apps also work with older servers)
           items:
             $ref: "#/components/schemas/Genre"
+    LibraryRefresh:
+      type: object
+      required: [running, done, total, failed]
+      properties:
+        running:
+          type: boolean
+        done:
+          type: integer
+          description: Titles handled so far, successful or not
+        total:
+          type: integer
+        failed:
+          type: integer
+        finishedAt:
+          type: string
+          format: date-time
+          description: End of the last run; missing while running or before the first run
+        error:
+          type: string
+          description: Why the last run stopped early (for example an invalid TMDB token)
     Period:
       type: object
       required: [movies, series, episodes, minutes, unknownRuntime]
@@ -3078,7 +3135,9 @@ components:
           description: If missing, the most recently used service for this series applies; `unknown` = no service.
         rewatch:
           type: boolean
-          description: Watched again (an additional watch instead of replacing).
+          description: >-
+            Watched again (an additional watch instead of replacing). For a season or the whole series: a new round,
+            every aired episode behind the highest watch count gets one more watch (all of them when they are level).
     HiddenInput:
       type: object
       required: [hidden]

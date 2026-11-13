@@ -12,6 +12,7 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         var imdbIDs: [Int: String] = [:]
         var failure: TMDBError?
         var genericFailure = false
+        var delay: Duration?
         var calls: [String] = []
     }
 
@@ -21,6 +22,12 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     var failure: TMDBError? {
         get { state.withLockedValue { $0.failure } }
         set { state.withLockedValue { $0.failure = newValue } }
+    }
+
+    /// Makes every call wait this long (to observe a run while it is going).
+    var delay: Duration? {
+        get { state.withLockedValue { $0.delay } }
+        set { state.withLockedValue { $0.delay = newValue } }
     }
 
     struct Boom: Error {}
@@ -56,7 +63,7 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     }
 
     func seriesIMDbID(id: Int) async throws -> String? {
-        try record("external_ids:\(id)")
+        try await record("external_ids:\(id)")
         return state.withLockedValue { $0.imdbIDs[id] }
     }
 
@@ -64,43 +71,44 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         state.withLockedValue { $0.moviesByID[movie.id] = movie }
     }
 
-    private func record(_ call: String) throws {
-        let (failure, generic) = state.withLockedValue { s -> (TMDBError?, Bool) in
+    private func record(_ call: String) async throws {
+        let (failure, generic, delay) = state.withLockedValue { s -> (TMDBError?, Bool, Duration?) in
             s.calls.append(call)
-            return (s.failure, s.genericFailure)
+            return (s.failure, s.genericFailure, s.delay)
         }
+        if let delay { try await Task.sleep(for: delay) }
         if generic { throw Boom() }
         if let failure { throw failure }
     }
 
     func validate() async throws {
-        try record("validate")
+        try await record("validate")
     }
 
     func search(_ query: String, kind: TitleKind) async throws -> [TMDBSearchResult] {
-        try record("search:\(kind.rawValue):\(query)")
+        try await record("search:\(kind.rawValue):\(query)")
         return state.withLockedValue { $0.searchResults["\(kind.rawValue):\(query)"] ?? [] }
     }
 
     func searchMulti(_ query: String) async throws -> [TMDBSearchResult] {
-        try record("multi:\(query)")
+        try await record("multi:\(query)")
         return state.withLockedValue { $0.searchResults["multi:\(query)"] ?? [] }
     }
 
     func series(id: Int) async throws -> TMDBSeries {
-        try record("series:\(id)")
+        try await record("series:\(id)")
         guard let series = state.withLockedValue({ $0.seriesByID[id] }) else { throw TMDBError.notFound }
         return series
     }
 
     func season(seriesID: Int, number: Int) async throws -> [TMDBEpisode] {
-        try record("season:\(seriesID)/\(number)")
+        try await record("season:\(seriesID)/\(number)")
         guard let episodes = state.withLockedValue({ $0.seasons["\(seriesID)/\(number)"] }) else { throw TMDBError.notFound }
         return episodes
     }
 
     func movie(id: Int) async throws -> TMDBMovie {
-        try record("movie:\(id)")
+        try await record("movie:\(id)")
         guard let movie = state.withLockedValue({ $0.moviesByID[id] }) else { throw TMDBError.notFound }
         return movie
     }

@@ -39,12 +39,7 @@ struct SeriesPage: HTML {
             if seasons.isEmpty {
                 p(.class("muted")) { "Für diese Serie sind keine Folgen bekannt." }
             } else {
-                form(.class("series-action"), .hx.post("/tv/\(title.tmdbID)/watch-all"),
-                     .hx.confirm("Alle erschienenen Folgen als gesehen markieren?"),
-                     .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) {
-                    ServiceSelect(selected: defaultService, id: ServiceSelect.seriesID())
-                    button(.type(.submit)) { "Gesamte Serie gesehen" }
-                }
+                SeriesWatchForm(tmdbID: title.tmdbID, defaultService: defaultService, rewatch: SeasonModel.seriesFullyWatched(seasons))
             }
             SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: today, defaultService: defaultService)
         }

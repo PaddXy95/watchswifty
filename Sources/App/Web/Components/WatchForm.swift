@@ -62,17 +62,43 @@ struct ServiceSelect: HTML {
     }
 }
 
-/// Out-of-band refresh of the season/series service choices after a watch changed the last used service; the forms
-/// outside the swapped part would otherwise keep their stale preselection (and save it).
+/// Out-of-band refresh of the forms outside the swapped part after a watch: the series form (its service choice and
+/// whether it marks a new round) and the other seasons' service choices; they would otherwise keep their stale state
+/// (and save it).
 struct BulkServiceRefresh: HTML {
+    let tmdbID: Int
     let selected: StreamingService?
+    /// Every aired regular episode is watched: the series form offers „Gesamte Serie erneut gesehen“.
+    let seriesRewatch: Bool
     /// Seasons whose form is not part of the swapped content.
     let seasons: [Int]
 
     var body: some HTML {
-        ServiceSelect(selected: selected, id: ServiceSelect.seriesID(), outOfBand: true)
+        SeriesWatchForm(tmdbID: tmdbID, defaultService: selected, rewatch: seriesRewatch, outOfBand: true)
         for season in seasons where season > 0 {
             ServiceSelect(selected: selected, id: ServiceSelect.seasonID(season), outOfBand: true)
         }
+    }
+}
+
+/// „Gesamte Serie gesehen“, or „Gesamte Serie erneut gesehen“ once every aired regular episode is watched (a new
+/// round, see `WatchService.markSeries`).
+struct SeriesWatchForm: HTML {
+    static let id = "series-action"
+
+    let tmdbID: Int
+    let defaultService: StreamingService?
+    let rewatch: Bool
+    var outOfBand = false
+
+    var body: some HTML {
+        form(.class("series-action"), .id(Self.id), .hx.post("/tv/\(tmdbID)/watch-all"),
+             .hx.confirm(rewatch ? "Alle erschienenen Folgen noch einmal als gesehen markieren?" : "Alle erschienenen Folgen als gesehen markieren?"),
+             .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) {
+            ServiceSelect(selected: defaultService, id: ServiceSelect.seriesID())
+            if rewatch { input(.type(.hidden), .name("rewatch"), .value("true")) }
+            button(.type(.submit)) { rewatch ? "Gesamte Serie erneut gesehen" : "Gesamte Serie gesehen" }
+        }
+        .attributes(.custom(name: "hx-swap-oob", value: "true"), when: outOfBand)
     }
 }
