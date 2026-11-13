@@ -116,6 +116,8 @@ struct AccountNotificationsTests {
             let blockEnd = rest.range(of: "/account/notifications/test")?.lowerBound ?? rest.endIndex
             #expect(rest[..<blockEnd].contains("Schlüssel entfernen"))
             #expect(!rest[..<blockEnd].contains("currentPassword"))
+            // No login-password autofill into the key (it would be sent to KNot).
+            #expect(rest[..<blockEnd].contains(#"name="key" required autocomplete="new-password""#))
         }
     }
 

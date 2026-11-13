@@ -305,7 +305,8 @@ struct AccountNotificationsSection: HTML, Sendable {
             form(.method(.post), .action("/account/notifications/webhook-key")) {
                 label {
                     "Webhook-Schlüssel"
-                    input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "off"))
+                    // "new-password": browsers must not fill in the login password (it would go to KNot as the key).
+                    input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "new-password"))
                 }
                 button(.type(.submit)) { "Schlüssel speichern" }
             }
