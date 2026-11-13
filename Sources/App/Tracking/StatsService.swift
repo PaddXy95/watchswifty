@@ -46,6 +46,48 @@ struct ChartBar: Equatable, Sendable {
 struct ServiceShare: Equatable, Sendable {
     let service: StreamingService?
     let minutes: Int
+    var episodes = 0
+    var movies = 0
+}
+
+/// A movie in „Längste Filme“ / „Meistgesehene Filme“: all its viewings in the period.
+struct MovieStat: Equatable, Sendable {
+    let tmdbID: Int
+    let name: String
+    let posterPath: String?
+    let watches: Int
+    let minutes: Int
+    let rating: Int?
+}
+
+/// An episode in „Meistgesehene Folgen“.
+struct EpisodeStat: Equatable, Sendable {
+    let tmdbID: Int
+    let seriesName: String
+    let posterPath: String?
+    let code: String
+    let season: Int
+    let number: Int
+    let name: String
+    let watches: Int
+}
+
+/// A series in „Meistgesehene Serien“: how often every aired regular episode was watched (all years).
+struct CompletedSeries: Equatable, Sendable {
+    let tmdbID: Int
+    let name: String
+    let posterPath: String?
+    let completions: Int
+    let rating: Int?
+}
+
+/// Time and distinct titles per genre in the period; a title counts for each of its genres.
+struct GenreStat: Equatable, Sendable {
+    let genre: Genre
+    var seriesMinutes = 0
+    var movieMinutes = 0
+    var series = 0
+    var movies = 0
 }
 
 struct TopSeries: Equatable, Sendable {
@@ -69,6 +111,16 @@ struct Stats: Sendable {
     var services: [ServiceShare] = []
     /// At most 5 series, by minutes.
     var topSeries: [TopSeries] = []
+    /// Up to 5 movies by the time of all their viewings (runtime known).
+    var longestMovies: [MovieStat] = []
+    /// Up to 5 movies watched at least twice, most viewings first.
+    var mostWatchedMovies: [MovieStat] = []
+    /// Up to 5 episodes watched at least twice.
+    var mostWatchedEpisodes: [EpisodeStat] = []
+    /// Up to 5 series watched completely at least once – always over all years.
+    var mostCompletedSeries: [CompletedSeries] = []
+    /// Genres by time in the period.
+    var genres: [GenreStat] = []
     let total: PeriodStats
     let undated: PeriodStats
     /// Newest first.
@@ -84,8 +136,11 @@ struct StatsService {
     let db: any Database
     let today: String
 
+    static let listLimit = 5
+
     private struct Viewing {
         let titleID: UUID
+        let episodeID: UUID?
         let isEpisode: Bool
         let minutes: Int?
         let year: Int?
@@ -144,8 +199,8 @@ struct StatsService {
                 return nil
             }
             let (year, month) = Self.yearMonth(watch.watchedOn)
-            return Viewing(titleID: watch.$title.id, isEpisode: watch.$episode.id != nil, minutes: minutes, year: year, month: month,
-                           service: watch.streamingService)
+            return Viewing(titleID: watch.$title.id, episodeID: watch.$episode.id, isEpisode: watch.$episode.id != nil, minutes: minutes,
+                           year: year, month: month, service: watch.streamingService)
         }
 
         var total = Tally(), undated = Tally()
@@ -163,15 +218,36 @@ struct StatsService {
         }
         let inRange = viewings.filter { selectedYear == nil || $0.year == selectedYear }
         var period = Tally()
-        var serviceMinutes: [StreamingService?: Int] = [:]
+        var serviceTally: [StreamingService?: (minutes: Int, episodes: Int, movies: Int)] = [:]
         var seriesTally: [UUID: (episodes: Int, minutes: Int)] = [:]
+        var movieTally: [UUID: (watches: Int, minutes: Int)] = [:]
+        var episodeWatches: [UUID: Int] = [:]
+        var genreTally: [Genre: (stat: GenreStat, seriesIDs: Set<UUID>, movieIDs: Set<UUID>)] = [:]
         for viewing in inRange {
             period.add(viewing)
             byRating[ratingByTitle[viewing.titleID] ?? nil, default: Tally()].add(viewing)
-            if let minutes = viewing.minutes { serviceMinutes[viewing.service, default: 0] += minutes }
+            var service = serviceTally[viewing.service] ?? (0, 0, 0)
+            service.minutes += viewing.minutes ?? 0
+            if viewing.isEpisode { service.episodes += 1 } else { service.movies += 1 }
+            serviceTally[viewing.service] = service
             if viewing.isEpisode {
                 let current = seriesTally[viewing.titleID] ?? (0, 0)
                 seriesTally[viewing.titleID] = (current.episodes + 1, current.minutes + (viewing.minutes ?? 0))
+                if let episodeID = viewing.episodeID { episodeWatches[episodeID, default: 0] += 1 }
+            } else {
+                let current = movieTally[viewing.titleID] ?? (0, 0)
+                movieTally[viewing.titleID] = (current.watches + 1, current.minutes + (viewing.minutes ?? 0))
+            }
+            for genre in titleByID[viewing.titleID]?.genreList ?? [] {
+                var entry = genreTally[genre] ?? (GenreStat(genre: genre), [], [])
+                if viewing.isEpisode {
+                    entry.stat.seriesMinutes += viewing.minutes ?? 0
+                    entry.seriesIDs.insert(viewing.titleID)
+                } else {
+                    entry.stat.movieMinutes += viewing.minutes ?? 0
+                    entry.movieIDs.insert(viewing.titleID)
+                }
+                genreTally[genre] = entry
             }
         }
 
@@ -194,14 +270,59 @@ struct StatsService {
         result.chart = Self.chart(inRange, year: selectedYear, years: byYear.keys.sorted(), monthCount: selectedYear.map { year in
             years.first { $0.year == year }?.months.count ?? (year == currentYear ? currentMonth ?? 12 : 12)
         })
-        result.services = serviceMinutes.filter { $0.value > 0 }.map { ServiceShare(service: $0.key, minutes: $0.value) }
-            .sorted { ($0.minutes, $0.service?.label ?? "") > ($1.minutes, $1.service?.label ?? "") }
+        result.services = serviceTally.map { ServiceShare(service: $0.key, minutes: $0.value.minutes, episodes: $0.value.episodes,
+                                                          movies: $0.value.movies) }
+            .sorted { ($0.minutes, $0.episodes + $0.movies, $1.service?.label ?? "") > ($1.minutes, $1.episodes + $1.movies, $0.service?.label ?? "") }
         result.topSeries = seriesTally.compactMap { titleID, tally -> TopSeries? in
             guard let title = titleByID[titleID] else { return nil }
             return TopSeries(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, episodes: tally.episodes,
                              minutes: tally.minutes, rating: ratingByTitle[titleID] ?? nil)
-        }.sorted { ($0.minutes, $0.episodes, $1.name) > ($1.minutes, $1.episodes, $0.name) }.prefix(5).map { $0 }
+        }.sorted { ($0.minutes, $0.episodes, $1.name) > ($1.minutes, $1.episodes, $0.name) }.prefix(Self.listLimit).map { $0 }
+
+        let movies = movieTally.compactMap { titleID, tally -> MovieStat? in
+            guard let title = titleByID[titleID] else { return nil }
+            return MovieStat(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, watches: tally.watches,
+                             minutes: tally.minutes, rating: ratingByTitle[titleID] ?? nil)
+        }
+        result.longestMovies = movies.filter { $0.minutes > 0 }
+            .sorted { ($0.minutes, $0.watches, $1.name) > ($1.minutes, $1.watches, $0.name) }.prefix(Self.listLimit).map { $0 }
+        result.mostWatchedMovies = movies.filter { $0.watches >= 2 }
+            .sorted { ($0.watches, $0.minutes, $1.name) > ($1.watches, $1.minutes, $0.name) }.prefix(Self.listLimit).map { $0 }
+
+        let episodeByID = Dictionary(episodes.compactMap { episode in episode.id.map { ($0, episode) } }, uniquingKeysWith: { a, _ in a })
+        result.mostWatchedEpisodes = episodeWatches.filter { $0.value >= 2 }.compactMap { episodeID, watches -> EpisodeStat? in
+            guard let episode = episodeByID[episodeID], let title = titleByID[episode.$title.id] else { return nil }
+            return EpisodeStat(tmdbID: title.tmdbID, seriesName: title.name, posterPath: title.posterPath, code: episode.code,
+                               season: episode.season, number: episode.number, name: episode.name, watches: watches)
+        }.sorted { ($0.watches, $1.seriesName, $1.season, $1.number) > ($1.watches, $0.seriesName, $0.season, $0.number) }
+            .prefix(Self.listLimit).map { $0 }
+
+        result.mostCompletedSeries = try await completedSeries(watches: watches, titleByID: titleByID, ratingByTitle: ratingByTitle)
+        result.genres = genreTally.values.map { entry in
+            var stat = entry.stat
+            stat.series = entry.seriesIDs.count
+            stat.movies = entry.movieIDs.count
+            return stat
+        }.sorted { ($0.seriesMinutes + $0.movieMinutes, $1.genre.label) > ($1.seriesMinutes + $1.movieMinutes, $0.genre.label) }
         return result
+    }
+
+    /// How often each watched series was seen completely: the fewest watches of any aired regular episode (season ≥ 1,
+    /// air date ≤ today; specials and episodes without a date do not count). Uses all watches, not only the period.
+    private func completedSeries(watches: [Watch], titleByID: [UUID: Title],
+                                 ratingByTitle: [UUID: Int?]) async throws -> [CompletedSeries] {
+        var countByEpisode: [UUID: Int] = [:]
+        for watch in watches { if let episodeID = watch.$episode.id { countByEpisode[episodeID, default: 0] += 1 } }
+        let seriesIDs = Array(Set(watches.filter { $0.$episode.id != nil }.map(\.$title.id)))
+        guard !seriesIDs.isEmpty else { return [] }
+        let regular = try await Episode.query(on: db).filter(\.$title.$id ~~ seriesIDs).filter(\.$season >= 1).all()
+        return Dictionary(grouping: regular, by: { $0.$title.id }).compactMap { titleID, episodes -> CompletedSeries? in
+            let aired = episodes.filter { ($0.airDate.map { $0 <= today }) ?? false }
+            guard let title = titleByID[titleID], !aired.isEmpty,
+                  let completions = aired.map({ $0.id.flatMap { countByEpisode[$0] } ?? 0 }).min(), completions > 0 else { return nil }
+            return CompletedSeries(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, completions: completions,
+                                   rating: ratingByTitle[titleID] ?? nil)
+        }.sorted { ($0.completions, $1.name) > ($1.completions, $0.name) }.prefix(Self.listLimit).map { $0 }
     }
 
     /// Months of the selected year (up to `monthCount`) or one bar per year; undated viewings have no bar.
