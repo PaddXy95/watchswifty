@@ -298,7 +298,7 @@ struct OIDCSection: HTML, Sendable {
         section(.class("mail-settings")) {
             h2 { "Anmeldung über OIDC (SSO)" }
             p(.class("muted")) {
-                "Optional: Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia, Pocket ID …). "
+                "Optional: Anmelden über einen eigenen Identity-Provider (Pocket ID, Authentik, Keycloak, Authelia …). "
                 "Die Einstellungen werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). "
                 DocsLink(page: "sso.md", label: "Anleitung zu SSO")
                 "."
@@ -315,7 +315,7 @@ struct OIDCSection: HTML, Sendable {
                 label {
                     "Anzeigename (leer = SSO)"
                     input(.type(.text), .name("displayName"), .value(values.displayName), .custom(name: "maxlength", value: "40"),
-                          .custom(name: "placeholder", value: "z. B. Authentik"))
+                          .custom(name: "placeholder", value: "z. B. Pocket ID"))
                 }
                 label {
                     "Issuer"

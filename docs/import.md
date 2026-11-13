@@ -2,7 +2,8 @@
 
 ## Netflix viewing history
 
-1. On netflix.com: profile → Account → choose the profile → **Viewing activity** → **Download all**.
+1. On netflix.com in a browser (not in the Netflix app): **Konto** (account) → **Einstellungen** (settings) →
+   **Titelverlauf** (viewing history) → at the very bottom **Alle herunterladen** (download all).
 2. In WatchSwifty, upload the file `NetflixViewingHistory.csv` under **Import**.
 3. Unambiguous series and movies are matched to TMDB automatically. Unclear names appear under **Zu prüfen** (to
    review), episodes that could not be found under **Nicht zugeordnet** (not matched). Wrong matches can be changed or

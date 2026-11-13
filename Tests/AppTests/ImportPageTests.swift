@@ -56,6 +56,8 @@ struct ImportPageTests {
                 #expect(body.contains("Zuordnungen"))
                 #expect(body.contains("Rick and Morty"))
                 #expect(body.contains("automatisch"))
+                #expect(body.contains("Konto → Einstellungen → Titelverlauf → ganz unten „Alle herunterladen“"))
+                #expect(!body.contains("Wiedergabeaktivität"))
             }
         }
     }

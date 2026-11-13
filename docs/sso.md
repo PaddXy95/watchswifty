@@ -1,6 +1,6 @@
 # Single sign-on (OIDC)
 
-Optional. If you already run an identity provider (Authentik, Keycloak, Authelia, Pocket ID, Zitadel, Kanidm, …),
+Optional. If you already run an identity provider (Pocket ID, Authentik, Keycloak, Authelia, Zitadel, Kanidm, …),
 users sign in through it with a „Mit SSO anmelden“ (sign in with SSO) button on the sign-in page. The provider decides
 who may use WatchSwifty (by granting the application to users or groups). There is exactly one provider.
 
@@ -14,19 +14,20 @@ In general: create an OAuth2/OpenID client of type *confidential* with
 
 Provider notes:
 
+- **Pocket ID:** under **OIDC Clients** add a client (not "public"), enter the callback URL from WatchSwifty and copy
+  client ID and secret (the secret is shown only once). The issuer is Pocket ID's `APP_URL` (for example
+  `https://id.example.com`). The callback URL must use https (otherwise set `ALLOW_INSECURE_CALLBACK_URLS=true` in
+  Pocket ID). If `INTERNAL_APP_URL` is set there, WatchSwifty must reach that internal address (for example in the same
+  Docker network). To limit access, assign user groups to the client; Pocket ID shows non-members its own error page.
 - **Authentik:** provider "OAuth2/OpenID", choose a **Signing Key** on the provider (without a key Authentik signs with
   HS256), leave the subject mode at the default, create the application and grant access. The issuer is the provider's
   "OpenID Configuration Issuer" address (with `/application/o/<slug>/`).
 - **Keycloak:** issuer `https://kc.example.com/realms/<realm>`, client with "Client authentication" on.
-- **Pocket ID:** create an OIDC client (not "public"); the issuer is Pocket ID's `APP_URL` (for example
-  `https://id.example.com`). The callback URL must use https (otherwise set `ALLOW_INSECURE_CALLBACK_URLS=true` in
-  Pocket ID). If `INTERNAL_APP_URL` is set there, WatchSwifty must reach that internal address (for example in the same
-  Docker network). With a group restriction, Pocket ID shows non-members its own error page.
 
 ## Setting up WatchSwifty
 
 As an admin, under **System → Anmeldung über OIDC (SSO)** (sign-in via OIDC) enter the display name (for example
-"Authentik"), issuer, client ID, client secret and the **address of WatchSwifty**, then save. The page shows the
+"Pocket ID"), issuer, client ID, client secret and the **address of WatchSwifty**, then save. The page shows the
 callback URL to copy (address + `/auth/oidc/callback`), checks the connection right away and has a
 „Verbindung testen“ (test connection) button. Everything is stored encrypted (key `TOKEN_KEY`) and takes effect
 immediately, without a restart. The secret is never shown again and must be entered again when the issuer or client ID

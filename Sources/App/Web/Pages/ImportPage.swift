@@ -23,7 +23,7 @@ struct ImportPage: HTML {
             section(.class("import-upload")) {
                 h2 { "Upload" }
                 p(.class("muted")) {
-                    "Netflix: Profil → Konto → Wiedergabeaktivität → „Alle herunterladen“. Die Datei heißt NetflixViewingHistory.csv."
+                    "Netflix im Browser: Konto → Einstellungen → Titelverlauf → ganz unten „Alle herunterladen“. Die Datei heißt NetflixViewingHistory.csv."
                 }
                 Messages(error: error, notice: summary.map {
                     "\($0.new) neu, \($0.known) bereits bekannt, \($0.skipped) übersprungen (leerer Titel)"
