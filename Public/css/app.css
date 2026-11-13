@@ -83,7 +83,7 @@ summary { cursor: pointer; font-weight: 600; }
 .watch-mark.unaired { opacity: 0.4; cursor: default; }
 .watched-mark { color: var(--paper); background: var(--ok); font-size: 0.75rem; font-weight: 700; line-height: 1; }
 .watch-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; font-size: var(--text-sm); }
-.watch-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
+.watch-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
 .watch-list li:last-child { border-bottom: none; }
 .watch-list button { font-size: var(--text-sm); }
 .episode-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
