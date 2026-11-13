@@ -131,6 +131,8 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 .title-meta { margin: calc(-1 * var(--space-3)) 0 var(--space-3); font-size: var(--text-sm); }
 .watch-form { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin: var(--space-2) 0; }
 .watch-form label { margin: 0; }
+/* Space below the field like other control rows above a list (.filter-bar); also keeps the focus ring off the first card. */
+.search-form { margin-bottom: var(--space-4); }
 .search-form input { width: 100%; max-width: 32rem; font-size: var(--text-lg); }
 .search-result { text-decoration: none; }
 #flash:empty { display: none; }

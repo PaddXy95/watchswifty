@@ -59,6 +59,20 @@ struct TitlePagesTests {
         }
     }
 
+    /// The results fragment carries its own `#results` wrapper, so the live search must replace it (outerHTML)
+    /// instead of nesting a second `#results` inside the first.
+    @Test func liveSearchReplacesResultsContainer() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.GET, "/search", headers: headers) { res async in
+                #expect(res.body.string.contains(##"hx-target="#results""##))
+                #expect(res.body.string.contains(#"hx-swap="outerHTML""#))
+            }
+            try await app.testing().test(.GET, "/search/results?q=Test", headers: headers) { res async in
+                #expect(res.body.string.hasPrefix(#"<div id="results""#))
+            }
+        }
+    }
+
     @Test func searchShowsOwnStatus() async throws {
         try await withUser { app, user, headers in
             let catalog = CatalogService(db: app.db, tmdb: app.tmdbProvider.make("test-token"))
