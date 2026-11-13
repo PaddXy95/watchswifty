@@ -290,7 +290,7 @@ struct StatsDashboardTests {
                 #expect(body.contains("<title>Mär: 2 Std. 45 Min."))
                 #expect(body.contains("Dienste"))
                 #expect(body.contains("Kino"))
-                #expect(body.contains("Meistgesehen"))
+                #expect(body.contains("Längste Serien"))
                 #expect(body.contains("Dark"))
                 #expect(body.contains("+155 %"))   // 255 vs 100 minutes
                 #expect(body.contains("Alle Zahlen"))
@@ -415,6 +415,41 @@ struct StatsListsTests {
             let result = try await stats(app, user, year: 2026)
             #expect(result.mostWatchedMovies.isEmpty && result.longestMovies.isEmpty && result.genres.isEmpty)
             #expect(try await stats(app, user, year: 2025).mostWatchedMovies.map(\.name) == ["Alt"])
+        }
+    }
+
+    func page(_ app: Application, _ path: String = "/stats?year=2026") async throws -> String {
+        var body = ""
+        try await app.testing().test(.GET, path, headers: try await login(app, "pat")) { res async in
+            #expect(res.status == .ok)
+            body = res.body.string
+        }
+        return body
+    }
+
+    @Test func statsPageShowsNewLists() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await seedMovies(app, user)
+            let dark = try await seedSeries(app, tmdbID: 80, name: "Dark", seasons: [1: 1], runtime: 45, genres: "drama")
+            try await watch(app, user, dark, try await episode(app, dark, 1, 1), service: .netflix, times: 2)
+            let body = try await page(app)
+            for text in ["Längste Serien", "Längste Filme", "Meistgesehene Filme", "3×", "Meistgesehene Folgen", "S01E01",
+                         "Meistgesehene Serien", "über alle Jahre", "2× komplett", "Genres", "Drama", "2 Folgen"] {
+                #expect(body.contains(text), "missing \(text)")
+            }
+        }
+    }
+
+    @Test func statsPageHidesEmptyLists() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            try await watch(app, user, try await seedMovie(app, tmdbID: 90, name: "Einmal", runtime: 90))
+            let body = try await page(app)
+            #expect(body.contains("Längste Filme"))
+            for text in ["Meistgesehene Filme", "Meistgesehene Folgen", "Meistgesehene Serien", ">Genres<"] {
+                #expect(!body.contains(text), "unexpected \(text)")
+            }
         }
     }
 

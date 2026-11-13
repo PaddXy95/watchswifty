@@ -296,6 +296,14 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 .service-bars { display: grid; gap: var(--space-2); }
 .service-row { display: grid; grid-template-columns: minmax(5.5rem, auto) 1fr auto; gap: var(--space-3); align-items: center; font-size: var(--text-sm); }
 .service-value { color: var(--ink-2); font-variant-numeric: tabular-nums; text-align: right; }
+/* Services sit in a narrow panel: name and value on top, the bar below at full width. */
+.service-shares .service-row { grid-template-columns: 1fr auto; grid-template-areas: "name value" "bar bar"; row-gap: var(--space-1); align-items: end; }
+.service-shares .service-name { grid-area: name; }
+.service-shares .service-value { grid-area: value; }
+.service-shares .bar { grid-area: bar; }
+/* Genres: one shared grid, so the bars of all rows start and end at the same place. */
+.genre-bars { grid-template-columns: max-content minmax(3rem, 1fr) max-content; gap: var(--space-2) var(--space-3); align-items: center; }
+.genre-bars .service-row { display: contents; }
 .top-series { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); counter-reset: top; }
 .top-series li { counter-increment: top; }
 .top-series-link { display: grid; grid-template-columns: 1.25rem 2.5rem 1fr auto; gap: var(--space-3); align-items: center; text-decoration: none; padding: var(--space-1); border-radius: var(--radius); }
@@ -323,6 +331,12 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 .stats-undated { color: var(--ink-2); }
 .bar { display: block; height: 0.5rem; background: var(--paper-3); border-radius: 999px; overflow: hidden; }
 .bar-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.bar-split { display: flex; }
+.bar-split .bar-fill { border-radius: 0; }
+.bar-fill.seg-series { background: var(--chart-series); }
+.bar-fill.seg-movies { background: var(--chart-movies); }
+.stats-panel-note { font-size: var(--text-sm); }
+.service-counts { display: block; color: var(--ink-3); font-size: 0.75rem; }
 @media (max-width: 560px) {
   .stats-panel { padding: var(--space-3); }
   .chart { grid-template-rows: 9rem auto; }

@@ -20,7 +20,8 @@ container, one SQLite file, data from TMDB. The web UI is in German; apps such a
 - **Tracking by hand:** search series and movies, mark episodes as watched (with date and streaming service), rate
   them 1–10, private comments on series, seasons and movies
 - **History and library** with synopsis, genres (library filter) and links to TMDB, IMDb, Rotten Tomatoes and SeriesGraph
-- **Statistics:** movies, series, episodes and time watched, in total, per year and month and by rating
+- **Statistics:** movies, series, episodes and time watched, in total, per year and month, by rating, service and genre;
+  longest and most watched series, movies and episodes
 - **Several users** with separate data; the admin creates accounts or invites people by mail
 - **Single sign-on (optional)** through your own OpenID Connect provider
 - **Mail (optional)** for invitations, password resets and new devices, for example through
