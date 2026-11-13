@@ -43,7 +43,7 @@ struct SeasonSection: HTML {
             if season.number > 0 {
                 form(.class("season-action"), .hx.post("/tv/\(tmdbID)/seasons/\(season.number)/watch"),
                      .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) {
-                    ServiceSelect(selected: defaultService)
+                    ServiceSelect(selected: defaultService, id: ServiceSelect.seasonID(season.number))
                     button(.type(.submit)) { "Ganze Staffel gesehen" }
                 }
             }
@@ -133,5 +133,16 @@ struct SeasonsList: HTML {
                 SeasonSection(tmdbID: tmdbID, season: season, today: today, defaultService: defaultService)
             }
         }
+    }
+}
+
+/// Swapped content followed by the out-of-band service refresh.
+struct SeasonUpdate<Section: HTML>: HTML {
+    let section: Section
+    let refresh: BulkServiceRefresh
+
+    var body: some HTML {
+        section
+        refresh
     }
 }

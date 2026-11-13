@@ -267,6 +267,41 @@ struct TitlePagesTests {
         }
     }
 
+    /// The fragment from `<label … id="<id>"` to its closing `</label>`.
+    func labelFragment(_ body: String, id: String) -> Substring {
+        guard let start = body.range(of: #"id="\#(id)""#) else { return "" }
+        let rest = body[start.lowerBound...]
+        return rest.range(of: "</label>").map { rest[..<$0.lowerBound] } ?? rest
+    }
+
+    @Test func markingRefreshesBulkServiceSelects() async throws {
+        try await withUser { app, _, headers in
+            // „bis hier“ swaps all seasons; the series form outside `#seasons` comes out of band.
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch-up-to", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(service: "wow"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let series = labelFragment(res.body.string, id: "series-service")
+                #expect(series.contains(#"hx-swap-oob="true""#))
+                #expect(series.contains(#"<option value="wow" selected"#))
+            })
+            // One season swapped: the series form and the other seasons' forms come out of band.
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/2/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "netflix"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let body = res.body.string
+                let series = labelFragment(body, id: "series-service")
+                #expect(series.contains(#"hx-swap-oob="true""#))
+                #expect(series.contains(#"<option value="netflix" selected"#))
+                let other = labelFragment(body, id: "season-service-2")
+                #expect(other.contains(#"hx-swap-oob="true""#))
+                #expect(other.contains(#"<option value="netflix" selected"#))
+                let own = labelFragment(body, id: "season-service-1")
+                #expect(!own.contains("hx-swap-oob"))
+                #expect(own.contains(#"<option value="netflix" selected"#))
+            })
+        }
+    }
+
     @Test func markSeason() async throws {
         try await withUser { app, _, headers in
             try await app.testing().test(.POST, "/tv/1399/seasons/1/watch", headers: headers) { res async in

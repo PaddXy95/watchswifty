@@ -39,6 +39,13 @@ struct WatchForm: HTML {
 /// „Dienst“ choice: „unbekannt“ (empty) or a streaming service, preselected with the last one used.
 struct ServiceSelect: HTML {
     let selected: StreamingService?
+    /// Set for the season/series forms, so marking elsewhere can refresh their preselection.
+    var id: String? = nil
+    /// Rendered as an htmx out-of-band swap (replaces the element with the same id).
+    var outOfBand = false
+
+    static func seriesID() -> String { "series-service" }
+    static func seasonID(_ season: Int) -> String { "season-service-\(season)" }
 
     var body: some HTML {
         label(.class("service-select")) {
@@ -49,6 +56,23 @@ struct ServiceSelect: HTML {
                     option(.value(service.rawValue)) { service.label }.attributes(.selected, when: service == selected)
                 }
             }
+        }
+        .attributes(.id(id ?? ""), when: id != nil)
+        .attributes(.custom(name: "hx-swap-oob", value: "true"), when: outOfBand)
+    }
+}
+
+/// Out-of-band refresh of the season/series service choices after a watch changed the last used service; the forms
+/// outside the swapped part would otherwise keep their stale preselection (and save it).
+struct BulkServiceRefresh: HTML {
+    let selected: StreamingService?
+    /// Seasons whose form is not part of the swapped content.
+    let seasons: [Int]
+
+    var body: some HTML {
+        ServiceSelect(selected: selected, id: ServiceSelect.seriesID(), outOfBand: true)
+        for season in seasons where season > 0 {
+            ServiceSelect(selected: selected, id: ServiceSelect.seasonID(season), outOfBand: true)
         }
     }
 }

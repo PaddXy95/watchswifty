@@ -83,8 +83,7 @@ struct TitleController {
             let service = try await serviceChoice(req, (try? req.content.decode(WatchInput.self))?.service, userID: userID, titleID: title.requireID())
             _ = try await req.watches.markSeries(userID: userID, titleID: title.requireID(), service: service)
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
-            return HTMLResponse(SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(),
-                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+            return try await seasonsResponse(req, title: title, seasons: seasons, userID: userID)
         }
     }
 
@@ -97,8 +96,7 @@ struct TitleController {
             var seasons = try await seasonModels(req, title: title, userID: userID, open: episode.season)
             // The button sits in the episode's details: they stay open.
             if let index = seasons.firstIndex(where: { $0.number == episode.season }) { seasons[index].openEpisode = episode.number }
-            return HTMLResponse(SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(),
-                                            defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+            return try await seasonsResponse(req, title: title, seasons: seasons, userID: userID)
         }
     }
 
@@ -259,8 +257,18 @@ struct TitleController {
         let seasons = try await seasonModels(req, title: title, userID: userID, open: season)
         guard var model = seasons.first(where: { $0.number == season }) else { throw Abort(.notFound) }
         model.openEpisode = openEpisode
-        return HTMLResponse(SeasonSection(tmdbID: title.tmdbID, season: model, today: req.watches.today(),
-                                          defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+        let service = try await req.watches.lastService(userID: userID, titleID: title.requireID())
+        return HTMLResponse(SeasonUpdate(
+            section: SeasonSection(tmdbID: title.tmdbID, season: model, today: req.watches.today(), defaultService: service),
+            refresh: BulkServiceRefresh(selected: service, seasons: seasons.map(\.number).filter { $0 != season })))
+    }
+
+    /// All seasons swapped, plus the series form's service choice (it sits outside `#seasons`).
+    private func seasonsResponse(_ req: Request, title: Title, seasons: [SeasonModel], userID: UUID) async throws -> HTMLResponse {
+        let service = try await req.watches.lastService(userID: userID, titleID: title.requireID())
+        return HTMLResponse(SeasonUpdate(
+            section: SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: req.watches.today(), defaultService: service),
+            refresh: BulkServiceRefresh(selected: service, seasons: [])))
     }
 
     func seasonModels(_ req: Request, title: Title, userID: UUID, open: Int?) async throws -> [SeasonModel] {

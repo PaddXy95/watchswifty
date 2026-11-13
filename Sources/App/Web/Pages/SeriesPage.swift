@@ -42,7 +42,7 @@ struct SeriesPage: HTML {
                 form(.class("series-action"), .hx.post("/tv/\(title.tmdbID)/watch-all"),
                      .hx.confirm("Alle erschienenen Folgen als gesehen markieren?"),
                      .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) {
-                    ServiceSelect(selected: defaultService)
+                    ServiceSelect(selected: defaultService, id: ServiceSelect.seriesID())
                     button(.type(.submit)) { "Gesamte Serie gesehen" }
                 }
             }
