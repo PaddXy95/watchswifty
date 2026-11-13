@@ -105,7 +105,9 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 .title-header .poster { width: 140px; }
 .rating-control { margin: var(--space-2) 0; }
 .rating-control select { display: inline-block; width: auto; }
-.season-action { margin: var(--space-2) 0; }
+.season-action, .series-action { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); margin: var(--space-2) 0; }
+.season-action .service-select, .series-action .service-select { margin: 0; }
+.season-action .service-select select, .series-action .service-select select { width: auto; }
 .episode-row .code { font-variant-numeric: tabular-nums; color: var(--ink-3); }
 .episode-row .name { flex: 1; }
 .episode-row .runtime { color: var(--ink-3); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }

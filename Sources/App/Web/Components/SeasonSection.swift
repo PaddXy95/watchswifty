@@ -41,8 +41,11 @@ struct SeasonSection: HTML {
         details(.id("season-\(season.number)"), .class("season")) {
             summary { "\(season.title) · \(season.watchedCount)/\(season.episodes.count) gesehen" }
             if season.number > 0 {
-                button(.class("season-action"), .hx.post("/tv/\(tmdbID)/seasons/\(season.number)/watch"),
-                       .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) { "Ganze Staffel gesehen" }
+                form(.class("season-action"), .hx.post("/tv/\(tmdbID)/seasons/\(season.number)/watch"),
+                     .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) {
+                    ServiceSelect(selected: defaultService)
+                    button(.type(.submit)) { "Ganze Staffel gesehen" }
+                }
             }
             for episode in season.episodes {
                 EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService,
@@ -90,8 +93,8 @@ struct EpisodeRow: HTML {
                         }
                         if model.aired {
                             WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
-                                      rewatch: model.watched, today: today, defaultService: defaultService, keepOpen: true)
-                            button(.hx.post("\(path)/watch-up-to"), .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "bis hier gesehen" }
+                                      rewatch: model.watched, today: today, defaultService: defaultService, keepOpen: true,
+                                      upToAction: "\(path)/watch-up-to")
                         }
                     }
                 }
