@@ -179,11 +179,13 @@ struct UpdateService {
         return settings
     }
 
-    /// Checks when automatic checks are on and the last one is at least 12 hours old.
+    /// Checks when automatic checks are on and the last one is at least 12 hours old, or predates the installed
+    /// version (right after an update the stored result is older than what runs).
     func checkIfDue(now: Date = .now) async throws -> Bool {
         let settings = try await settings()
         guard settings.updateCheck else { return false }
-        if let checked = settings.checkedAt, now.timeIntervalSince(checked) < Self.interval { return false }
+        let outdated = settings.latestVersion.flatMap { isNewerVersion(current.version, than: $0) } == true
+        if !outdated, let checked = settings.checkedAt, now.timeIntervalSince(checked) < Self.interval { return false }
         try await checkNow(now: now)
         return true
     }

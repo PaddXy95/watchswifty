@@ -118,6 +118,11 @@ struct UpdateResult: HTML {
                                 ". Vorher ein Backup machen schadet nicht."
                             }
                         }
+                    case false? where isNewerVersion(current.version, than: latest) == true:
+                        // Updated since the last check: the stored release is older than what runs.
+                        p(.class("muted")) {
+                            "Seit der letzten Prüfung aktualisiert (damals neueste Version: v\(latest)) – „Jetzt prüfen“ zeigt den aktuellen Stand."
+                        }
                     case false?:
                         p(.class("notice")) { "Du nutzt die neueste Version (v\(latest))." }
                     case nil:

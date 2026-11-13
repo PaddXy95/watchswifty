@@ -2,6 +2,13 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.5.1] – 2026-11-13
+
+### Fixed
+- **System → Version & Updates:** after an update the page no longer claims „Du nutzt die neueste Version“ (you use
+  the newest version) with the older release found before the update; it says the installation was updated since
+  the last check. With automatic checks on, the check runs right after an update instead of up to 12 hours later.
+
 ## [0.5.0] – 2026-11-13
 
 ### Added
