@@ -78,6 +78,7 @@ summary { cursor: pointer; font-weight: 600; }
 .episode-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-3); padding: var(--space-1) 0; border-top: 1px solid var(--line); }
 .episode-row > input[type=checkbox] { margin: 0.2rem 0 0; }
 .episode-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.episode-summary .episode-title { flex: 1 1 10rem; }
 details.episode { background: none; border: none; padding: 0; margin: 0; }
 details.episode > summary { list-style: none; font-weight: 400; }
 details.episode > summary::-webkit-details-marker { display: none; }
