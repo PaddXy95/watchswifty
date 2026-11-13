@@ -1,16 +1,20 @@
 @testable import App
 import Elementary
+import Foundation
 import Testing
 import VaporTesting
 
 @Suite("Rendering")
 struct RenderingTests {
-    @Test func layoutContainsAssetsAndNav() {
+    @Test func layoutContainsAssetsAndNav() throws {
         let html = PageLayout(title: "Verlauf", nav: .init(username: "pat", isAdmin: false, active: .history)) {
             p { "x" }
         }.render()
-        #expect(html.contains(#"<script src="/js/htmx.min.js""#))
-        #expect(html.contains(#"href="/css/app.css""#))
+        // Versioned links: a browser loads the new file after an update instead of a cached old one.
+        let htmx = try #require(AssetVersion.htmx)
+        let css = try #require(AssetVersion.css)
+        #expect(html.contains(#"<script src="/js/htmx.min.js?v=\#(htmx)""#))
+        #expect(html.contains(#"href="/css/app.css?v=\#(css)""#))
         #expect(html.contains("Verlauf · WatchSwifty"))
         #expect(html.contains(">WatchSwifty<"))
         #expect(html.contains("Weiterschauen"))
@@ -78,7 +82,21 @@ struct RenderingTests {
             try await app.testing().test(.GET, "/css/app.css") { res async in
                 #expect(res.status == .ok)
             }
+            try await app.testing().test(.GET, "/css/app.css?v=0123456789") { res async in
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains(".fold-block"))
+            }
         }
+    }
+
+    @Test func assetFingerprintFollowsContent() throws {
+        let a = AssetVersion.fingerprint(Data("a".utf8))
+        #expect(a != AssetVersion.fingerprint(Data("b".utf8)))
+        #expect(a.count == 10 && a.allSatisfy { $0.isHexDigit })
+        let css = try #require(FileManager.default.contents(atPath: "Public/css/app.css"))
+        #expect(AssetVersion.css == AssetVersion.fingerprint(css))
+        #expect(AssetVersion.fingerprint(file: "css/gibt-es-nicht.css") == nil)
+        #expect(AssetVersion.url("/css/app.css", nil) == "/css/app.css")
     }
 
     @Test func footerOnEveryPage() {

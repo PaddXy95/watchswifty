@@ -42,8 +42,8 @@ struct PageLayout<Content: HTML>: HTMLDocument {
         link(.rel(.icon), .href("/favicon.svg"), .custom(name: "type", value: "image/svg+xml"))
         link(.rel("apple-touch-icon"), .href("/apple-touch-icon.png"))
         link(.rel("manifest"), .href("/manifest.json"))
-        link(.rel(.stylesheet), .href("/css/app.css"))
-        script(.src("/js/htmx.min.js")) {}
+        link(.rel(.stylesheet), .href(AssetVersion.url("/css/app.css", AssetVersion.css)))
+        script(.src(AssetVersion.url("/js/htmx.min.js", AssetVersion.htmx))) {}
     }
 
     var body: some HTML {
