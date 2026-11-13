@@ -94,3 +94,39 @@ public struct NotifyChannelValue: OpenStringValue {
     public static let webhook = Self(rawValue: "webhook")
     public static let known: [Self] = [.mail, .webhook]
 }
+
+/// Schema `Genre`: one genre list for series and movies.
+public struct GenreValue: OpenStringValue {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let action = Self(rawValue: "action")
+    public static let adventure = Self(rawValue: "adventure")
+    public static let animation = Self(rawValue: "animation")
+    public static let comedy = Self(rawValue: "comedy")
+    public static let crime = Self(rawValue: "crime")
+    public static let documentary = Self(rawValue: "documentary")
+    public static let drama = Self(rawValue: "drama")
+    public static let family = Self(rawValue: "family")
+    public static let fantasy = Self(rawValue: "fantasy")
+    public static let history = Self(rawValue: "history")
+    public static let horror = Self(rawValue: "horror")
+    public static let music = Self(rawValue: "music")
+    public static let mystery = Self(rawValue: "mystery")
+    public static let romance = Self(rawValue: "romance")
+    public static let scienceFiction = Self(rawValue: "science_fiction")
+    public static let tvMovie = Self(rawValue: "tv_movie")
+    public static let thriller = Self(rawValue: "thriller")
+    public static let war = Self(rawValue: "war")
+    public static let western = Self(rawValue: "western")
+    public static let kids = Self(rawValue: "kids")
+    public static let news = Self(rawValue: "news")
+    public static let reality = Self(rawValue: "reality")
+    public static let soap = Self(rawValue: "soap")
+    public static let talk = Self(rawValue: "talk")
+    public static let politics = Self(rawValue: "politics")
+    public static let known: [Self] = [.action, .adventure, .animation, .comedy, .crime, .documentary, .drama,
+                                       .family, .fantasy, .history, .horror, .music, .mystery, .romance,
+                                       .scienceFiction, .tvMovie, .thriller, .war, .western, .kids, .news,
+                                       .reality, .soap, .talk, .politics]
+}

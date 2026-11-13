@@ -130,6 +130,15 @@ struct TMDBOverviewTests {
         let movie = try LiveTMDBClient.decodeMovie(Data(#"{"id":603,"title":"Matrix","overview":"Neo erwacht."}"#.utf8))
         #expect(movie.overview == "Neo erwacht.")
     }
+
+    @Test func decodesGenreIDs() throws {
+        let series = try LiveTMDBClient.decodeSeries(Data(#"{"id":1,"name":"X","seasons":[],"genres":[{"id":10759,"name":"Action & Adventure"},{"id":18,"name":"Drama"}]}"#.utf8))
+        #expect(series.genreIDs == [10759, 18])
+        let movie = try LiveTMDBClient.decodeMovie(Data(#"{"id":603,"title":"Matrix","genres":[{"id":878,"name":"Science Fiction"}]}"#.utf8))
+        #expect(movie.genreIDs == [878])
+        let bare = try LiveTMDBClient.decodeMovie(Data(#"{"id":604,"title":"Y"}"#.utf8))
+        #expect(bare.genreIDs == [])
+    }
 }
 
 @Suite("TMDBIMDb")

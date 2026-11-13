@@ -25,9 +25,10 @@ func refreshToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) a
         .lazy.compactMap { cipher.open($0.tmdbToken) }.first
 }
 
-/// Watched titles cached before runtimes were stored (`runtime == nil`), sorted by TMDB id.
-func titlesMissingRuntime(on db: any Database) async throws -> [Title] {
-    let missing = try await Title.query(on: db).filter(\.$runtime == nil).sort(\.$tmdbID).all()
+/// Watched titles cached before runtimes or genres were stored (`runtime` or `genres` nil), sorted by TMDB id.
+func titlesMissingDetails(on db: any Database) async throws -> [Title] {
+    let missing = try await Title.query(on: db).group(.or) { $0.filter(\.$runtime == nil).filter(\.$genres == nil) }
+        .sort(\.$tmdbID).all()
     guard !missing.isEmpty else { return [] }
     let watched = Set(try await Watch.query(on: db).filter(\.$title.$id ~~ missing.compactMap(\.id)).unique().all(\.$title.$id))
     return missing.filter { $0.id.map(watched.contains) ?? false }
@@ -41,11 +42,11 @@ func backfillToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) 
         .lazy.compactMap { cipher.open($0.tmdbToken) }.first
 }
 
-/// Loads runtimes for watched titles that lack them (one refresh each); returns how many were refreshed.
-func backfillRuntimes(db: any Database, provider: TMDBProvider, cipher: TokenCipher, logger: Logger) async -> Int {
+/// Loads runtimes and genres for watched titles that lack them (one refresh each); returns how many were refreshed.
+func backfillDetails(db: any Database, provider: TMDBProvider, cipher: TokenCipher, logger: Logger) async -> Int {
     let titles: [Title]
-    do { titles = try await titlesMissingRuntime(on: db) } catch {
-        logger.warning("Laufzeiten: Abfrage fehlgeschlagen: \(error)")
+    do { titles = try await titlesMissingDetails(on: db) } catch {
+        logger.warning("Laufzeiten/Genres: Abfrage fehlgeschlagen: \(error)")
         return 0
     }
     var refreshed = 0
@@ -56,7 +57,7 @@ func backfillRuntimes(db: any Database, provider: TMDBProvider, cipher: TokenCip
             try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
             refreshed += 1
         } catch {
-            logger.warning("Laufzeit für \(title.name) nicht geladen: \(error)")
+            logger.warning("Laufzeit/Genres für \(title.name) nicht geladen: \(error)")
         }
     }
     return refreshed
@@ -70,8 +71,8 @@ func runDailyPass(_ application: Application, now: Date = .now) async {
     let worker = application.matchingWorker
     let logger = application.logger
     let cipher = application.tokenCipher
-    let filled = await backfillRuntimes(db: db, provider: provider, cipher: cipher, logger: logger)
-    if filled > 0 { logger.info("Laufzeiten nachgeladen: \(filled) Titel") }
+    let filled = await backfillDetails(db: db, provider: provider, cipher: cipher, logger: logger)
+    if filled > 0 { logger.info("Laufzeiten/Genres nachgeladen: \(filled) Titel") }
     if let expired = try? await APITokenService(db: db).deleteExpired(), expired > 0 {
         logger.info("App-API: \(expired) abgelaufene Geräte-Tokens gelöscht")
     }

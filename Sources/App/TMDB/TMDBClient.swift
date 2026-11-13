@@ -24,6 +24,8 @@ struct TMDBSeries: Sendable, Equatable {
     var overview: String? = nil
     /// Typical episode length in minutes (first of `episode_run_time`); nil when TMDB has none.
     var episodeRunTime: Int? = nil
+    /// TMDB genre ids (TV list), see `Genre.from(tmdbIDs:)`.
+    var genreIDs: [Int] = []
 }
 
 struct TMDBEpisode: Sendable, Equatable {
@@ -47,6 +49,8 @@ struct TMDBMovie: Sendable, Equatable {
     var imdbID: String? = nil
     /// Minutes; nil when TMDB has none.
     var runtime: Int? = nil
+    /// TMDB genre ids (movie list), see `Genre.from(tmdbIDs:)`.
+    var genreIDs: [Int] = []
 }
 
 enum TMDBError: Error, Equatable, CustomStringConvertible {

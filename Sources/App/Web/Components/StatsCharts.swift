@@ -158,14 +158,19 @@ struct ServiceBars: HTML {
     var body: some HTML {
         let total = services.reduce(0) { $0 + $1.minutes }
         let largest = services.first?.minutes ?? 0
-        div(.class("service-bars")) {
+        div(.class("service-bars service-shares")) {
             for share in services {
                 let percent = total > 0 ? Int((Double(share.minutes) / Double(total) * 100).rounded()) : 0
                 div(.class("service-row")) {
-                    span(.class("service-name")) { share.service?.label ?? "ohne Dienst" }
+                    span(.class("service-name")) {
+                        share.service?.label ?? "ohne Dienst"
+                        let counts = (share.episodes > 0 ? [countLabel(share.episodes, "Folge", "Folgen")] : [])
+                            + (share.movies > 0 ? [countLabel(share.movies, "Film", "Filme")] : [])
+                        if !counts.isEmpty { span(.class("service-counts")) { counts.joined(separator: " · ") } }
+                    }
                     span(.class("bar"), .custom(name: "aria-hidden", value: "true")) {
                         span(.class("bar-fill"),
-                             .style("width: \(largest > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
+                             .style("width: \(largest > 0 && share.minutes > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
                     }
                     span(.class("service-value")) { "\(formatDuration(minutes: share.minutes)) · \(percent) %" }
                 }
@@ -174,21 +179,33 @@ struct ServiceBars: HTML {
     }
 }
 
-/// Top series of the period with poster, episodes, time and rating.
-struct TopSeriesList: HTML {
-    let series: [TopSeries]
+/// „1 Folge“, „80 Folgen“.
+func countLabel(_ value: Int, _ one: String, _ many: String) -> String {
+    "\(groupedThousands(value)) \(value == 1 ? one : many)"
+}
+
+/// One row of a ranked list: poster, name, detail line and rating, linking to the title.
+struct RankedItem: Sendable {
+    let href: String
+    let posterPath: String?
+    let name: String
+    let detail: String
+    let rating: Int?
+}
+
+/// Numbered list of titles (top series, movies, episodes, completed series).
+struct RankedList: HTML {
+    let items: [RankedItem]
 
     var body: some HTML {
         ol(.class("top-series")) {
-            for item in series {
+            for item in items {
                 li {
-                    a(.href("/tv/\(item.tmdbID)"), .class("top-series-link")) {
+                    a(.href(item.href), .class("top-series-link")) {
                         Poster(path: item.posterPath, alt: item.name, displayWidth: 40)
                         span(.class("top-series-text")) {
                             strong { item.name }
-                            span(.class("muted")) {
-                                "\(groupedThousands(item.episodes)) \(item.episodes == 1 ? "Folge" : "Folgen") · \(formatDuration(minutes: item.minutes))"
-                            }
+                            span(.class("muted")) { item.detail }
                         }
                         if let rating = item.rating { span(.class("rating")) { "★ \(rating)" } }
                     }
@@ -197,3 +214,35 @@ struct TopSeriesList: HTML {
         }
     }
 }
+
+/// Time per genre, split into series and movie time (colors of the time chart), with the number of titles.
+struct GenreBars: HTML {
+    let genres: [GenreStat]
+
+    var body: some HTML {
+        let largest = genres.map { $0.seriesMinutes + $0.movieMinutes }.max() ?? 0
+        div(.class("service-bars genre-bars")) {
+            for stat in genres {
+                let total = stat.seriesMinutes + stat.movieMinutes
+                div(.class("service-row")) {
+                    span(.class("service-name")) {
+                        stat.genre.label
+                        let counts = (stat.series > 0 ? [countLabel(stat.series, "Serie", "Serien")] : [])
+                            + (stat.movies > 0 ? [countLabel(stat.movies, "Film", "Filme")] : [])
+                        if !counts.isEmpty { span(.class("service-counts")) { counts.joined(separator: " · ") } }
+                    }
+                    span(.class("bar bar-split"), .custom(name: "aria-hidden", value: "true")) {
+                        span(.class("bar-fill seg-series"), .style("width: \(Self.percent(stat.seriesMinutes, of: largest))%")) {}
+                        span(.class("bar-fill seg-movies"), .style("width: \(Self.percent(stat.movieMinutes, of: largest))%")) {}
+                    }
+                    span(.class("service-value")) { formatDuration(minutes: total) }
+                }
+            }
+        }
+    }
+
+    static func percent(_ value: Int, of largest: Int) -> Int {
+        largest > 0 ? Int((Double(value) / Double(largest) * 100).rounded()) : 0
+    }
+}
+

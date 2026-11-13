@@ -56,8 +56,60 @@ struct ImportPageTests {
                 #expect(body.contains("Zuordnungen"))
                 #expect(body.contains("Rick and Morty"))
                 #expect(body.contains("automatisch"))
+                #expect(body.contains("Konto → Einstellungen → Titelverlauf → ganz unten „Alle herunterladen“"))
+                #expect(!body.contains("Wiedergabeaktivität"))
             }
         }
+    }
+
+    @Test func reviewShowsWatchDate() async throws {
+        try await withImported { app, _, headers in
+            try await app.testing().test(.GET, "/import", headers: headers) { res async in
+                #expect(res.body.string.contains("1 Zeilen · Serie · gesehen am 06.11.2026"))
+            }
+        }
+    }
+
+    @Test func reviewShowsDateRange() async throws {
+        try await withTestApp(tmdb: Self.fake()) { app in
+            let user = try await createUser(app, "pat")
+            let csv = """
+            Title,Date
+            "Rick and Morty: Staffel 8: Papa-Morty","11/6/26"
+            "Rick and Morty: Staffel 8: Papa-Morty","3/2/25"
+            """
+            _ = try await ImportService(db: app.db).ingest(text: csv, filename: "a.csv", userID: user.requireID())
+            _ = try await app.matchingWorker.processAll()
+            try await app.testing().test(.GET, "/import", headers: try await login(app, "pat")) { res async in
+                let body = res.body.string
+                #expect(body.contains("2 Zeilen · Serie · gesehen 02.03.2025 – 06.11.2026"))
+                #expect(body.contains("Zeilen anzeigen"))
+                let newest = body.range(of: "Rick and Morty: Staffel 8: Papa-Morty · 06.11.2026")
+                let oldest = body.range(of: "Rick and Morty: Staffel 8: Papa-Morty · 02.03.2025")
+                #expect(newest != nil && oldest != nil)
+                if let newest, let oldest { #expect(newest.lowerBound < oldest.lowerBound) }
+            }
+        }
+    }
+
+    @Test func reviewListsAtMostTwentyRows() {
+        let mapping = NetflixMapping()
+        mapping.id = UUID()
+        mapping.netflixName = "Viel"
+        mapping.kind = TitleKind.tv.rawValue
+        let rows = (1...23).map { day -> NetflixRow in
+            let row = NetflixRow()
+            row.rawTitle = "Viel: Folge \(day)"
+            row.watchedOn = String(format: "2026-10-%02d", day)
+            return row
+        }
+        let item = ReviewItem(mapping: mapping, rows: rows)
+        #expect(item.rowCount == 23)
+        #expect(item.firstDay == "2026-10-01" && item.lastDay == "2026-10-23")
+        #expect(item.shownRows.count == 20)
+        #expect(item.shownRows.first?.watchedOn == "2026-10-23")
+        let html = MappingReviewItem(item: item).render()
+        #expect(html.contains("… und 3 weitere"))
     }
 
     @Test func acceptMatchesRows() async throws {
@@ -254,11 +306,37 @@ struct ImportPageLightTests {
 struct CandidateLabelTests {
     @Test func candidateLabel() {
         let html = CandidateList(mappingID: UUID(), results: [
-            TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: nil),
+            TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: "/a.jpg"),
         ], action: "accept", target: "x").render()
-        #expect(html.contains("Aftermath (2021) · "))
-        #expect(html.contains("Übernehmen"))
+        #expect(html.contains("Aftermath (2021)"))
+        #expect(html.contains(#"href="https://www.themoviedb.org/movie/1" target="_blank""#))
+        #expect(html.contains("TMDB ↗"))
+        #expect(html.contains(">Übernehmen</button>"))
+        #expect(html.contains("popovertarget="))
+        #expect(html.contains("w342/a.jpg"))
         #expect(!html.contains("Film"))
-        #expect(!html.contains("FilmÜbernehmen"))
+    }
+
+    @Test func candidateWithoutPosterHasNoPopover() {
+        let html = CandidateList(mappingID: UUID(), results: [
+            TMDBSearchResult(id: 2, kind: .tv, name: "Ohne Bild", originalName: nil, year: nil, posterPath: nil),
+        ], action: "accept", target: "x").render()
+        #expect(!html.contains("popovertarget="))
+        #expect(html.contains(#"href="https://www.themoviedb.org/tv/2""#))
+    }
+
+    @Test func candidatePopoverIDsUnique() {
+        let result = TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: "/a.jpg")
+        let first = CandidateList(mappingID: UUID(), results: [result], action: "accept", target: "x").render()
+        let second = CandidateList(mappingID: UUID(), results: [result], action: "accept", target: "x").render()
+        func popoverID(_ html: String) -> String? {
+            guard let start = html.range(of: #"popovertarget=""#)?.upperBound,
+                  let end = html[start...].firstIndex(of: "\"") else { return nil }
+            return String(html[start..<end])
+        }
+        let a = try? #require(popoverID(first))
+        let b = try? #require(popoverID(second))
+        #expect(a != nil && a != b)
+        if let a { #expect(first.contains(#"id="\#(a)" popover"#)) }
     }
 }

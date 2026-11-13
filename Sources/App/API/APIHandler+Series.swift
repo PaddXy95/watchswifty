@@ -135,7 +135,7 @@ extension APIHandler {
         return .init(
             tmdbId: title.tmdbID, name: title.name, year: title.year, posterPath: title.posterPath,
             overview: title.overview.flatMap { $0.isEmpty ? nil : $0 }, status: title.tmdbStatus,
-            runtime: title.runtime.flatMap { $0 > 0 ? $0 : nil }, links: links(title),
+            runtime: title.runtime.flatMap { $0 > 0 ? $0 : nil }, genres: genres(title), links: links(title),
             rating: model.rating, comment: model.comment, hidden: model.hidden, followed: model.followed,
             lastService: model.defaultService.flatMap { Components.Schemas.Service(rawValue: $0.rawValue) },
             next: next.map { .init(episodeId: $0.id.uuidString, season: $0.season, number: $0.number, name: $0.name, airDate: $0.airDate) },

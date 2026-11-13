@@ -8,7 +8,6 @@ struct NotificationPrefsService {
     static let keyMessage = "Der Schlüssel muss mindestens 16 Zeichen lang sein, ohne Leerzeichen."
 
     let db: any Database
-    let hasher: AsyncPasswordHasher
     let cipher: TokenCipher
 
     /// Toggles and channel need no password. Switching „neu angekündigt“ on starts its window now, so it does not
@@ -27,14 +26,9 @@ struct NotificationPrefsService {
         try await user.save(on: db)
     }
 
-    /// Sets (or with an empty value removes) the key. Needs the current password where the account has one, so a
-    /// hijacked session cannot redirect „Neues Gerät“ to a target of its own.
-    func setWebhookKey(user: User, key raw: String, currentPassword: String?) async throws {
-        if user.hasPassword {
-            guard let currentPassword, try await hasher.verify(currentPassword, created: user.passwordHash) else {
-                throw APIError.validation(AccountValidation.wrongCurrentPasswordMessage)
-            }
-        }
+    /// Sets (or with an empty value removes) the key. No password since the 2026-11-13 feedback round: the user accepts
+    /// that a hijacked session could redirect „Neues Gerät“ (spec `2026-11-13-feedback-round-design.md` §5).
+    func setWebhookKey(user: User, key raw: String) async throws {
         let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if key.isEmpty {
             user.webhookKey = nil
@@ -50,6 +44,6 @@ struct NotificationPrefsService {
 
 extension Request {
     var notificationPrefs: NotificationPrefsService {
-        NotificationPrefsService(db: db, hasher: password.async, cipher: application.tokenCipher)
+        NotificationPrefsService(db: db, cipher: application.tokenCipher)
     }
 }

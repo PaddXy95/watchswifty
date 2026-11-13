@@ -153,7 +153,7 @@ struct UpdateCheckTests {
             let admin = try await login(app, "chef")
             let user = try await login(app, "pat")
             try await app.testing().test(.GET, "/library", headers: admin) { res async in
-                #expect(res.body.string.contains(#"<a href="/admin/system" class="update-hint">Update auf v0.1.3 verfügbar</a>"#))
+                #expect(res.body.string.contains(#"<a href="/admin/system?open=updates" class="update-hint">Update auf v0.1.3 verfügbar</a>"#))
             }
             try await app.testing().test(.GET, "/library", headers: user) { res async in
                 #expect(!res.body.string.contains("update-hint"))

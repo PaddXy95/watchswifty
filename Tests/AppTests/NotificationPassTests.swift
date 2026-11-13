@@ -74,7 +74,7 @@ struct NotificationPassTests {
             try await configureMail(app)
             try await configureWebhook(app)
             let pat = try await seedPat(app, email: nil)
-            try await prefsService(app).setWebhookKey(user: pat, key: "k-1234567890abcdef", currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: "k-1234567890abcdef")
             let bob = try await notifyUser(app, "bobby", email: "bob@x.de")
             let show = try await Title.query(on: app.db).filter(\.$tmdbID == 1).first()!
             try await F.follow(app, bob, show)

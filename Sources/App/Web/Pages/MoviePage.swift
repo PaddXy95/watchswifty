@@ -18,8 +18,10 @@ struct MoviePage: HTML {
                         title.name
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
-                    if let runtime = title.runtime, runtime > 0 {
-                        p(.class("muted title-meta")) { formatDuration(minutes: runtime) }
+                    let meta = [title.runtime.flatMap { $0 > 0 ? formatDuration(minutes: $0) : nil }].compactMap { $0 }
+                        + (title.genreList ?? []).map(\.label)
+                    if !meta.isEmpty {
+                        p(.class("muted title-meta")) { meta.joined(separator: " · ") }
                     }
                     if let overview = title.overview, !overview.isEmpty {
                         p(.class("overview")) { overview }

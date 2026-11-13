@@ -51,6 +51,6 @@ extension APIHandler {
         let watches = try await request.seriesDetails.movieWatches(userID: user.requireID(), titleID: titleID)
         return .init(tmdbId: title.tmdbID, name: title.name, year: title.year, posterPath: title.posterPath,
                      overview: title.overview.flatMap { $0.isEmpty ? nil : $0 }, runtime: title.runtime.flatMap { $0 > 0 ? $0 : nil },
-                     links: links(title), rating: entry?.rating, comment: entry?.comment, watches: watches.map(watchSummary))
+                     genres: genres(title), links: links(title), rating: entry?.rating, comment: entry?.comment, watches: watches.map(watchSummary))
     }
 }

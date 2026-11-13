@@ -48,8 +48,8 @@ into a mail to the recipient configured for that key.
 1. In KNot, add one target per person with their mail address and a key from `java -jar knot.jar key`.
 2. As admin, enter the hook address (for example `https://knot.example.lan/hook`) under **System →
    Benachrichtigungen**. Addresses with user info, `?…` or `#…` are rejected; the key belongs in the header.
-3. Give each person their key. They enter it under **Konto → Benachrichtigungen** (with their current password, if
-   the account has one) and can send a **Testnachricht** (test message).
+3. Give each person their key. They enter it under **Konto → Benachrichtigungen** (no password needed) and can send a
+   **Testnachricht** (test message).
 
 The key is stored encrypted and never shown again. WatchSwifty waits up to 60 seconds for KNot (it delivers the mail
 while the request is open) and does not follow redirects.

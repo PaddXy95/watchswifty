@@ -2,6 +2,13 @@ import Elementary
 import ElementaryHTMX2
 import Foundation
 
+/// The foldable blocks of the Konto page.
+enum AccountBlock: String, Sendable {
+    case tmdb, followed, notifications, devices, sso, email, password
+
+    var id: String { "block-\(rawValue)" }
+}
+
 struct AccountPage: HTML {
     let nav: NavContext
     let tokenSuffix: String?
@@ -23,6 +30,12 @@ struct AccountPage: HTML {
     /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
     var tokenNeedsReauth = false
     var notifications: AccountNotifications? = nil
+    /// Block of the last action (or `?open=`); the token block is also open while no usable token is stored.
+    var openBlock: AccountBlock? = nil
+
+    private func isOpen(_ block: AccountBlock) -> Bool {
+        openBlock == block || (block == .tmdb && tokenSuffix == nil)
+    }
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
@@ -30,158 +43,168 @@ struct AccountPage: HTML {
             p(.class("muted")) { "Angemeldet als \(nav.username)" }
             Messages(error: error, notice: notice)
 
-            h2 { "TMDB-Token" }
-            p(.class("muted")) {
-                "Für Suche, Poster und den Netflix-Import brauchst du einen eigenen kostenlosen Read Access Token von "
-                a(.href("https://www.themoviedb.org/settings/api"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "themoviedb.org" }
-                "."
-            }
-            if let tokenSuffix {
-                p { "Hinterlegt: \(tokenSuffix)" }
-            } else if tokenUnreadable {
-                p(.class("error")) { "Token nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
-            } else {
-                p { "Kein TMDB-Token hinterlegt." }
-            }
-            TokenHelp(open: tokenSuffix == nil)
-            form(.method(.post), .action("/account/tmdb-token"), .class("inline-form")) {
-                input(.type(.password), .name("token"), .required, .custom(name: "autocomplete", value: "off"),
-                      .custom(name: "placeholder", value: "Read Access Token"), .custom(name: "aria-label", value: "TMDB-Token"))
-                button(.type(.submit), .class("primary")) { tokenSuffix == nil ? "Speichern" : "Ersetzen" }
-            }
-            if tokenSuffix != nil {
-                form(.method(.post), .action("/account/tmdb-token/remove"), .class("inline-form")) {
-                    button(.type(.submit)) { "Entfernen" }
+            FoldableBlock(id: AccountBlock.tmdb.id, title: "TMDB-Token", open: isOpen(.tmdb)) {
+                p(.class("muted")) {
+                    "Für Suche, Poster und den Netflix-Import brauchst du einen eigenen kostenlosen Read Access Token von "
+                    a(.href("https://www.themoviedb.org/settings/api"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { "themoviedb.org" }
+                    "."
+                }
+                if let tokenSuffix {
+                    p { "Hinterlegt: \(tokenSuffix)" }
+                } else if tokenUnreadable {
+                    p(.class("error")) { "Token nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
+                } else {
+                    p { "Kein TMDB-Token hinterlegt." }
+                }
+                TokenHelp(open: tokenSuffix == nil)
+                form(.method(.post), .action("/account/tmdb-token"), .class("inline-form")) {
+                    input(.type(.password), .name("token"), .required, .custom(name: "autocomplete", value: "off"),
+                          .custom(name: "placeholder", value: "Read Access Token"), .custom(name: "aria-label", value: "TMDB-Token"))
+                    button(.type(.submit), .class("primary")) { tokenSuffix == nil ? "Speichern" : "Ersetzen" }
+                }
+                if tokenSuffix != nil {
+                    form(.method(.post), .action("/account/tmdb-token/remove"), .class("inline-form")) {
+                        button(.type(.submit)) { "Entfernen" }
+                    }
                 }
             }
 
-            h2 { "Beobachtete Serien" }
-            if followed.isEmpty {
-                p(.class("muted")) { "Du beobachtest noch keine Serien. Auf der Serienseite gibt es dafür „🔔 Beobachten“." }
-            } else {
-                ul(.class("followed-list")) {
-                    for series in followed {
-                        li {
-                            a(.href("/tv/\(series.tmdbID)")) { series.name }
-                            if let next = series.nextEpisode, let air = next.airDate {
-                                span(.class("muted")) { "Nächste Folge: \(next.code) am \(CalendarDay.display(air))" }
+            FoldableBlock(id: AccountBlock.followed.id, title: "Beobachtete Serien", open: isOpen(.followed)) {
+                if followed.isEmpty {
+                    p(.class("muted")) { "Du beobachtest noch keine Serien. Auf der Serienseite gibt es dafür „🔔 Beobachten“." }
+                } else {
+                    ul(.class("followed-list")) {
+                        for series in followed {
+                            li {
+                                a(.href("/tv/\(series.tmdbID)")) { series.name }
+                                if let next = series.nextEpisode, let air = next.airDate {
+                                    span(.class("muted")) { "Nächste Folge: \(next.code) am \(CalendarDay.display(air))" }
+                                }
+                                button(.class("link-button"), .hx.post("/tv/\(series.tmdbID)/follow"),
+                                       .hx.vals(#"{"followed":"false","context":"account"}"#),
+                                       .hx.target("closest li"), .hx.swap(.outerHTML)) { "Nicht mehr beobachten" }
                             }
-                            button(.class("link-button"), .hx.post("/tv/\(series.tmdbID)/follow"),
-                                   .hx.vals(#"{"followed":"false","context":"account"}"#),
-                                   .hx.target("closest li"), .hx.swap(.outerHTML)) { "Nicht mehr beobachten" }
                         }
                     }
                 }
             }
 
-            if let notifications { AccountNotificationsSection(state: notifications) }
-
-            h2 { "Geräte" }
-            p(.class("muted")) {
-                "Apps und Skripte mit Zugriff auf dein Konto über die API (Doku unter "
-                a(.href("/api")) { "/api" }
-                "). Jede Anmeldung gilt 90 Tage."
-            }
-            if let newToken {
-                p(.class("notice"), .custom(name: "role", value: "status")) {
-                    "Neues Token (wird nur jetzt angezeigt): "
-                    code(.class("new-token")) { newToken }
+            if let notifications {
+                FoldableBlock(id: AccountBlock.notifications.id, title: "Benachrichtigungen", open: isOpen(.notifications)) {
+                    AccountNotificationsSection(state: notifications)
                 }
             }
-            if devices.isEmpty {
-                p(.class("muted")) { "Keine Geräte verbunden." }
-            } else {
-                ul(.class("device-list")) {
-                    for device in devices {
-                        li {
-                            strong { device.name }
-                            span(.class("muted")) {
-                                " \(device.tokenKind == .manual ? "manuell erstellt" : "Gerät") · angelegt \(formatDateTime(device.createdAt))"
-                                " · läuft ab \(formatDateTime(device.expiresAt))"
-                                " · zuletzt benutzt \(device.lastUsedAt.map(formatDateTime) ?? "nie")"
-                            }
-                            form(.method(.post), .action("/account/devices/\(device.id?.uuidString ?? "")/revoke"), .class("inline-form")) {
-                                button(.type(.submit), .class("link-button")) { "Abmelden" }
+
+            FoldableBlock(id: AccountBlock.devices.id, title: "Geräte", open: isOpen(.devices)) {
+                p(.class("muted")) {
+                    "Apps und Skripte mit Zugriff auf dein Konto über die API (Doku unter "
+                    a(.href("/api")) { "/api" }
+                    "). Jede Anmeldung gilt 90 Tage."
+                }
+                if let newToken {
+                    p(.class("notice"), .custom(name: "role", value: "status")) {
+                        "Neues Token (wird nur jetzt angezeigt): "
+                        code(.class("new-token")) { newToken }
+                    }
+                }
+                if devices.isEmpty {
+                    p(.class("muted")) { "Keine Geräte verbunden." }
+                } else {
+                    ul(.class("device-list")) {
+                        for device in devices {
+                            li {
+                                strong { device.name }
+                                span(.class("muted")) {
+                                    " \(device.tokenKind == .manual ? "manuell erstellt" : "Gerät") · angelegt \(formatDateTime(device.createdAt))"
+                                    " · läuft ab \(formatDateTime(device.expiresAt))"
+                                    " · zuletzt benutzt \(device.lastUsedAt.map(formatDateTime) ?? "nie")"
+                                }
+                                form(.method(.post), .action("/account/devices/\(device.id?.uuidString ?? "")/revoke"), .class("inline-form")) {
+                                    button(.type(.submit), .class("link-button")) { "Abmelden" }
+                                }
                             }
                         }
                     }
                 }
-            }
-            if tokenNeedsReauth, let sso {
-                p(.class("muted")) { "Für ein neues Token einmal über \(sso.name) bestätigen (gilt 5 Minuten)." }
-                form(.method(.post), .action("/account/oidc/reauth"), .class("inline-form")) {
-                    button(.type(.submit)) { "Über \(sso.name) bestätigen" }
+                if tokenNeedsReauth, let sso {
+                    p(.class("muted")) { "Für ein neues Token einmal über \(sso.name) bestätigen (gilt 5 Minuten)." }
+                    form(.method(.post), .action("/account/oidc/reauth"), .class("inline-form")) {
+                        button(.type(.submit)) { "Über \(sso.name) bestätigen" }
+                    }
                 }
-            }
-            form(.method(.post), .action("/account/devices"), .class("inline-form")) {
-                input(.type(.text), .name("name"), .required, .custom(name: "maxlength", value: "60"),
-                      .custom(name: "placeholder", value: "Name, z. B. Skript"), .custom(name: "aria-label", value: "Name des Tokens"))
-                button(.type(.submit)) { "Token erstellen" }
+                form(.method(.post), .action("/account/devices"), .class("inline-form")) {
+                    input(.type(.text), .name("name"), .required, .custom(name: "maxlength", value: "60"),
+                          .custom(name: "placeholder", value: "Name, z. B. Skript"), .custom(name: "aria-label", value: "Name des Tokens"))
+                    button(.type(.submit)) { "Token erstellen" }
+                }
             }
 
             if let sso {
-                h2 { sso.name }
-                if sso.linked {
-                    p { "Mit \(sso.name) verknüpft." }
-                } else {
-                    p(.class("muted")) { "Verknüpfe dein Konto, um dich künftig über \(sso.name) anzumelden." }
-                    form(.method(.post), .action("/account/oidc/link")) {
-                        if sso.needsPassword {
-                            label {
-                                "Aktuelles Passwort"
-                                input(.type(.password), .name("currentPassword"), .required,
-                                      .custom(name: "autocomplete", value: "current-password"))
+                FoldableBlock(id: AccountBlock.sso.id, title: sso.name, open: isOpen(.sso)) {
+                    if sso.linked {
+                        p { "Mit \(sso.name) verknüpft." }
+                    } else {
+                        p(.class("muted")) { "Verknüpfe dein Konto, um dich künftig über \(sso.name) anzumelden." }
+                        form(.method(.post), .action("/account/oidc/link")) {
+                            if sso.needsPassword {
+                                label {
+                                    "Aktuelles Passwort"
+                                    input(.type(.password), .name("currentPassword"), .required,
+                                          .custom(name: "autocomplete", value: "current-password"))
+                                }
                             }
+                            button(.type(.submit), .class("primary")) { "Mit \(sso.name) verknüpfen" }
                         }
-                        button(.type(.submit), .class("primary")) { "Mit \(sso.name) verknüpfen" }
                     }
                 }
             }
 
-            h2 { "E-Mail-Adresse" }
-            if let sso, sso.emailFromProvider {
+            FoldableBlock(id: AccountBlock.email.id, title: "E-Mail-Adresse", open: isOpen(.email)) {
+                if let sso, sso.emailFromProvider {
+                    switch email {
+                    case .address(let address): p { "Hinterlegt: \(address)" }
+                    default: p { "Keine Adresse hinterlegt." }
+                    }
+                    p(.class("muted")) { "Die Adresse kommt von \(sso.name) – dort ändern." }
+                } else {
+                p(.class("muted")) { "Für „Passwort vergessen“. Nur du siehst sie vollständig." }
+                if !mailConfigured {
+                    p(.class("muted")) { "Der Admin hat den Mail-Versand noch nicht eingerichtet – „Passwort vergessen“ funktioniert erst danach." }
+                }
                 switch email {
+                case .none: p { "Keine Adresse hinterlegt." }
+                case .unreadable: p(.class("error")) { "Adresse nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
                 case .address(let address): p { "Hinterlegt: \(address)" }
-                default: p { "Keine Adresse hinterlegt." }
                 }
-                p(.class("muted")) { "Die Adresse kommt von \(sso.name) – dort ändern." }
-            } else {
-            p(.class("muted")) { "Für „Passwort vergessen“. Nur du siehst sie vollständig." }
-            if !mailConfigured {
-                p(.class("muted")) { "Der Admin hat den Mail-Versand noch nicht eingerichtet – „Passwort vergessen“ funktioniert erst danach." }
-            }
-            switch email {
-            case .none: p { "Keine Adresse hinterlegt." }
-            case .unreadable: p(.class("error")) { "Adresse nicht lesbar – bitte neu eintragen (der Server-Schlüssel hat sich geändert)." }
-            case .address(let address): p { "Hinterlegt: \(address)" }
-            }
-            form(.method(.post), .action("/account/email")) {
-                label {
-                    "E-Mail-Adresse (leer lassen zum Entfernen)"
-                    input(.type(.email), .name("email"), .value(email.address ?? ""), .custom(name: "autocomplete", value: "email"))
+                form(.method(.post), .action("/account/email")) {
+                    label {
+                        "E-Mail-Adresse (leer lassen zum Entfernen)"
+                        input(.type(.email), .name("email"), .value(email.address ?? ""), .custom(name: "autocomplete", value: "email"))
+                    }
+                    label {
+                        "Aktuelles Passwort"
+                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
+                    }
+                    button(.type(.submit)) { "Adresse speichern" }
                 }
-                label {
-                    "Aktuelles Passwort"
-                    input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
                 }
-                button(.type(.submit)) { "Adresse speichern" }
-            }
             }
 
             if passwordChange {
-            h2 { "Passwort ändern" }
-            form(.method(.post), .action("/account/password")) {
-                label {
-                    "Aktuelles Passwort"
-                    input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
+                FoldableBlock(id: AccountBlock.password.id, title: "Passwort ändern", open: isOpen(.password)) {
+                    form(.method(.post), .action("/account/password")) {
+                        label {
+                            "Aktuelles Passwort"
+                            input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
+                        }
+                        label {
+                            "Neues Passwort (mindestens 8 Zeichen)"
+                            input(.type(.password), .name("newPassword"), .required, .custom(name: "minlength", value: "8"),
+                                  .custom(name: "autocomplete", value: "new-password"))
+                        }
+                        button(.type(.submit), .class("primary")) { "Passwort ändern" }
+                    }
                 }
-                label {
-                    "Neues Passwort (mindestens 8 Zeichen)"
-                    input(.type(.password), .name("newPassword"), .required, .custom(name: "minlength", value: "8"),
-                          .custom(name: "autocomplete", value: "new-password"))
-                }
-                button(.type(.submit), .class("primary")) { "Passwort ändern" }
-            }
             }
         }
     }
@@ -239,8 +262,6 @@ struct AccountNotifications: Sendable {
     var webhookConfigured: Bool
     var keyState: WebhookKeyState
     var dailyRunTime: String
-    /// Changing the key asks for the current password (accounts with a password).
-    var needsPassword: Bool
 }
 
 struct AccountNotificationsSection: HTML, Sendable {
@@ -254,7 +275,6 @@ struct AccountNotificationsSection: HTML, Sendable {
     }
 
     var body: some HTML {
-        h2 { "Benachrichtigungen" }
         form(.method(.post), .action("/account/notifications"), .class("notification-prefs")) {
             p { "Neue Folgen beobachteter Serien:" }
             label(.class("checkbox")) {
@@ -307,28 +327,19 @@ struct AccountNotificationsSection: HTML, Sendable {
             form(.method(.post), .action("/account/notifications/webhook-key")) {
                 label {
                     "Webhook-Schlüssel"
-                    input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "off"))
-                }
-                if state.needsPassword {
-                    label {
-                        "Aktuelles Passwort"
-                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
-                    }
+                    // "new-password": browsers must not fill in the login password (it would go to KNot as the key).
+                    input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "new-password"))
                 }
                 button(.type(.submit)) { "Schlüssel speichern" }
             }
             if state.keyState != .none {
                 form(.method(.post), .action("/account/notifications/webhook-key/remove"), .class("inline-form")) {
-                    if state.needsPassword {
-                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"),
-                              .custom(name: "placeholder", value: "Aktuelles Passwort"), .custom(name: "aria-label", value: "Aktuelles Passwort"))
-                    }
                     button(.type(.submit)) { "Schlüssel entfernen" }
                 }
             }
         }
         if let active = state.active {
-            form(.method(.post), .action("/account/notifications/test"), .class("inline-form")) {
+            form(.method(.post), .action("/account/notifications/test"), .class("inline-form notification-test")) {
                 button(.type(.submit)) { "Testnachricht senden" }
                 span(.class("muted")) { " (per \(channelName(active)))" }
             }

@@ -11,7 +11,11 @@ struct MappingBody: Codable {
 }
 struct NetflixImportBody: Codable {
     struct Progress: Codable { let running: Bool; let pendingRows: Int; let waitingForReview: Int; let lastError: String? }
-    struct Review: Codable { let id: UUID; let netflixName: String; let rowCount: Int; let candidates: [SearchResultBody] }
+    struct Review: Codable {
+        struct Row: Codable { let rawTitle: String; let day: String }
+        let id: UUID; let netflixName: String; let rowCount: Int; let candidates: [SearchResultBody]
+        let firstDay: String; let lastDay: String; let rows: [Row]
+    }
     struct Unmatched: Codable { let id: UUID; let rawTitle: String; let day: String; let canAssign: Bool }
     let progress: Progress; let review: [Review]; let unmatched: [Unmatched]; let unmatchedTotal: Int; let mappings: [MappingBody]
 }
@@ -87,6 +91,9 @@ struct APINetflixImportTests {
             let current = try #require(try await state(app, token))
             let rick = try #require(current.review.first { $0.netflixName == "Rick and Morty" })
             #expect(rick.candidates.map(\.tmdbId) == [60625, 60626])
+            #expect(rick.firstDay == "2026-11-06" && rick.lastDay == "2026-11-06")
+            #expect(rick.rows.map(\.day) == ["2026-11-06"])
+            #expect(rick.rows.first?.rawTitle == "Rick and Morty: Staffel 8: Papa-Morty")
             try await app.testing().test(.POST, "/api/v1/imports/netflix/mappings/\(rick.id)/accept", headers: .bearer(token), beforeRequest: { req in
                 try req.content.encode(DecisionBody(kind: "tv", tmdbId: 60625), as: .json)
             }, afterResponse: { res async throws in

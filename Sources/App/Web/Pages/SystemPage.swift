@@ -27,6 +27,13 @@ func formatDateTime(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
+/// The foldable blocks of the System page; the block of the last action (or `?open=`) is shown open.
+enum SystemBlock: String, Sendable {
+    case updates, mail, notifications, oidc
+
+    var id: String { "block-\(rawValue)" }
+}
+
 struct SystemPage: HTML {
     let nav: NavContext
     let current: AppVersion
@@ -38,17 +45,15 @@ struct SystemPage: HTML {
     var testRecipient: String? = nil
     var oidc: OIDCSection? = nil
     var notifications: NotificationsSection? = nil
+    var openBlock: SystemBlock? = nil
 
     var body: some HTML {
         PageLayout(title: "System", nav: nav) {
             h1 { "System" }
             Messages(error: error, notice: notice)
-            section {
-                h2 { "Version" }
-                p { "Installiert: \(current.label)" }
-            }
+            FoldableBlock(id: SystemBlock.updates.id, title: "Version & Updates", open: openBlock == .updates) {
             section(.class("updates")) {
-                h2 { "Updates" }
+                p { "Installiert: \(current.label)" }
                 p(.class("muted update-note")) {
                     "Für die Prüfung fragt WatchSwifty die GitHub-API (api.github.com) nach dem neuesten Release von "
                     "PaddXy95/watchswifty. GitHub sieht dabei die IP-Adresse dieses Servers; Daten aus WatchSwifty werden "
@@ -69,9 +74,16 @@ struct SystemPage: HTML {
                 }
                 UpdateResult(current: current, state: state)
             }
-            MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
-            if let notifications { notifications }
-            if let oidc { oidc }
+            }
+            FoldableBlock(id: SystemBlock.mail.id, title: "E-Mail", open: openBlock == .mail) {
+                MailSection(state: mail, values: mailForm, testRecipient: testRecipient)
+            }
+            if let notifications {
+                FoldableBlock(id: SystemBlock.notifications.id, title: "Benachrichtigungen", open: openBlock == .notifications) { notifications }
+            }
+            if let oidc {
+                FoldableBlock(id: SystemBlock.oidc.id, title: "Anmeldung über OIDC (SSO)", open: openBlock == .oidc) { oidc }
+            }
         }
     }
 }
@@ -168,7 +180,6 @@ struct MailSection: HTML {
 
     var body: some HTML {
         section(.class("mail-settings")) {
-            h2 { "E-Mail" }
             p(.class("muted")) {
                 "Optional: Damit verschickt WatchSwifty Einladungen, Links für „Passwort vergessen“ und Hinweise auf neu "
                 "verbundene Geräte. Die Einstellungen "
@@ -296,9 +307,8 @@ struct OIDCSection: HTML, Sendable {
 
     var body: some HTML {
         section(.class("mail-settings")) {
-            h2 { "Anmeldung über OIDC (SSO)" }
             p(.class("muted")) {
-                "Optional: Anmelden über einen eigenen Identity-Provider (Authentik, Keycloak, Authelia, Pocket ID …). "
+                "Optional: Anmelden über einen eigenen Identity-Provider (Pocket ID, Authentik, Keycloak, Authelia …). "
                 "Die Einstellungen werden verschlüsselt gespeichert (Schlüssel TOKEN_KEY). "
                 DocsLink(page: "sso.md", label: "Anleitung zu SSO")
                 "."
@@ -315,7 +325,7 @@ struct OIDCSection: HTML, Sendable {
                 label {
                     "Anzeigename (leer = SSO)"
                     input(.type(.text), .name("displayName"), .value(values.displayName), .custom(name: "maxlength", value: "40"),
-                          .custom(name: "placeholder", value: "z. B. Authentik"))
+                          .custom(name: "placeholder", value: "z. B. Pocket ID"))
                 }
                 label {
                     "Issuer"
@@ -401,7 +411,6 @@ struct NotificationsSection: HTML, Sendable {
 
     var body: some HTML {
         section(.class("mail-settings notification-settings")) {
-            h2 { "Benachrichtigungen" }
             p(.class("muted")) {
                 "Wer Serien beobachtet, kann sich unter „Konto → Benachrichtigungen“ über neue Folgen informieren lassen – "
                 "per E-Mail oder über einen Webhook. Geprüft wird einmal am Tag; dabei gleicht WatchSwifty auch die Serien mit TMDB ab. "

@@ -51,6 +51,43 @@ struct APILibraryStatsTests {
         }
     }
 
+    struct StatsListsBody: Codable {
+        struct Movie: Codable { let tmdbId: Int; let name: String; let watches: Int; let minutes: Int }
+        struct EpisodeEntry: Codable { let tmdbId: Int; let seriesName: String; let season: Int; let number: Int; let name: String; let watches: Int }
+        struct Completed: Codable { let name: String; let completions: Int }
+        struct GenreEntry: Codable { let genre: String; let seriesMinutes: Int; let movieMinutes: Int; let series: Int; let movies: Int }
+        struct Service: Codable { let service: String?; let minutes: Int; let episodes: Int?; let movies: Int? }
+        let longestMovies: [Movie]
+        let mostWatchedMovies: [Movie]
+        let mostWatchedEpisodes: [EpisodeEntry]
+        let mostCompletedSeries: [Completed]
+        let genres: [GenreEntry]
+        let services: [Service]
+    }
+
+    @Test func statsListsInAPI() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let token = try await apiToken(app, user)
+            func watch(_ title: Title, _ episode: Episode? = nil, times: Int) async throws {
+                for _ in 0..<times {
+                    try await Watch(userID: user.requireID(), titleID: title.requireID(), episodeID: episode?.requireID(),
+                                    watchedOn: "2026-03-01", service: .netflix, origin: .manual).save(on: app.db)
+                }
+            }
+            try await watch(try await seedMovie(app, tmdbID: 10, name: "Oft", runtime: 100, genres: "drama"), times: 3)
+            let dark = try await seedSeries(app, tmdbID: 20, name: "Dark", seasons: [1: 1], runtime: 45, genres: "drama")
+            try await watch(dark, try await episode(app, dark, 1, 1), times: 2)
+            let stats = try #require(try await get(StatsListsBody.self, app, token, "/api/v1/stats?year=2026"))
+            #expect(stats.longestMovies.map(\.minutes) == [300])
+            #expect(stats.mostWatchedMovies.first?.watches == 3)
+            #expect(stats.mostWatchedEpisodes.first.map { "\($0.seriesName) \($0.season)x\($0.number) \($0.watches)" } == "Dark 1x1 2")
+            #expect(stats.mostCompletedSeries.first?.completions == 2)
+            #expect(stats.genres.first.map { "\($0.genre) \($0.seriesMinutes) \($0.movieMinutes) \($0.series) \($0.movies)" } == "drama 90 300 1 1")
+            #expect(stats.services.first.map { "\($0.service ?? "-") \($0.episodes ?? -1) \($0.movies ?? -1)" } == "netflix 2 3")
+        }
+    }
+
     @Test func statsMatchService() async throws {
         try await withTestApp { app in
             let user = try await createUser(app, "pat")

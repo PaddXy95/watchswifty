@@ -57,7 +57,7 @@ struct AccountNotificationsTests {
             #expect(!mailOnly.contains(#"value="webhook""#))
             #expect(mailOnly.contains("Senden per E-Mail"))
             try await configureWebhook(app)
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             let both = try await page(app, headers)
             #expect(both.contains(#"value="webhook""#))
             #expect(both.contains(#"value="mail""#))
@@ -91,17 +91,33 @@ struct AccountNotificationsTests {
         }
     }
 
-    @Test func keyWithWrongPasswordFails() async throws {
+    @Test func keySavedWithoutPassword() async throws {
         try await withTestApp { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
             try await app.testing().test(.POST, "/account/notifications/webhook-key", headers: try await login(app, "pat"), beforeRequest: { req in
-                try req.content.encode(KeyForm(key: Self.key, currentPassword: "falsch"), as: .urlEncodedForm)
+                try req.content.encode(KeyForm(key: Self.key), as: .urlEncodedForm)
             }, afterResponse: { res async in
-                #expect(res.status == .unprocessableEntity)
-                #expect(res.body.string.contains(AccountValidation.wrongCurrentPasswordMessage))
+                #expect(res.status == .ok)
+                #expect(res.body.string.contains("Webhook-Schlüssel gespeichert."))
             })
-            #expect(try await reload(app, pat).webhookKey == nil)
+            #expect(try await reload(app, pat).webhookKey != nil)
+        }
+    }
+
+    @Test func keyFormAsksNoPassword() async throws {
+        try await withTestApp { app in
+            try await configureWebhook(app)
+            let pat = try await notifyUser(app, "pat")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
+            let body = try await page(app, try await login(app, "pat"))
+            let keyBlock = try #require(body.range(of: "Webhook-Schlüssel (KNot)")).upperBound
+            let rest = body[keyBlock...]
+            let blockEnd = rest.range(of: "/account/notifications/test")?.lowerBound ?? rest.endIndex
+            #expect(rest[..<blockEnd].contains("Schlüssel entfernen"))
+            #expect(!rest[..<blockEnd].contains("currentPassword"))
+            // No login-password autofill into the key (it would be sent to KNot).
+            #expect(rest[..<blockEnd].contains(#"name="key" required autocomplete="new-password""#))
         }
     }
 
@@ -109,11 +125,9 @@ struct AccountNotificationsTests {
         try await withTestApp { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await app.testing().test(.POST, "/account/notifications/webhook-key/remove", headers: try await login(app, "pat"),
-                                         beforeRequest: { req in
-                try req.content.encode(["currentPassword": "password123"], as: .urlEncodedForm)
-            }, afterResponse: { res async in
+                                         afterResponse: { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains("Webhook-Schlüssel entfernt."))
             })
@@ -126,7 +140,7 @@ struct AccountNotificationsTests {
         try await withTestApp(webhook: webhook) { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await app.testing().test(.POST, "/account/notifications/test", headers: try await login(app, "pat")) { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains("Testnachricht gesendet."))
@@ -141,7 +155,7 @@ struct AccountNotificationsTests {
         try await withTestApp(webhook: webhook) { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await app.testing().test(.POST, "/account/notifications/test", headers: try await login(app, "pat")) { res async in
                 #expect(res.status == .serviceUnavailable)
                 #expect(res.body.string.contains(WebhookError.status(502).message))
@@ -172,7 +186,7 @@ struct AccountNotificationsTests {
             try await configureMail(app)
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat", email: "pat@x.de")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await prefsService(app).save(user: pat, announced: false, soon: false, today: false, channel: .webhook,
                                              available: [.mail, .webhook])
             try await NotificationSettingsService(db: app.db).removeWebhook()

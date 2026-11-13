@@ -100,8 +100,57 @@ struct StatsPage: HTML {
             }
             if !stats.topSeries.isEmpty {
                 section(.class("stats-panel")) {
-                    h2 { "Meistgesehen" }
-                    TopSeriesList(series: stats.topSeries)
+                    h2 { "Längste Serien" }
+                    RankedList(items: stats.topSeries.map {
+                        RankedItem(href: "/tv/\($0.tmdbID)", posterPath: $0.posterPath, name: $0.name,
+                                   detail: "\(countLabel($0.episodes, "Folge", "Folgen")) · \(formatDuration(minutes: $0.minutes))", rating: $0.rating)
+                    })
+                }
+            }
+            if !stats.longestMovies.isEmpty {
+                section(.class("stats-panel")) {
+                    h2 { "Längste Filme" }
+                    RankedList(items: stats.longestMovies.map(Self.movieItem))
+                }
+            }
+            if !stats.mostCompletedSeries.isEmpty {
+                section(.class("stats-panel")) {
+                    div(.class("stats-panel-head")) {
+                        h2 { "Meistgesehene Serien" }
+                        span(.class("muted stats-panel-note")) { "über alle Jahre" }
+                    }
+                    RankedList(items: stats.mostCompletedSeries.map {
+                        RankedItem(href: "/tv/\($0.tmdbID)", posterPath: $0.posterPath, name: $0.name,
+                                   detail: "\($0.completions)× komplett", rating: $0.rating)
+                    })
+                }
+            }
+            if !stats.mostWatchedMovies.isEmpty {
+                section(.class("stats-panel")) {
+                    h2 { "Meistgesehene Filme" }
+                    RankedList(items: stats.mostWatchedMovies.map(Self.movieItem))
+                }
+            }
+            if !stats.mostWatchedEpisodes.isEmpty {
+                section(.class("stats-panel")) {
+                    h2 { "Meistgesehene Folgen" }
+                    RankedList(items: stats.mostWatchedEpisodes.map {
+                        RankedItem(href: "/tv/\($0.tmdbID)", posterPath: $0.posterPath, name: $0.seriesName,
+                                   detail: [$0.code, $0.name].filter { !$0.isEmpty }.joined(separator: " ") + " · \($0.watches)×", rating: nil)
+                    })
+                }
+            }
+        }
+
+        if !stats.genres.isEmpty {
+            section(.class("stats-panel")) {
+                div(.class("stats-panel-head")) {
+                    h2 { "Genres" }
+                    ChartLegend()
+                }
+                GenreBars(genres: stats.genres)
+                p(.class("muted stats-note")) {
+                    "Ein Titel zählt bei jedem seiner Genres; Titel, deren Genres noch nicht geladen sind, fehlen."
                 }
             }
         }
@@ -151,6 +200,15 @@ struct StatsPage: HTML {
                 }
             }
         }
+    }
+}
+
+extension StatsPage {
+    /// „2× · 4 Std. 32 Min.“ (time only when the runtime is known).
+    static func movieItem(_ movie: MovieStat) -> RankedItem {
+        RankedItem(href: "/movie/\(movie.tmdbID)", posterPath: movie.posterPath, name: movie.name,
+                   detail: "\(movie.watches)×" + (movie.minutes > 0 ? " · \(formatDuration(minutes: movie.minutes))" : ""),
+                   rating: movie.rating)
     }
 }
 

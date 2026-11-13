@@ -53,7 +53,17 @@ struct RuntimeTests {
                 try await Watch(userID: user.requireID(), titleID: title.requireID(), episodeID: nil, watchedOn: "2026-01-01",
                                 service: nil, origin: .manual).save(on: app.db)
             }
-            #expect(try await titlesMissingRuntime(on: app.db).map(\.tmdbID) == [1])
+            #expect(try await titlesMissingDetails(on: app.db).map(\.tmdbID) == [1])
+        }
+    }
+
+    @Test func missingGenresCountAsMissingDetails() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await seedMovie(app, tmdbID: 7, runtime: 100, genres: nil)
+            try await Watch(userID: user.requireID(), titleID: title.requireID(), episodeID: nil, watchedOn: "2026-01-01",
+                            service: nil, origin: .manual).save(on: app.db)
+            #expect(try await titlesMissingDetails(on: app.db).map(\.tmdbID) == [7])
         }
     }
 
@@ -72,11 +82,11 @@ struct RuntimeTests {
             try await Watch(userID: watcher.requireID(), titleID: movie.requireID(), episodeID: nil, watchedOn: nil,
                             service: nil, origin: .manual).save(on: app.db)
 
-            #expect(await backfillRuntimes(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger) == 1)
+            #expect(await backfillDetails(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger) == 1)
             #expect(tokens.withLockedValue { $0 } == ["pat-token"])
             #expect(try await Title.find(movie.requireID(), on: app.db)?.runtime == 136)
 
-            #expect(await backfillRuntimes(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger) == 0)
+            #expect(await backfillDetails(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger) == 0)
             #expect(tmdb.calls.filter { $0 == "movie:603" }.count == 1)
         }
     }

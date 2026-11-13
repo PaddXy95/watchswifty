@@ -8,8 +8,7 @@ struct AccountController {
     struct EmailInput: Content { var email: String; var currentPassword: String }
     struct LinkInput: Content { var currentPassword: String? }
     struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var channel: String? }
-    struct WebhookKeyInput: Content { var key: String; var currentPassword: String? }
-    struct WebhookKeyRemoveInput: Content { var currentPassword: String? }
+    struct WebhookKeyInput: Content { var key: String }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
@@ -38,30 +37,29 @@ struct AccountController {
             try await req.notificationPrefs.save(user: user, announced: on(input.announced), soon: on(input.soon), today: on(input.today),
                                                  channel: channel, available: try await req.notifications.availableChannels(for: user))
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .notifications, status: error.status, error: error.message)
         }
-        return try await page(req, notice: "Benachrichtigungen gespeichert.")
+        return try await page(req, open: .notifications, notice: "Benachrichtigungen gespeichert.")
     }
 
     func saveWebhookKey(req: Request) async throws -> HTMLResponse {
         let input = try req.content.decode(WebhookKeyInput.self)
         do {
-            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: input.key, currentPassword: input.currentPassword)
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: input.key)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .notifications, status: error.status, error: error.message)
         }
         let removed = input.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return try await page(req, notice: removed ? "Webhook-Schlüssel entfernt." : "Webhook-Schlüssel gespeichert.")
+        return try await page(req, open: .notifications, notice: removed ? "Webhook-Schlüssel entfernt." : "Webhook-Schlüssel gespeichert.")
     }
 
     func removeWebhookKey(req: Request) async throws -> HTMLResponse {
-        let input = (try? req.content.decode(WebhookKeyRemoveInput.self)) ?? WebhookKeyRemoveInput()
         do {
-            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: "", currentPassword: input.currentPassword)
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: "")
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .notifications, status: error.status, error: error.message)
         }
-        return try await page(req, notice: "Webhook-Schlüssel entfernt.")
+        return try await page(req, open: .notifications, notice: "Webhook-Schlüssel entfernt.")
     }
 
     func testNotification(req: Request) async throws -> HTMLResponse {
@@ -69,16 +67,16 @@ struct AccountController {
         do {
             try await req.notifications.send(NotificationTexts.test(username: user.username), to: user)
         } catch let error as NotifyError {
-            return try await page(req, status: error == .notConfigured ? .unprocessableEntity : .serviceUnavailable, error: error.message)
+            return try await page(req, open: .notifications, status: error == .notConfigured ? .unprocessableEntity : .serviceUnavailable, error: error.message)
         }
-        return try await page(req, notice: "Testnachricht gesendet.")
+        return try await page(req, open: .notifications, notice: "Testnachricht gesendet.")
     }
 
     /// „Über … bestätigen“: SSO accounts confirm through the provider before they get a manual token.
     func startReauth(req: Request) async throws -> Response {
         guard req.application.loginSettings.current.oidc != nil else { throw Abort(.notFound) }
         req.session.data[OIDCController.intentKey] = OIDCIntent.reauth.rawValue
-        req.session.data[OIDCController.returnToKey] = "/account"
+        req.session.data[OIDCController.returnToKey] = "/account?open=devices"
         return req.redirect(to: "/auth/oidc/start", redirectType: .normal)
     }
 
@@ -100,13 +98,13 @@ struct AccountController {
         }
         let user = try req.currentUser
         if user.isLinked(oidc) {
-            return try await page(req, status: .unprocessableEntity, error: OIDCLoginService.alreadyLinked(oidc).message).encodeResponse(for: req)
+            return try await page(req, open: .sso, status: .unprocessableEntity, error: OIDCLoginService.alreadyLinked(oidc).message).encodeResponse(for: req)
         }
         // Like the e-mail address: a hijacked session must not bind the account to someone else's identity.
         if user.hasPassword {
             let entered = (try? req.content.decode(LinkInput.self).currentPassword) ?? ""
             guard try await req.password.async.verify(entered, created: user.passwordHash) else {
-                return try await page(req, status: .unprocessableEntity, error: AccountValidation.wrongCurrentPasswordMessage)
+                return try await page(req, open: .sso, status: .unprocessableEntity, error: AccountValidation.wrongCurrentPasswordMessage)
                     .encodeResponse(for: req)
             }
         }
@@ -118,20 +116,20 @@ struct AccountController {
     func createDeviceToken(req: Request) async throws -> HTMLResponse {
         if try tokenNeedsReauth(req) {
             let ssoName = req.application.loginSettings.current.oidc?.displayName ?? "SSO"
-            return try await page(req, status: .forbidden, error: "Bitte zuerst über \(ssoName) bestätigen – danach das Token erstellen.")
+            return try await page(req, open: .devices, status: .forbidden, error: "Bitte zuerst über \(ssoName) bestätigen – danach das Token erstellen.")
         }
         let name = try req.content.decode(DeviceInput.self).name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...60).contains(name.count) else {
-            return try await page(req, status: .unprocessableEntity, error: "Der Name muss 1 bis 60 Zeichen haben.")
+            return try await page(req, open: .devices, status: .unprocessableEntity, error: "Der Name muss 1 bis 60 Zeichen haben.")
         }
         let issued = try await APITokenService(db: req.db).issue(userID: try req.userID, name: name, kind: .manual)
-        return try await page(req, newToken: issued.token)
+        return try await page(req, open: .devices, newToken: issued.token)
     }
 
     func revokeDevice(req: Request) async throws -> HTMLResponse {
         guard let id = req.parameters.get("deviceID", as: UUID.self) else { throw Abort(.notFound) }
         try await APITokenService(db: req.db).revoke(id: id, userID: try req.userID)
-        return try await page(req, notice: "Gerät abgemeldet.")
+        return try await page(req, open: .devices, notice: "Gerät abgemeldet.")
     }
 
     func show(req: Request) async throws -> HTMLResponse {
@@ -139,14 +137,16 @@ struct AccountController {
         let welcome = (try? req.query.get(String.self, at: "welcome")) == "1"
         let name = req.application.loginSettings.current.oidc?.displayName ?? "SSO"
         switch try? req.query.get(String.self, at: "sso") {
-        case "linked": return try await page(req, notice: "Mit \(name) verknüpft.")
-        case "taken": return try await page(req, error: "Dieses \(name)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
+        case "linked": return try await page(req, open: .sso, notice: "Mit \(name) verknüpft.")
+        case "taken": return try await page(req, open: .sso, error: "Dieses \(name)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
         case "host":
             let address = req.application.loginSettings.current.oidc?.canonicalOrigin ?? ""
-            return try await page(req, notice: "Verknüpfen geht nur über \(address) – dort erneut anmelden und klicken.")
+            return try await page(req, open: .sso, notice: "Verknüpfen geht nur über \(address) – dort erneut anmelden und klicken.")
         default: break
         }
-        return try await page(req, notice: welcome ? "Willkommen – trag hier deinen TMDB-Token ein." : nil)
+        // `?open=devices` after „Über … bestätigen“; unknown values open nothing.
+        let open = welcome ? .tmdb : (try? req.query.get(String.self, at: "open")).flatMap(AccountBlock.init(rawValue:))
+        return try await page(req, open: open, notice: welcome ? "Willkommen – trag hier deinen TMDB-Token ein." : nil)
     }
 
     func changePassword(req: Request) async throws -> HTMLResponse {
@@ -155,9 +155,9 @@ struct AccountController {
         do {
             try await req.account.changePassword(user: try req.currentUser, current: input.currentPassword, new: input.newPassword)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .password, status: error.status, error: error.message)
         }
-        return try await page(req, notice: "Passwort geändert.")
+        return try await page(req, open: .password, notice: "Passwort geändert.")
     }
 
     func setEmail(req: Request) async throws -> HTMLResponse {
@@ -165,10 +165,10 @@ struct AccountController {
         do {
             try await req.account.setEmail(user: try req.currentUser, email: input.email, currentPassword: input.currentPassword)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .email, status: error.status, error: error.message)
         }
         let removed = input.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return try await page(req, notice: removed ? "E-Mail-Adresse entfernt." : "E-Mail-Adresse gespeichert.")
+        return try await page(req, open: .email, notice: removed ? "E-Mail-Adresse entfernt." : "E-Mail-Adresse gespeichert.")
     }
 
     /// Stores the user's TMDB token after TMDB accepted it.
@@ -177,18 +177,18 @@ struct AccountController {
         do {
             try await req.account.saveTMDBToken(user: try req.currentUser, token: token)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, open: .tmdb, status: error.status, error: error.message)
         }
-        return try await page(req, notice: "TMDB-Token gespeichert.")
+        return try await page(req, open: .tmdb, notice: "TMDB-Token gespeichert.")
     }
 
     func removeToken(req: Request) async throws -> HTMLResponse {
         try await req.account.removeTMDBToken(user: try req.currentUser)
-        return try await page(req, notice: "TMDB-Token entfernt.")
+        return try await page(req, open: .tmdb, notice: "TMDB-Token entfernt.")
     }
 
-    private func page(_ req: Request, status: HTTPStatus = .ok, error: String? = nil, notice: String? = nil,
-                      newToken: String? = nil) async throws -> HTMLResponse {
+    private func page(_ req: Request, open: AccountBlock? = nil, status: HTTPStatus = .ok, error: String? = nil,
+                      notice: String? = nil, newToken: String? = nil) async throws -> HTMLResponse {
         let stored = try req.currentUser.tmdbToken
         let suffix = req.tmdbToken.map { "…" + String($0.suffix(4)) }
         let unreadable = suffix == nil && !(stored ?? "").isEmpty
@@ -205,13 +205,13 @@ struct AccountController {
             announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
             available: available, active: available.contains(user.preferredChannel) ? user.preferredChannel : available.first,
             preferred: user.preferredChannel, webhookConfigured: notifySettings.webhookURL != nil,
-            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime,
-            needsPassword: user.hasPassword)
+            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime)
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),
                                                         mailConfigured: mailConfigured, sso: sso,
                                                         passwordChange: user.hasPassword && config.passwordLogin,
-                                                        tokenNeedsReauth: try tokenNeedsReauth(req), notifications: notifications))
+                                                        tokenNeedsReauth: try tokenNeedsReauth(req), notifications: notifications,
+                                                        openBlock: open))
     }
 }

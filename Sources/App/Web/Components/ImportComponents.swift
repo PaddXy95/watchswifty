@@ -60,18 +60,46 @@ struct CandidateList: HTML {
                 p(.class("muted")) { "Keine Treffer." }
             }
             for result in results {
-                button(.class("candidate"), .hx.post("/import/mappings/\(mappingID.uuidString)/\(action)"),
-                       .hx.vals(#"{"kind":"\#(result.kind.rawValue)","tmdbID":"\#(result.id)"}"#),
-                       .hx.target(target), .hx.swap(.outerHTML)) {
-                    Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
-                    span {
-                        result.name
-                        if let year = result.year { " (\(year))" }
-                        " · "
-                        span(.class("candidate-action")) { "Übernehmen" }
-                    }
-                }
+                CandidateRow(result: result, popoverID: CandidateRow.newPopoverID(),
+                             acceptURL: "/import/mappings/\(mappingID.uuidString)/\(action)",
+                             vals: #"{"kind":"\#(result.kind.rawValue)","tmdbID":"\#(result.id)"}"#, target: target)
             }
+        }
+    }
+}
+
+/// One TMDB candidate: poster (click → large popover), name (year), TMDB link and „Übernehmen“.
+struct CandidateRow: HTML {
+    let result: TMDBSearchResult
+    /// Unique on the page: the same candidate can appear in several lists (review, own search, film list).
+    let popoverID: String
+    let acceptURL: String
+    /// `hx-vals` JSON sent with „Übernehmen“.
+    let vals: String
+    let target: String
+
+    static func newPopoverID() -> String { "poster-\(UUID().uuidString.lowercased())" }
+
+    var body: some HTML {
+        div(.class("candidate")) {
+            if result.posterPath != nil {
+                button(.type(.button), .class("poster-button"), .custom(name: "popovertarget", value: popoverID),
+                       .custom(name: "aria-label", value: "Poster von \(result.name) vergrößern")) {
+                    Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
+                }
+                div(.id(popoverID), .custom(name: "popover", value: ""), .class("poster-popover")) {
+                    Poster(path: result.posterPath, alt: result.name, displayWidth: 342)
+                }
+            } else {
+                Poster(path: nil, alt: result.name, displayWidth: 40)
+            }
+            span(.class("candidate-name")) {
+                result.name
+                if let year = result.year { " (\(year))" }
+            }
+            a(.href("https://www.themoviedb.org/\(result.kind.rawValue)/\(result.id)"), .target(.blank),
+              .custom(name: "rel", value: "noopener noreferrer"), .class("candidate-link")) { "TMDB ↗" }
+            button(.class("primary"), .hx.post(acceptURL), .hx.vals(vals), .hx.target(target), .hx.swap(.outerHTML)) { "Übernehmen" }
         }
     }
 }
@@ -92,8 +120,28 @@ struct CandidateSearch: HTML {
 }
 
 struct ReviewItem {
+    static let rowLimit = 20
+
     let mapping: NetflixMapping
-    let rowCount: Int
+    /// Open rows of the mapping, newest first.
+    let rows: [NetflixRow]
+
+    init(mapping: NetflixMapping, rows: [NetflixRow]) {
+        self.mapping = mapping
+        self.rows = rows.sorted { ($0.watchedOn, $1.rawTitle) > ($1.watchedOn, $0.rawTitle) }
+    }
+
+    var rowCount: Int { rows.count }
+    var firstDay: String { rows.last?.watchedOn ?? "" }
+    var lastDay: String { rows.first?.watchedOn ?? "" }
+    var shownRows: ArraySlice<NetflixRow> { rows.prefix(Self.rowLimit) }
+
+    /// „gesehen am 06.11.2026“ or „gesehen 02.03.2025 – 06.11.2026“.
+    var watchedText: String {
+        firstDay == lastDay
+            ? "gesehen am \(CalendarDay.display(lastDay))"
+            : "gesehen \(CalendarDay.display(firstDay)) – \(CalendarDay.display(lastDay))"
+    }
 }
 
 struct MappingReviewItem: HTML {
@@ -104,7 +152,21 @@ struct MappingReviewItem: HTML {
         article(.class("mapping-review card"), .id("mapping-\(id.uuidString)")) {
             div(.class("card-body")) {
                 h3 { item.mapping.netflixName }
-                p(.class("muted")) { "\(item.rowCount) Zeilen · \(item.mapping.titleKind == .tv ? "Serie" : "Film")" }
+                p(.class("muted")) {
+                    "\(item.rowCount) Zeilen · \(item.mapping.titleKind == .tv ? "Serie" : "Film")"
+                    if !item.rows.isEmpty { " · \(item.watchedText)" }
+                }
+                if !item.rows.isEmpty {
+                    details(.class("review-rows")) {
+                        summary { "Zeilen anzeigen" }
+                        ul {
+                            for row in item.shownRows { li { "\(row.rawTitle) · \(CalendarDay.display(row.watchedOn))" } }
+                            if item.rowCount > item.shownRows.count {
+                                li(.class("muted")) { "… und \(item.rowCount - item.shownRows.count) weitere" }
+                            }
+                        }
+                    }
+                }
                 CandidateList(mappingID: id, results: item.mapping.candidateResults, action: "accept", target: "closest .mapping-review")
                 details {
                     summary { "Eigene Suche" }

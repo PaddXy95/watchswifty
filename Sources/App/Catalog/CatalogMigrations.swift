@@ -91,3 +91,14 @@ struct AddEpisodeSeenTimes: AsyncMigration {
         try await database.schema(Episode.schema).deleteField("first_seen_at").update()
     }
 }
+
+/// Genres of a title (spec `2026-11-13-feedback-round-design.md` §7); nil until the next refresh.
+struct AddTitleGenres: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(Title.schema).field("genres", .string).update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(Title.schema).deleteField("genres").update()
+    }
+}

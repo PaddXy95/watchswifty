@@ -28,8 +28,8 @@ click „Jetzt prüfen“ (check now). WatchSwifty then asks the GitHub API (`ap
 GitHub sees the server's IP address; no data from WatchSwifty is sent. The check is off by default.
 
 If there is a newer version, the footer shows admins „Update auf vX.Y.Z verfügbar“ (update available) and the
-**System** page shows the commands to update. The running version is shown on the left of the footer and at
-`http://<server>:8080/version`.
+**System** page shows the commands to update. The running version is shown on the left of the footer (after
+signing in) and at `http://<server>:8080/version`.
 
 ## Backup and restore
 

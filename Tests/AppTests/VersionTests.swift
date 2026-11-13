@@ -33,7 +33,7 @@ struct VersionTests {
     }
 
     @Test func footerShowsVersion() {
-        let html = PageLayout(title: "X", nav: nil) { p { "x" } }.render()
+        let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: false, active: .history)) { p { "x" } }.render()
         #expect(html.contains(#"class="version""#))
         #expect(html.contains(AppVersion.current.label))
     }

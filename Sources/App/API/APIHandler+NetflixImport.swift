@@ -32,7 +32,9 @@ extension APIHandler {
             review: state.review.map { item in
                 .init(id: item.mapping.id?.uuidString ?? "", netflixName: item.mapping.netflixName,
                       kind: item.mapping.titleKind == .movie ? .movie : .tv, rowCount: item.rowCount,
-                      candidates: item.mapping.candidateResults.map(Self.searchResult))
+                      candidates: item.mapping.candidateResults.map(Self.searchResult),
+                      firstDay: item.firstDay, lastDay: item.lastDay,
+                      rows: item.shownRows.map { .init(rawTitle: $0.rawTitle, day: $0.watchedOn) })
             },
             unmatched: state.unmatched.map { .init(id: $0.row.id?.uuidString ?? "", rawTitle: $0.row.rawTitle, day: $0.row.watchedOn, canAssign: $0.canAssign) },
             unmatchedTotal: state.unmatchedTotal,

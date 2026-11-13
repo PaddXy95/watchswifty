@@ -22,6 +22,15 @@ struct SystemOIDCTests {
         }
     }
 
+    @Test func placeholderNamesPocketID() async throws {
+        try await withTestApp { app in
+            let page = try await browserGet(app, "/admin/system", headers: try await admin(app))
+            #expect(page.body.contains("z. B. Pocket ID"))
+            #expect(!page.body.contains("z. B. Authentik"))
+            #expect(page.body.contains("(Pocket ID, Authentik, Keycloak, Authelia …)"))
+        }
+    }
+
     @Test func saveActivatesImmediately() async throws {
         try await withTestApp { app in
             let saved = try await browserPost(app, "/admin/system/oidc", form: form, headers: try await admin(app))

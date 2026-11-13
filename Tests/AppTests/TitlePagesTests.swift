@@ -4,7 +4,7 @@ import Foundation
 import Testing
 import VaporTesting
 
-struct WatchFormInput: Content { var day: String?; var service: String?; var rewatch: String? }
+struct WatchFormInput: Content { var day: String?; var service: String?; var rewatch: String?; var open: String? }
 struct RatingInput: Content { var rating: String }
 struct HiddenInput: Content { var hidden: Bool }
 
@@ -86,6 +86,58 @@ struct TitlePagesTests {
         }
     }
 
+    /// The markup of one episode row (from its id to the next row or the end).
+    func row(_ body: String, _ id: String) -> Substring {
+        guard let start = body.range(of: #"id="\#(id)""#) else { return "" }
+        let rest = body[start.upperBound...]
+        let end = rest.range(of: #"class="episode-row""#)?.lowerBound ?? rest.endIndex
+        return rest[..<end]
+    }
+
+    @Test func episodesStartClosed() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains(#"<details class="episode">"#))
+                #expect(!body.contains(#"<details class="episode" open"#))
+                #expect(row(body, "ep-1-1").contains(#"<summary class="episode-summary">"#))
+                #expect(!body.contains(">Details<"))
+            }
+        }
+    }
+
+    @Test func watchFromFormKeepsEpisodeOpen() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-05", service: "netflix", open: "1"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let body = res.body.string
+                #expect(row(body, "ep-1-1").contains(#"<details class="episode" open"#))
+                #expect(!row(body, "ep-1-2").contains(#"<details class="episode" open"#))
+                #expect(body.components(separatedBy: #"<details class="episode" open"#).count == 2)
+            })
+        }
+    }
+
+    @Test func checkboxLeavesAllClosed() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { res async in
+                #expect(res.body.string.contains("Staffel 1 · 1/2 gesehen"))
+                #expect(!res.body.string.contains(#"<details class="episode" open"#))
+            }
+        }
+    }
+
+    @Test func upToKeepsEpisodeOpen() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/2/watch-up-to", headers: headers) { res async in
+                let body = res.body.string
+                #expect(row(body, "ep-1-2").contains(#"<details class="episode" open"#))
+                #expect(body.components(separatedBy: #"<details class="episode" open"#).count == 2)
+            }
+        }
+    }
+
     @Test func markEpisodeReturnsCheckedRow() async throws {
         try await withUser { app, user, headers in
             try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { res async in
@@ -152,6 +204,101 @@ struct TitlePagesTests {
                 #expect(res.body.string.contains("Staffel 1 · 0/2 gesehen"))
             }
             #expect(try await userWatches(app, user).isEmpty)
+        }
+    }
+
+    @Test func seasonWithChosenService() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/tv/1399/seasons/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(service: "prime_video"), as: .urlEncodedForm)
+            })
+            let watches = try await userWatches(app, user)
+            #expect(watches.count == 2)
+            #expect(watches.allSatisfy { $0.streamingService == .primeVideo })
+        }
+    }
+
+    @Test func seasonWithUnknownService() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/2/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "netflix"), as: .urlEncodedForm)
+            })
+            try await app.testing().test(.POST, "/tv/1399/seasons/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(service: ""), as: .urlEncodedForm)
+            })
+            let seasonOne = try await userWatches(app, user).filter { $0.watchedOn == nil }
+            #expect(seasonOne.count == 2)
+            #expect(seasonOne.allSatisfy { $0.service == nil })
+        }
+    }
+
+    @Test func upToTakesService() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/2/watch-up-to", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "wow", open: "1"), as: .urlEncodedForm)
+            })
+            let watches = try await userWatches(app, user)
+            #expect(watches.count == 2)
+            #expect(watches.allSatisfy { $0.streamingService == .wow })
+        }
+    }
+
+    @Test func seasonAndSeriesFormsOfferServices() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/2/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "netflix"), as: .urlEncodedForm)
+            })
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                let body = res.body.string
+                let season = body.range(of: #"<form class="season-action"#).map { body[$0.lowerBound...] } ?? ""
+                let seasonForm = season.range(of: "</form>").map { season[..<$0.lowerBound] } ?? ""
+                #expect(seasonForm.contains(#"<option value="netflix" selected"#))
+                #expect(seasonForm.contains("Ganze Staffel gesehen"))
+                let series = body.range(of: #"<form class="series-action"#).map { body[$0.lowerBound...] } ?? ""
+                let seriesForm = series.range(of: "</form>").map { series[..<$0.lowerBound] } ?? ""
+                #expect(seriesForm.contains(#"name="service""#))
+                #expect(seriesForm.contains("Gesamte Serie gesehen"))
+                #expect(seriesForm.contains("hx-confirm"))
+                let episode = row(body, "ep-1-1")
+                let form = episode.range(of: #"<form class="watch-form"#).map { episode[$0.lowerBound...] } ?? ""
+                let watchForm = form.range(of: "</form>").map { form[..<$0.lowerBound] } ?? ""
+                #expect(watchForm.contains("/tv/1399/episodes/1/1/watch-up-to"))
+            }
+        }
+    }
+
+    /// The fragment from `<label … id="<id>"` to its closing `</label>`.
+    func labelFragment(_ body: String, id: String) -> Substring {
+        guard let start = body.range(of: #"id="\#(id)""#) else { return "" }
+        let rest = body[start.lowerBound...]
+        return rest.range(of: "</label>").map { rest[..<$0.lowerBound] } ?? rest
+    }
+
+    @Test func markingRefreshesBulkServiceSelects() async throws {
+        try await withUser { app, _, headers in
+            // „bis hier“ swaps all seasons; the series form outside `#seasons` comes out of band.
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch-up-to", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(service: "wow"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let series = labelFragment(res.body.string, id: "series-service")
+                #expect(series.contains(#"hx-swap-oob="true""#))
+                #expect(series.contains(#"<option value="wow" selected"#))
+            })
+            // One season swapped: the series form and the other seasons' forms come out of band.
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/2/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "netflix"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                let body = res.body.string
+                let series = labelFragment(body, id: "series-service")
+                #expect(series.contains(#"hx-swap-oob="true""#))
+                #expect(series.contains(#"<option value="netflix" selected"#))
+                let other = labelFragment(body, id: "season-service-2")
+                #expect(other.contains(#"hx-swap-oob="true""#))
+                #expect(other.contains(#"<option value="netflix" selected"#))
+                let own = labelFragment(body, id: "season-service-1")
+                #expect(!own.contains("hx-swap-oob"))
+                #expect(own.contains(#"<option value="netflix" selected"#))
+            })
         }
     }
 

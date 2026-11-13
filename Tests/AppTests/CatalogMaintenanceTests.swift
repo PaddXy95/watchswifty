@@ -29,6 +29,7 @@ struct CatalogMaintenanceTests {
         let title = try await seedMovie(app, tmdbID: tmdbID, runtime: 100)
         title.overview = "Alt."
         title.imdbID = "tt1"
+        title.genres = "drama"
         title.refreshedAt = refreshedAt
         try await title.save(on: app.db)
         return title
@@ -100,6 +101,7 @@ struct CatalogMaintenanceTests {
             #expect(cleared.overview == nil)
             #expect(cleared.imdbID == nil)
             #expect(cleared.runtime == nil)
+            #expect(cleared.genres == nil)
             #expect(cleared.name == "Film")   // kept for the user's history
             #expect(tokens.withLockedValue { $0 }.isEmpty)
         }

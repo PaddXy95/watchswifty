@@ -1,7 +1,7 @@
 # Releases
 
 WatchSwifty follows [SemVer](https://semver.org); changes are listed in the [CHANGELOG](../CHANGELOG.md). The running
-version is shown on the left of the footer and at `http://<server>:8080/version`. To be told about new versions, see
+version is shown on the left of the footer (after signing in) and at `http://<server>:8080/version`. To be told about new versions, see
 [Update check](operations.md#update-check).
 
 ## Image tags

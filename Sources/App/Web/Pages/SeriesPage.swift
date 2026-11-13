@@ -21,6 +21,9 @@ struct SeriesPage: HTML {
                         title.name
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
+                    if let genres = title.genreList, !genres.isEmpty {
+                        p(.class("muted title-meta")) { genres.map(\.label).joined(separator: " · ") }
+                    }
                     if let overview = title.overview, !overview.isEmpty {
                         p(.class("overview")) { overview }
                     }
@@ -36,9 +39,12 @@ struct SeriesPage: HTML {
             if seasons.isEmpty {
                 p(.class("muted")) { "Für diese Serie sind keine Folgen bekannt." }
             } else {
-                button(.class("series-action"), .hx.post("/tv/\(title.tmdbID)/watch-all"),
-                       .hx.confirm("Alle erschienenen Folgen als gesehen markieren?"),
-                       .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) { "Gesamte Serie gesehen" }
+                form(.class("series-action"), .hx.post("/tv/\(title.tmdbID)/watch-all"),
+                     .hx.confirm("Alle erschienenen Folgen als gesehen markieren?"),
+                     .hx.target("#seasons"), .hx.swap(.outerHTMLGuarded)) {
+                    ServiceSelect(selected: defaultService, id: ServiceSelect.seriesID())
+                    button(.type(.submit)) { "Gesamte Serie gesehen" }
+                }
             }
             SeasonsList(tmdbID: title.tmdbID, seasons: seasons, today: today, defaultService: defaultService)
         }
