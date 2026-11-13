@@ -11,7 +11,7 @@ struct TitleController {
     func register(on protected: any RoutesBuilder) {
         protected.get("tv", ":tmdbID", use: seriesPage)
         protected.post("tv", ":tmdbID", "episodes", ":season", ":number", "watch", use: markEpisode)
-        protected.delete("tv", ":tmdbID", "episodes", ":season", ":number", "watch", use: unmarkEpisode)
+        protected.delete("tv", ":tmdbID", "episodes", ":season", ":number", "watches", ":watchID", use: deleteEpisodeWatch)
         protected.post("tv", ":tmdbID", "episodes", ":season", ":number", "watch-up-to", use: markUpTo)
         protected.post("tv", ":tmdbID", "seasons", ":season", "watch", use: markSeason)
         protected.post("tv", ":tmdbID", "watch-all", use: markSeries)
@@ -56,12 +56,15 @@ struct TitleController {
         }
     }
 
-    func unmarkEpisode(req: Request) async throws -> Response {
+    /// Deletes one viewing from the episode's details; the episode stays expanded.
+    func deleteEpisodeWatch(req: Request) async throws -> Response {
         try await handle(req) {
             let (title, episode) = try await resolveEpisode(req)
+            guard let watchID = req.parameters.get("watchID", as: UUID.self) else { throw Abort(.notFound) }
             let userID = try req.userID
-            try await req.watches.unmarkEpisode(userID: userID, episodeID: episode.requireID())
-            return try await seasonResponse(req, title: title, season: episode.season, userID: userID)
+            try await req.watches.deleteWatch(userID: userID, watchID: watchID, titleID: title.requireID(),
+                                              episodeID: episode.requireID())
+            return try await seasonResponse(req, title: title, season: episode.season, userID: userID, openEpisode: episode.number)
         }
     }
 

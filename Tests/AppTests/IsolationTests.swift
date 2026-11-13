@@ -109,6 +109,9 @@ struct IsolationTests {
             try await app.testing().test(.DELETE, "/watches/\(watchID)", headers: w.bobHeaders) { res async in
                 #expect(res.status == .notFound)
             }
+            try await app.testing().test(.DELETE, "/tv/1/episodes/1/1/watches/\(watchID)", headers: w.bobHeaders) { res async in
+                #expect(res.status == .notFound)
+            }
             try await app.testing().test(.POST, "/import/mappings/\(mapping.requireID())/accept", headers: w.bobHeaders, beforeRequest: { req in
                 try req.content.encode(AcceptInput(kind: "tv", tmdbID: 1001), as: .urlEncodedForm)
             }, afterResponse: { res async in #expect(res.status == .notFound) })

@@ -76,7 +76,16 @@ th, td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var
 details { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); }
 summary { cursor: pointer; font-weight: 600; }
 .episode-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
-.episode-row > input[type=checkbox] { margin: 0.2rem 0 0; }
+/* Left of each episode: green check (watched), clickable circle (aired), dimmed circle (not aired yet). */
+.watch-mark, .watched-mark { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 1.125rem; height: 1.125rem; margin: 0.15rem 0 0; padding: 0; border-radius: 50%; }
+.watch-mark { border: 2px solid var(--ink-3); background: transparent; cursor: pointer; }
+.watch-mark:hover, .watch-mark:focus-visible { border-color: var(--ok); }
+.watch-mark.unaired { opacity: 0.4; cursor: default; }
+.watched-mark { color: var(--paper); background: var(--ok); font-size: 0.75rem; font-weight: 700; line-height: 1; }
+.watch-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; font-size: var(--text-sm); }
+.watch-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
+.watch-list li:last-child { border-bottom: none; }
+.watch-list button { font-size: var(--text-sm); }
 .episode-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
 .episode-summary .episode-title { flex: 1 1 10rem; }
 details.episode { background: none; border: none; padding: 0; margin: 0; }

@@ -86,16 +86,16 @@ struct EpisodeRow: HTML {
 
     var body: some HTML {
         div(.class("episode-row"), .id("ep-\(model.info.season)-\(model.info.number)")) {
-            if model.aired {
-                if model.watched {
-                    input(.type(.checkbox), .checked, .hx.delete("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTMLGuarded),
-                          .custom(name: "aria-label", value: "\(model.info.code) als ungesehen markieren"))
-                } else {
-                    input(.type(.checkbox), .hx.post("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTMLGuarded),
-                          .custom(name: "aria-label", value: "\(model.info.code) als gesehen markieren"))
-                }
+            // Watched: a green check (removing goes through the list in the details). Aired: one click marks it as
+            // watched today. Not aired yet: a dimmed circle.
+            if model.watched {
+                span(.class("watched-mark"), .role("img"), .custom(name: "aria-label", value: "gesehen")) { "✓" }
+            } else if model.aired {
+                button(.type(.button), .class("watch-mark"), .hx.post("\(path)/watch"), .hx.target(target), .hx.swap(.outerHTMLGuarded),
+                       .custom(name: "aria-label", value: "\(model.info.code) als gesehen markieren")) {}
             } else {
-                input(.type(.checkbox), .disabled, .custom(name: "aria-label", value: "\(model.info.code) noch nicht erschienen"))
+                span(.class("watch-mark unaired"), .role("img"),
+                     .custom(name: "aria-label", value: "\(model.info.code) noch nicht erschienen")) {}
             }
             // The title opens the details (checkbox stays outside the summary: no control inside a summary).
             if hasDetails {
@@ -104,6 +104,9 @@ struct EpisodeRow: HTML {
                     div(.class("episode-panel")) {
                         if let overview = model.info.overview, !overview.isEmpty {
                             p(.class("episode-overview")) { overview }
+                        }
+                        if model.watched {
+                            WatchList(watches: model.watches, deletePrefix: "\(path)/watches", target: target)
                         }
                         if model.aired {
                             WatchForm(action: "\(path)/watch", target: target, submitLabel: model.watched ? "Erneut gesehen" : "Gesehen",
