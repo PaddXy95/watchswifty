@@ -239,8 +239,6 @@ struct AccountNotifications: Sendable {
     var webhookConfigured: Bool
     var keyState: WebhookKeyState
     var dailyRunTime: String
-    /// Changing the key asks for the current password (accounts with a password).
-    var needsPassword: Bool
 }
 
 struct AccountNotificationsSection: HTML, Sendable {
@@ -309,20 +307,10 @@ struct AccountNotificationsSection: HTML, Sendable {
                     "Webhook-Schlüssel"
                     input(.type(.password), .name("key"), .required, .custom(name: "autocomplete", value: "off"))
                 }
-                if state.needsPassword {
-                    label {
-                        "Aktuelles Passwort"
-                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"))
-                    }
-                }
                 button(.type(.submit)) { "Schlüssel speichern" }
             }
             if state.keyState != .none {
                 form(.method(.post), .action("/account/notifications/webhook-key/remove"), .class("inline-form")) {
-                    if state.needsPassword {
-                        input(.type(.password), .name("currentPassword"), .required, .custom(name: "autocomplete", value: "current-password"),
-                              .custom(name: "placeholder", value: "Aktuelles Passwort"), .custom(name: "aria-label", value: "Aktuelles Passwort"))
-                    }
                     button(.type(.submit)) { "Schlüssel entfernen" }
                 }
             }

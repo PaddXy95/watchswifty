@@ -911,7 +911,7 @@ paths:
     put:
       operationId: setWebhookKey
       tags: [Account]
-      summary: Store your KNot API key (encrypted, never returned); current password required for accounts with one
+      summary: Store your KNot API key (encrypted, never returned); no password needed
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -933,7 +933,7 @@ paths:
     delete:
       operationId: deleteWebhookKey
       tags: [Account]
-      summary: Remove your KNot API key; current password required for accounts with one
+      summary: Remove your KNot API key; no password needed
       security: [{ bearerAuth: [] }]
       requestBody:
         required: false
@@ -2886,11 +2886,15 @@ components:
           description: KNot API key (at least 16 printable characters, no spaces); empty removes it.
         currentPassword:
           type: string
+          deprecated: true
+          description: Ignored; kept for older apps.
     WebhookKeyRemove:
       type: object
       properties:
         currentPassword:
           type: string
+          deprecated: true
+          description: Ignored; kept for older apps.
     AdminNotificationSettings:
       type: object
       required: [dailyRunTime, timeZone, nextRunAt]

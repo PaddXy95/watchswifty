@@ -19,7 +19,7 @@ func configureWebhook(_ app: Application, url: String = "https://knot.example.la
 }
 
 func prefsService(_ app: Application) -> NotificationPrefsService {
-    NotificationPrefsService(db: app.db, hasher: app.password.async, cipher: app.tokenCipher)
+    NotificationPrefsService(db: app.db, cipher: app.tokenCipher)
 }
 
 @Suite("NotificationService")
@@ -58,7 +58,7 @@ struct NotificationServiceTests {
             try await configureMail(app)
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat", email: "pat@x.de")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             let available = try await app.notifications.availableChannels(for: pat)
             #expect(available == [.mail, .webhook])
             try await prefsService(app).save(user: pat, announced: false, soon: false, today: false, channel: .webhook, available: available)
@@ -77,7 +77,7 @@ struct NotificationServiceTests {
             try await configureMail(app)
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat", email: "pat@x.de")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await prefsService(app).save(user: pat, announced: false, soon: false, today: false, channel: .webhook,
                                              available: [.mail, .webhook])
             try await NotificationSettingsService(db: app.db).removeWebhook()
@@ -93,25 +93,21 @@ struct NotificationServiceTests {
         try await withTestApp(webhook: webhook) { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             await #expect(throws: NotifyError(message: WebhookError.status(401).message)) {
                 try await app.notifications.send(message, to: pat)
             }
         }
     }
 
-    @Test func keyNeedsCurrentPassword() async throws {
+    @Test func keyIsSealedWithoutPassword() async throws {
         try await withTestApp { app in
             let pat = try await notifyUser(app, "pat")
-            await #expect(throws: APIError.validation(AccountValidation.wrongCurrentPasswordMessage)) {
-                try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "falsch")
-            }
-            #expect(pat.webhookKey == nil)
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             let stored = try #require(try await User.find(pat.requireID(), on: app.db))
             #expect(stored.webhookKey != nil && stored.webhookKey != Self.key)
             #expect(stored.webhookKeyState(app.tokenCipher) == .key(Self.key))
-            try await prefsService(app).setWebhookKey(user: stored, key: "  ", currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: stored, key: "  ")
             #expect(stored.webhookKeyState(app.tokenCipher) == WebhookKeyState.none)
         }
     }
@@ -119,7 +115,7 @@ struct NotificationServiceTests {
     @Test func keyWithoutPasswordForSSOOnlyAccount() async throws {
         try await withTestApp { app in
             let sso = try await notifyUser(app, "sso", password: nil)
-            try await prefsService(app).setWebhookKey(user: sso, key: Self.key, currentPassword: nil)
+            try await prefsService(app).setWebhookKey(user: sso, key: Self.key)
             #expect(sso.webhookKeyState(app.tokenCipher) == .key(Self.key))
         }
     }
@@ -129,7 +125,7 @@ struct NotificationServiceTests {
             let pat = try await notifyUser(app, "pat")
             for bad in ["kurz", "mit leerzeichen drin 123", "umlaut-ä-1234567890"] {
                 await #expect(throws: APIError.validation(NotificationPrefsService.keyMessage), "\(bad)") {
-                    try await prefsService(app).setWebhookKey(user: pat, key: bad, currentPassword: "password123")
+                    try await prefsService(app).setWebhookKey(user: pat, key: bad)
                 }
             }
         }
@@ -164,7 +160,7 @@ struct NotificationServiceTests {
             try await configureMail(app)
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat", email: "pat@x.de")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             try await prefsService(app).save(user: pat, announced: false, soon: false, today: false, channel: .webhook,
                                              available: [.mail, .webhook])
             await app.deviceNotice.handle(userID: try pat.requireID(), deviceName: "iPhone")

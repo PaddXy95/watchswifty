@@ -8,8 +8,7 @@ struct AccountController {
     struct EmailInput: Content { var email: String; var currentPassword: String }
     struct LinkInput: Content { var currentPassword: String? }
     struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var channel: String? }
-    struct WebhookKeyInput: Content { var key: String; var currentPassword: String? }
-    struct WebhookKeyRemoveInput: Content { var currentPassword: String? }
+    struct WebhookKeyInput: Content { var key: String }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
@@ -46,7 +45,7 @@ struct AccountController {
     func saveWebhookKey(req: Request) async throws -> HTMLResponse {
         let input = try req.content.decode(WebhookKeyInput.self)
         do {
-            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: input.key, currentPassword: input.currentPassword)
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: input.key)
         } catch let error as APIError {
             return try await page(req, status: error.status, error: error.message)
         }
@@ -55,9 +54,8 @@ struct AccountController {
     }
 
     func removeWebhookKey(req: Request) async throws -> HTMLResponse {
-        let input = (try? req.content.decode(WebhookKeyRemoveInput.self)) ?? WebhookKeyRemoveInput()
         do {
-            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: "", currentPassword: input.currentPassword)
+            try await req.notificationPrefs.setWebhookKey(user: try req.currentUser, key: "")
         } catch let error as APIError {
             return try await page(req, status: error.status, error: error.message)
         }
@@ -205,8 +203,7 @@ struct AccountController {
             announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
             available: available, active: available.contains(user.preferredChannel) ? user.preferredChannel : available.first,
             preferred: user.preferredChannel, webhookConfigured: notifySettings.webhookURL != nil,
-            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime,
-            needsPassword: user.hasPassword)
+            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime)
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),

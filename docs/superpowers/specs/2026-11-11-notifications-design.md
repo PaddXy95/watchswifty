@@ -223,10 +223,11 @@ heute: „Neues Gerät“ per Mail, sofern Adresse und Mail eingerichtet sind.
 - **„Webhook-Schlüssel (KNot)“**: nur sichtbar, wenn der Admin einen Webhook eingerichtet hat. Passwortfeld, wird nach
   dem Speichern nie wieder angezeigt („gespeichert“), Knopf „Schlüssel entfernen“. Kurzer Hinweis: den Schlüssel gibt
   der Admin bzw. Betreiber von KNot.
-- **Setzen, Ändern oder Entfernen des Schlüssels braucht das aktuelle Passwort**, wie bei der Mail-Adresse – sonst
+- *Aufgehoben durch `2026-11-13-feedback-round-design.md` §5: der Schlüssel braucht kein Passwort mehr.*
+  ~~**Setzen, Ändern oder Entfernen des Schlüssels braucht das aktuelle Passwort**, wie bei der Mail-Adresse – sonst
   könnte eine gekaperte Sitzung „Neues Gerät“ auf ein eigenes Ziel umleiten und unbemerkt eine App verbinden. Konten
   ohne Passwort (nur SSO) setzen ihn ohne *(Entscheidung Claude: sie haben keinen anderen Nachweis; das Risiko
-  beschränkt sich auf den Geräte-Hinweis).*
+  beschränkt sich auf den Geräte-Hinweis).*~~
 - **Schlüssel verschlüsselt** mit `TokenCipher` in `users.webhook_key`; nicht lesbar (Schlüssel des Servers geändert)
   → „Schlüssel nicht lesbar – bitte neu eintragen“, Weg gilt als nicht verfügbar. Gespeichert wird nur, was nicht leer
   ist; geprüft wird nur die Form (≥ 16 Zeichen, druckbares ASCII ohne Leerzeichen, wie KNot es verlangt), kein

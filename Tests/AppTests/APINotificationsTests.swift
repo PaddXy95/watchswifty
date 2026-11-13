@@ -105,15 +105,20 @@ struct APINotificationsTests {
         }
     }
 
-    @Test func keyNeedsPassword() async throws {
+    @Test func keyIgnoresPassword() async throws {
         try await withTestApp { app in
             let token = try await apiToken(app, try await notifyUser(app, "pat"))
             try await app.testing().test(.PUT, "/api/v1/me/notifications/webhook-key", headers: .bearer(token), beforeRequest: { req in
                 try req.content.encode(WebhookKeyBody(key: Self.key, currentPassword: "falsch"))
             }, afterResponse: { res async throws in
-                #expect(res.status == .unprocessableEntity)
-                let error = try JSONDecoder().decode(APIErrorBody.self, from: Data(res.body.readableBytesView))
-                #expect(error.code == "validation")
+                #expect(res.status == .ok)
+                let body = try JSONDecoder().decode(NotificationPrefsBody.self, from: Data(res.body.readableBytesView))
+                #expect(body.hasWebhookKey)
+            })
+            try await app.testing().test(.DELETE, "/api/v1/me/notifications/webhook-key", headers: .bearer(token), afterResponse: { res async throws in
+                #expect(res.status == .ok)
+                let body = try JSONDecoder().decode(NotificationPrefsBody.self, from: Data(res.body.readableBytesView))
+                #expect(!body.hasWebhookKey)
             })
         }
     }
@@ -136,7 +141,7 @@ struct APINotificationsTests {
         try await withTestApp(webhook: webhook) { app in
             try await configureWebhook(app)
             let pat = try await notifyUser(app, "pat")
-            try await prefsService(app).setWebhookKey(user: pat, key: Self.key, currentPassword: "password123")
+            try await prefsService(app).setWebhookKey(user: pat, key: Self.key)
             let token = try await apiToken(app, pat)
             try await app.testing().test(.POST, "/api/v1/me/notifications/test", headers: .bearer(token)) { res async throws in
                 #expect(res.status == .serviceUnavailable)

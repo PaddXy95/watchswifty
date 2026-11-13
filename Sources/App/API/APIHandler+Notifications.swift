@@ -23,16 +23,15 @@ extension APIHandler {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
-        try await request.notificationPrefs.setWebhookKey(user: user, key: body.key, currentPassword: body.currentPassword)
+        // `currentPassword` is ignored (no longer needed, older apps still send it).
+        try await request.notificationPrefs.setWebhookKey(user: user, key: body.key)
         return .ok(.init(body: .json(try await Self.notificationPrefs(user, request: request))))
     }
 
     func deleteWebhookKey(_ input: Operations.deleteWebhookKey.Input) async throws -> Operations.deleteWebhookKey.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
-        var password: String?
-        if case let .json(body)? = input.body { password = body.currentPassword }
-        try await request.notificationPrefs.setWebhookKey(user: user, key: "", currentPassword: password)
+        try await request.notificationPrefs.setWebhookKey(user: user, key: "")
         return .ok(.init(body: .json(try await Self.notificationPrefs(user, request: request))))
     }
 
