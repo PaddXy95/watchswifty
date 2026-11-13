@@ -2,6 +2,20 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.5.2] – 2026-11-13
+
+### Performance
+- **Weiterschauen** (continue watching) loads about four times faster: per series only the next episode and the
+  number of episodes left are read, instead of every episode of every series you started, and watches only for
+  series that get a card.
+- **Statistik** (statistics) loads about twice as fast: watches come with their episode runtimes in one query, and
+  titles and ratings are read without building full records.
+- New database index on watches by user and title; it is created automatically on start.
+
+### Fixed
+- **Statistik → Dienste** (services) is as tall as the other panels in its row again; opening „weitere Dienste“
+  (more services) only makes this panel taller.
+
 ## [0.5.1] – 2026-11-13
 
 ### Added
