@@ -28,4 +28,9 @@ WatchSwifty keeps a local copy of the titles and episodes its users track. Follo
 - titles nobody uses any more are deleted;
 - TMDB texts (synopsis, runtimes, genres) are removed after 180 days without a refresh.
 
+Running series are refreshed every day, and a title's page reloads it when its data is older than 7 days. To reload
+all your series and movies at once (for example after an update that brings new data), use „Alle Daten von TMDB neu
+laden“ under **Konto → TMDB-Token** (account → TMDB token). It runs in the background with your token and shows its
+progress there; with a large library it takes a few minutes.
+
 The language of the TMDB data is set with `TMDB_LANGUAGE` (default `de-DE`), see [Configuration](configuration.md).

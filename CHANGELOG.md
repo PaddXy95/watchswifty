@@ -4,6 +4,16 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
 
 ## [0.5.1] – 2026-11-13
 
+### Added
+- **Reload all data from TMDB:** under **Konto → TMDB-Token** (account → TMDB token), „Alle Daten von TMDB neu
+  laden“ reloads all your series and movies in the background with your token (watched, rated, hidden or followed,
+  also finished series), titles without genres or runtime first. The block shows the progress and the result. Useful
+  after an update that brings new data, such as the genres in 0.5.0.
+- **App API:** `POST /v1/library/refresh` starts the reload, `GET /v1/library/refresh` returns its progress.
+
+### Changed
+- Episode titles on the series page are no longer underlined, and the episodes have more space between them.
+
 ### Fixed
 - **System → Version & Updates:** after an update the page no longer claims „Du nutzt die neueste Version“ (you use
   the newest version) with the older release found before the update; it says the installation was updated since
