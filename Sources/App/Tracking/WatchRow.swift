@@ -12,12 +12,13 @@ struct WatchRow: Sendable {
     let origin: WatchOrigin
     let createdAt: Date?
 
-    /// The user's watches; `episodesOnly` leaves out movie watches, `titleID` limits them to one title.
-    static func all(userID: UUID, episodesOnly: Bool = false, titleID: UUID? = nil, on db: any Database) async throws -> [WatchRow] {
+    /// The user's watches; `episodesOnly` leaves out movie watches, `titleIDs` limits them to these titles.
+    static func all(userID: UUID, episodesOnly: Bool = false, titleIDs: [UUID]? = nil, on db: any Database) async throws -> [WatchRow] {
+        if let titleIDs, titleIDs.isEmpty { return [] }
         guard let sql = db as? any SQLDatabase else {
             var query = Watch.query(on: db).filter(\.$user.$id == userID)
             if episodesOnly { query = query.filter(\.$episode.$id != nil) }
-            if let titleID { query = query.filter(\.$title.$id == titleID) }
+            if let titleIDs { query = query.filter(\.$title.$id ~~ titleIDs) }
             return try await query.all().map {
                 WatchRow(titleID: $0.$title.id, episodeID: $0.$episode.id, watchedOn: $0.watchedOn, service: $0.streamingService,
                          origin: $0.watchOrigin, createdAt: $0.createdAt)
@@ -37,7 +38,7 @@ struct WatchRow: Sendable {
             .from(Watch.schema)
             .where(SQLColumn("user_id"), .equal, SQLBind(userID))
         if episodesOnly { query = query.where(SQLColumn("episode_id"), .isNot, SQLLiteral.null) }
-        if let titleID { query = query.where(SQLColumn("title_id"), .equal, SQLBind(titleID)) }
+        if let titleIDs { query = query.where(SQLColumn("title_id"), .in, SQLBind.group(titleIDs)) }
         return try await query.all(decoding: Row.self).map { row in
             WatchRow(titleID: row.title_id, episodeID: row.episode_id, watchedOn: row.watched_on,
                      service: row.service.flatMap(StreamingService.init(rawValue:)),

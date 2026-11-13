@@ -177,22 +177,20 @@ struct StatsService {
     /// series and movies, most watched movies and episodes); `mostCompletedSeries` and the yearly table (`years`,
     /// `undated`, `total`) always cover everything.
     func stats(userID: UUID, year selectedYear: Int?) async throws -> Stats {
-        let watches = try await WatchRow.all(userID: userID, on: db)
-        let titleIDs = Array(Set(watches.map(\.titleID)))
-        let titles = titleIDs.isEmpty ? [] : try await Title.query(on: db).filter(\.$id ~~ titleIDs).all()
-        let titleByID = Dictionary(titles.compactMap { title in title.id.map { ($0, title) } }, uniquingKeysWith: { a, _ in a })
-        let episodeByID = try await watchedEpisodes(userID: userID)
-        let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).all()
-        let ratingByTitle = Dictionary(entries.map { ($0.$title.id, $0.rating) }, uniquingKeysWith: { a, _ in a })
+        let watches = try await statsWatches(userID: userID)
+        let titles = try await TitleRow.all(Array(Set(watches.map(\.titleID))), on: db)
+        let titleByID = Dictionary(titles.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let ratingByTitle = try await EntryRow.all(userID: userID, on: db).mapValues(\.rating)
+        let genresByTitle = titleByID.mapValues { $0.genreList ?? [] }
 
         let viewings: [Viewing] = watches.compactMap { watch in
             guard let title = titleByID[watch.titleID] else { return nil }
             let seriesRuntime = (title.runtime ?? 0) > 0 ? title.runtime : nil
             let minutes: Int?
-            if let episodeID = watch.episodeID {
-                let own = episodeByID[episodeID]?.info.runtime
+            if watch.episodeID != nil {
+                let own = watch.episodeRuntime
                 minutes = (own ?? 0) > 0 ? own : seriesRuntime
-            } else if title.titleKind == .movie {
+            } else if title.kind == .movie {
                 minutes = seriesRuntime
             } else {
                 return nil
@@ -237,7 +235,7 @@ struct StatsService {
                 let current = movieTally[viewing.titleID] ?? (0, 0)
                 movieTally[viewing.titleID] = (current.watches + 1, current.minutes + (viewing.minutes ?? 0))
             }
-            for genre in titleByID[viewing.titleID]?.genreList ?? [] {
+            for genre in genresByTitle[viewing.titleID] ?? [] {
                 var entry = genreTally[genre] ?? (GenreStat(genre: genre), [], [])
                 if viewing.isEpisode {
                     entry.stat.seriesMinutes += viewing.minutes ?? 0
@@ -291,15 +289,16 @@ struct StatsService {
             .sorted { ($0.watches, $0.minutes, $1.name, $1.tmdbID) > ($1.watches, $1.minutes, $0.name, $0.tmdbID) }
             .prefix(Self.listLimit).map { $0 }
 
-        result.mostWatchedEpisodes = episodeWatches.filter { $0.value >= 2 }.compactMap { episodeID, watches -> EpisodeStat? in
+        let rewatched = episodeWatches.filter { $0.value >= 2 }
+        let episodeByID = try await episodes(Array(rewatched.keys))
+        result.mostWatchedEpisodes = rewatched.compactMap { episodeID, watches -> EpisodeStat? in
             guard let (titleID, episode) = episodeByID[episodeID], let title = titleByID[titleID] else { return nil }
             return EpisodeStat(tmdbID: title.tmdbID, seriesName: title.name, posterPath: title.posterPath, code: episode.code,
                                season: episode.season, number: episode.number, name: episode.name, watches: watches)
         }.sorted { ($0.watches, $1.seriesName, $1.season, $1.number) > ($1.watches, $0.seriesName, $0.season, $0.number) }
             .prefix(Self.listLimit).map { $0 }
 
-        result.mostCompletedSeries = try await completedSeries(userID: userID, watches: watches, titleByID: titleByID,
-                                                               ratingByTitle: ratingByTitle)
+        result.mostCompletedSeries = try await completedSeries(userID: userID, titleByID: titleByID, ratingByTitle: ratingByTitle)
         result.genres = genreTally.values.map { entry in
             var stat = entry.stat
             stat.series = entry.seriesIDs.count
@@ -309,12 +308,54 @@ struct StatsService {
         return result
     }
 
-    /// The episodes the user watched (runtime, code and name), one projection instead of thousands of Fluent models.
-    private func watchedEpisodes(userID: UUID) async throws -> [UUID: (titleID: UUID, info: EpisodeInfo)] {
+    /// What a watch contributes to the statistics: the watch plus its episode's own runtime, in one query.
+    private struct StatsWatch {
+        let titleID: UUID
+        let episodeID: UUID?
+        let watchedOn: String?
+        let service: StreamingService?
+        /// The episode's own runtime (nil or 0 = unknown); nil for movies.
+        let episodeRuntime: Int?
+    }
+
+    /// The user's watches with their episodes' runtimes: one projection instead of thousands of Fluent models.
+    private func statsWatches(userID: UUID) async throws -> [StatsWatch] {
         guard let sql = db as? any SQLDatabase else {
-            let ids = Array(Set(try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$episode.$id != nil).all()
-                .compactMap(\.$episode.id)))
-            let episodes = ids.isEmpty ? [] : try await Episode.query(on: db).filter(\.$id ~~ ids).all()
+            let watches = try await WatchRow.all(userID: userID, on: db)
+            let runtimes = try await episodes(Array(Set(watches.compactMap(\.episodeID)))).mapValues(\.info.runtime)
+            return watches.map {
+                StatsWatch(titleID: $0.titleID, episodeID: $0.episodeID, watchedOn: $0.watchedOn, service: $0.service,
+                           episodeRuntime: $0.episodeID.flatMap { runtimes[$0] ?? nil })
+            }
+        }
+        struct Row: Decodable {
+            let title_id: UUID
+            let episode_id: UUID?
+            let watched_on: String?
+            let service: String?
+            let runtime: Int?
+        }
+        return try await sql.select()
+            .column(SQLColumn("title_id", table: "w"), as: "title_id")
+            .column(SQLColumn("episode_id", table: "w"), as: "episode_id")
+            .column(SQLColumn("watched_on", table: "w"), as: "watched_on")
+            .column(SQLColumn("service", table: "w"), as: "service")
+            .column(SQLColumn("runtime", table: "e"), as: "runtime")
+            .from(SQLAlias(SQLIdentifier(Watch.schema), as: SQLIdentifier("w")))
+            .join(SQLAlias(SQLIdentifier(Episode.schema), as: SQLIdentifier("e")), method: SQLJoinMethod.left,
+                  on: SQLColumn("id", table: "e"), .equal, SQLColumn("episode_id", table: "w"))
+            .where(SQLColumn("user_id", table: "w"), .equal, SQLBind(userID))
+            .all(decoding: Row.self).map { row in
+                StatsWatch(titleID: row.title_id, episodeID: row.episode_id, watchedOn: row.watched_on,
+                           service: row.service.flatMap(StreamingService.init(rawValue:)), episodeRuntime: row.runtime)
+            }
+    }
+
+    /// Code, name and runtime of the given episodes (for „Meistgesehene Folgen“ only the rewatched ones).
+    private func episodes(_ ids: [UUID]) async throws -> [UUID: (titleID: UUID, info: EpisodeInfo)] {
+        guard !ids.isEmpty else { return [:] }
+        guard let sql = db as? any SQLDatabase else {
+            let episodes = try await Episode.query(on: db).filter(\.$id ~~ ids).all()
             return Dictionary(episodes.map { ($0.id!, ($0.$title.id, EpisodeInfo($0))) }, uniquingKeysWith: { a, _ in a })
         }
         struct Row: Decodable {
@@ -325,16 +366,10 @@ struct StatsService {
             let name: String
             let runtime: Int?
         }
-        // episodes WHERE id IN (the user's watched episode ids)
-        let watchedIDs = SQLSubquery.select { $0
-            .column("episode_id")
-            .from(Watch.schema)
-            .where(SQLColumn("user_id"), .equal, SQLBind(userID))
-        }
         let rows = try await sql.select()
             .columns("id", "title_id", "season_number", "episode_number", "name", "runtime")
             .from(Episode.schema)
-            .where(SQLColumn("id"), .in, watchedIDs)
+            .where(SQLColumn("id"), .in, SQLBind.group(ids))
             .all(decoding: Row.self)
         return Dictionary(rows.map { row in
             (row.id, (row.title_id, EpisodeInfo(id: row.id, season: row.season_number, number: row.episode_number, name: row.name,
@@ -346,7 +381,7 @@ struct StatsService {
     /// air date ≤ today; specials, episodes without a date and rows the last refresh no longer returned – see
     /// `Episode.isCurrent` – do not count). Uses all watches, not only the period.
     /// Counted in SQL: one row per series instead of every episode of every watched series.
-    private func completedSeries(userID: UUID, watches: [WatchRow], titleByID: [UUID: Title],
+    private func completedSeries(userID: UUID, titleByID: [UUID: TitleRow],
                                  ratingByTitle: [UUID: Int?]) async throws -> [CompletedSeries] {
         var counts: [(titleID: UUID, completions: Int)] = []
         if let sql = db as? any SQLDatabase {
@@ -393,14 +428,18 @@ struct StatsService {
                 .groupBy(SQLColumn("title_id", table: "e"))
                 .all(decoding: Row.self).map { ($0.title_id, $0.completions) }
         } else {
+            let watches = try await WatchRow.all(userID: userID, episodesOnly: true, on: db)
             var countByEpisode: [UUID: Int] = [:]
             for watch in watches { if let episodeID = watch.episodeID { countByEpisode[episodeID, default: 0] += 1 } }
-            let seriesIDs = Array(Set(watches.filter { $0.episodeID != nil }.map(\.titleID)))
+            let seriesIDs = Array(Set(watches.map(\.titleID)))
             let regular = seriesIDs.isEmpty ? []
                 : try await Episode.query(on: db).filter(\.$title.$id ~~ seriesIDs).filter(\.$season >= 1).all()
+            let refreshedAt = seriesIDs.isEmpty ? [:] : Dictionary(
+                try await Title.query(on: db).filter(\.$id ~~ seriesIDs).all().map { ($0.id!, $0.refreshedAt) },
+                uniquingKeysWith: { a, _ in a })
             for (titleID, episodes) in Dictionary(grouping: regular, by: { $0.$title.id }) {
                 let counted = episodes.filter {
-                    ($0.airDate.map { $0 <= today } ?? false) && $0.isCurrent(titleRefreshedAt: titleByID[titleID]?.refreshedAt)
+                    ($0.airDate.map { $0 <= today } ?? false) && $0.isCurrent(titleRefreshedAt: refreshedAt[titleID] ?? nil)
                 }
                 if let fewest = counted.map({ $0.id.flatMap { countByEpisode[$0] } ?? 0 }).min() { counts.append((titleID, fewest)) }
             }

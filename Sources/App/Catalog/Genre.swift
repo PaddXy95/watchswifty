@@ -64,10 +64,17 @@ enum Genre: String, CaseIterable, Sendable {
     }
 }
 
+extension Genre {
+    /// A stored `genres` column as a list: nil = not fetched yet, [] = TMDB has none. Unknown keys are skipped.
+    static func list(_ stored: String?) -> [Genre]? {
+        stored.map { $0.split(separator: ",").compactMap { Genre(rawValue: String($0)) } }
+    }
+}
+
 extension Title {
     /// `genres` as a list: nil = not fetched yet, [] = TMDB has none. Unknown keys are skipped.
     var genreList: [Genre]? {
-        get { genres.map { $0.split(separator: ",").compactMap { Genre(rawValue: String($0)) } } }
+        get { Genre.list(genres) }
         set { genres = newValue?.map(\.rawValue).joined(separator: ",") }
     }
 }

@@ -1,4 +1,5 @@
 import Fluent
+import SQLKit
 
 struct CreateUserTitle: AsyncMigration {
     func prepare(on database: any Database) async throws {
@@ -84,5 +85,18 @@ struct AddFollowedAt: AsyncMigration {
 
     func revert(on database: any Database) async throws {
         try await database.schema(UserTitle.schema).deleteField("followed_at").update()
+    }
+}
+
+/// Every page reads watches by user (and often by title); without an index each query scanned the watches of all users.
+struct AddWatchUserIndex: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        guard let sql = database as? any SQLDatabase else { return }
+        try await sql.raw("CREATE INDEX IF NOT EXISTS watches_user_title ON watches (user_id, title_id)").run()
+    }
+
+    func revert(on database: any Database) async throws {
+        guard let sql = database as? any SQLDatabase else { return }
+        try await sql.raw("DROP INDEX IF EXISTS watches_user_title").run()
     }
 }

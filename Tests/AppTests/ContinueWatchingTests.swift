@@ -122,6 +122,32 @@ struct ContinueWatchingTests {
         #expect(StreamingService.netflix.watchLink(for: "Fluch & Segen")?.url == "https://www.netflix.com/search?q=Fluch%20%26%20Segen")
     }
 
+    /// The next episode comes after the highest watched regular episode: specials, gaps before it, episodes without
+    /// an air date and unaired ones do not count; `remaining` counts the aired ones from there on.
+    @Test func nextEpisodeSkipsSpecialsGapsAndUnaired() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let gaps = try await seedSeries(app, tmdbID: 1, name: "Lücken", seasons: [0: 1, 1: 4, 2: 3],
+                                            unaired: ["2x3"], noAirDate: ["1x4"])
+            for (season, number) in [(0, 1), (1, 1), (1, 3)] {
+                _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, gaps, season, number).requireID(),
+                                                  day: nil, service: nil)
+            }
+            let onlySpecial = try await seedSeries(app, tmdbID: 2, name: "Nur Special", seasons: [0: 1, 1: 2])
+            _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, onlySpecial, 0, 1).requireID(), day: nil,
+                                              service: nil)
+            let jump = try await seedSeries(app, tmdbID: 3, name: "Sprung", seasons: [1: 2, 2: 2])
+            _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, jump, 2, 1).requireID(), day: nil, service: nil)
+
+            let byName = Dictionary(uniqueKeysWithValues: try await cards(app, user).map { ($0.name, $0) })
+            #expect(Set(byName.keys) == ["Lücken", "Sprung"])
+            #expect(byName["Lücken"].map { [$0.next.season, $0.next.number, $0.remaining] } == [2, 1, 2])
+            #expect(byName["Lücken"]?.next.name == "Folge 2x1")
+            #expect(byName["Sprung"].map { [$0.next.season, $0.next.number, $0.remaining] } == [2, 2, 1])
+        }
+    }
+
     @Test func singleCardLookup() async throws {
         try await withTestApp { app in
             let user = try await createUser(app, "pat")
