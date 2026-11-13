@@ -108,6 +108,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
                                         enabled: backgroundJobs, lock: app.importLock)
     app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
                                         today: config.today, enabled: backgroundJobs)
+    app.libraryRefresh = LibraryRefreshWorker(db: app.db, provider: tmdbProvider, logger: app.logger, matching: app.matchingWorker)
+    app.lifecycle.use(LibraryRefreshLifecycle())
     if backgroundJobs {
         app.lifecycle.use(MatchingWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
