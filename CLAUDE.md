@@ -125,6 +125,19 @@ Spec `2026-11-11-notifications-design.md`.
 - `Tests/AppTests/Fixtures/netflix-sample.csv` holds representative rows; never commit a real user's export.
 - `ReleaseScriptTests` run `scripts/*.sh` in throwaway git repos.
 
+## Git workflow
+
+- Changes are made only on `dev` or on a branch off `dev`, never on `main` or any other branch.
+- Every task gets its own branch from an up-to-date `dev`:
+  `git switch dev && git pull && git switch -c feature/<short-description>`
+- A task is done when all tests are green and the user has confirmed the result.
+- When it is done, merge the branch back into `dev`:
+  `git switch dev && git merge --no-ff feature/<short-description>`
+- On merge conflicts run `git merge --abort` and ask the user. Never resolve conflicts on your own.
+- Delete the branch only after a successful merge:
+  - locally: `git branch -d feature/<short-description>` (never `-D`)
+  - on the remote, if it exists: `git push origin --delete feature/<short-description>`
+
 ## Releases and CI
 
 - `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`); `image-check.yml` adds a test image
