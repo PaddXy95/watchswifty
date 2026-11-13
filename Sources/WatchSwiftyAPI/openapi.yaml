@@ -2140,7 +2140,7 @@ components:
           type: integer
     MovieDetail:
       type: object
-      required: [tmdbId, name, links, watches, genres]
+      required: [tmdbId, name, links, watches]
       properties:
         tmdbId:
           type: integer
@@ -2157,7 +2157,7 @@ components:
           description: Minutes
         genres:
           type: array
-          description: Genres of the title; empty until loaded from TMDB
+          description: Genres of the title; empty until loaded from TMDB (always sent; optional so apps also work with older servers)
           items:
             $ref: "#/components/schemas/Genre"
         links:
@@ -2232,7 +2232,7 @@ components:
       enum: [action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, romance, science_fiction, tv_movie, thriller, war, western, kids, news, reality, soap, talk, politics]
     LibraryEntry:
       type: object
-      required: [kind, tmdbId, name, hidden, genres]
+      required: [kind, tmdbId, name, hidden]
       properties:
         kind:
           type: string
@@ -2249,7 +2249,7 @@ components:
           type: boolean
         genres:
           type: array
-          description: Genres of the title; empty until loaded from TMDB
+          description: Genres of the title; empty until loaded from TMDB (always sent; optional so apps also work with older servers)
           items:
             $ref: "#/components/schemas/Genre"
     Period:
@@ -2432,7 +2432,7 @@ components:
           type: string
     MappingReview:
       type: object
-      required: [id, netflixName, kind, rowCount, candidates, firstDay, lastDay, rows]
+      required: [id, netflixName, kind, rowCount, candidates]
       properties:
         id:
           type: string
@@ -2450,7 +2450,7 @@ components:
             $ref: "#/components/schemas/SearchResult"
         firstDay:
           type: string
-          description: Earliest day of the open rows (YYYY-MM-DD)
+          description: Earliest day of the open rows (YYYY-MM-DD; always sent; optional so apps also work with older servers)
         lastDay:
           type: string
           description: Latest day of the open rows (YYYY-MM-DD)
@@ -3073,7 +3073,7 @@ components:
             $ref: "#/components/schemas/Episode"
     SeriesDetail:
       type: object
-      required: [tmdbId, name, links, hidden, followed, seasons, genres]
+      required: [tmdbId, name, links, hidden, followed, seasons]
       properties:
         tmdbId:
           type: integer
@@ -3092,7 +3092,7 @@ components:
           description: Typical episode length in minutes
         genres:
           type: array
-          description: Genres of the title; empty until loaded from TMDB
+          description: Genres of the title; empty until loaded from TMDB (always sent; optional so apps also work with older servers)
           items:
             $ref: "#/components/schemas/Genre"
         links:
