@@ -23,7 +23,7 @@ struct TitleController {
         protected.post("tv", ":tmdbID", "seasons", ":season", "comment", use: setSeasonComment)
         protected.get("movie", ":tmdbID", use: moviePage)
         protected.post("movie", ":tmdbID", "watch", use: markMovie)
-        protected.delete("movie", ":tmdbID", "watch", use: unmarkMovie)
+        protected.delete("movie", ":tmdbID", "watches", ":watchID", use: deleteMovieWatch)
         protected.post("movie", ":tmdbID", "rating") { try await setRating(req: $0, kind: .movie) }
         protected.post("movie", ":tmdbID", "comment") { try await setComment(req: $0, kind: .movie) }
     }
@@ -150,12 +150,15 @@ struct TitleController {
         }
     }
 
-    func unmarkMovie(req: Request) async throws -> Response {
+    /// Deletes one viewing from the movie page.
+    func deleteMovieWatch(req: Request) async throws -> Response {
         try await handle(req) {
             let title = try await resolve(req, .movie)
+            guard let watchID = req.parameters.get("watchID", as: UUID.self) else { throw Abort(.notFound) }
             let userID = try req.userID
-            try await req.watches.unmarkMovie(userID: userID, titleID: title.requireID())
-            return HTMLResponse(MovieWatchesSection(tmdbID: title.tmdbID, watches: [], today: req.watches.today()))
+            try await req.watches.deleteWatch(userID: userID, watchID: watchID, titleID: title.requireID(), episodeID: nil)
+            return HTMLResponse(MovieWatchesSection(tmdbID: title.tmdbID, watches: try await movieWatches(req, userID: userID, titleID: title.requireID()),
+                                                    today: req.watches.today()))
         }
     }
 

@@ -442,7 +442,7 @@ struct TitlePagesTests {
     }
 
     @Test func movieWatchedInCinema() async throws {
-        try await withUser { app, _, headers in
+        try await withUser { app, user, headers in
             try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
                 try req.content.encode(WatchFormInput(day: "2026-11-01", service: "cinema"), as: .urlEncodedForm)
             }, afterResponse: { res async in
@@ -453,11 +453,44 @@ struct TitlePagesTests {
             try await app.testing().test(.GET, "/movie/603", headers: headers) { res async in
                 #expect(res.body.string.contains("Matrix"))
                 #expect(res.body.string.contains("Erneut gesehen"))
+                #expect(res.body.string.contains(#"hx-delete="/movie/603/watches/"#))
+                #expect(res.body.string.contains(#"hx-confirm="Diese Sichtung löschen?""#))
+                #expect(!res.body.string.contains(">Nicht gesehen<"))
             }
-            try await app.testing().test(.DELETE, "/movie/603/watch", headers: headers) { res async in
+            let watchID = try #require(try await userWatches(app, user).first).requireID()
+            try await app.testing().test(.DELETE, "/movie/603/watches/\(watchID)", headers: headers) { res async in
                 #expect(res.status == .ok)
                 #expect(!res.body.string.contains("01.11.2026"))
+                #expect(res.body.string.contains("Noch nicht gesehen."))
             }
+        }
+    }
+
+    @Test func deleteOneMovieWatchKeepsTheOther() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "cinema"), as: .urlEncodedForm)
+            }, afterResponse: { _ async in })
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-05", service: "", rewatch: "true"), as: .urlEncodedForm)
+            }, afterResponse: { _ async in })
+            let cinema = try #require(try await userWatches(app, user).first { $0.watchedOn == "2026-11-01" })
+            try await app.testing().test(.DELETE, "/movie/603/watches/\(cinema.requireID())", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(!res.body.string.contains("01.11.2026"))
+                #expect(res.body.string.contains("05.11.2026"))
+            }
+            #expect(try await userWatches(app, user).map(\.watchedOn) == ["2026-11-05"])
+        }
+    }
+
+    @Test func oldMovieUnmarkRouteIsGone() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers) { _ async in }
+            try await app.testing().test(.DELETE, "/movie/603/watch", headers: headers) { res async in
+                #expect(res.status == .notFound)
+            }
+            #expect(try await userWatches(app, user).count == 1)
         }
     }
 

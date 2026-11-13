@@ -47,19 +47,11 @@ struct MovieWatchesSection: HTML {
             if watches.isEmpty {
                 p(.class("muted")) { "Noch nicht gesehen." }
             } else {
-                ul {
-                    for watch in watches {
-                        li { watchSummary([watch]) }
-                    }
-                }
+                WatchList(watches: watches, deletePrefix: "/movie/\(tmdbID)/watches", target: "#movie-watches")
             }
             WatchForm(action: "/movie/\(tmdbID)/watch", target: "#movie-watches",
                       submitLabel: watches.isEmpty ? "Gesehen" : "Erneut gesehen", rewatch: !watches.isEmpty,
                       today: today, defaultService: watches.first?.streamingService)
-            if !watches.isEmpty {
-                button(.hx.delete("/movie/\(tmdbID)/watch"), .hx.confirm("Alle Sichtungen dieses Films löschen?"),
-                       .hx.target("#movie-watches"), .hx.swap(.outerHTML)) { "Nicht gesehen" }
-            }
         }
     }
 }
