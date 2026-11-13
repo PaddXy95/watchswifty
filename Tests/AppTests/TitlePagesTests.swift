@@ -143,7 +143,7 @@ struct TitlePagesTests {
             try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains(todayDisplay))
-                #expect(res.body.string.contains("checked"))
+                #expect(row(res.body.string, "ep-1-1").contains(#"class="watched-mark""#))
                 #expect(res.body.string.contains("Staffel 1 · 1/2 gesehen"))
             }
             #expect(try await userWatches(app, user).count == 1)
@@ -196,14 +196,104 @@ struct TitlePagesTests {
         }
     }
 
-    @Test func unmarkEpisode() async throws {
+    @Test func deleteOneEpisodeWatch() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { _ async in }
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-05", service: "", rewatch: "true"), as: .urlEncodedForm)
+            }, afterResponse: { _ async in })
+            let watches = try await userWatches(app, user)
+            let older = try #require(watches.first { $0.watchedOn == "2026-11-05" })
+            let newer = try #require(watches.first { $0.watchedOn == "2026-11-07" })
+            try await app.testing().test(.DELETE, "/tv/1399/episodes/1/1/watches/\(newer.requireID())", headers: headers) { res async in
+                #expect(res.status == .ok)
+                let body = res.body.string
+                #expect(body.contains("Staffel 1 · 1/2 gesehen"))
+                #expect(row(body, "ep-1-1").contains(#"class="watched-mark""#))
+                #expect(row(body, "ep-1-1").contains(#"<details class="episode" open"#))
+                #expect(row(body, "ep-1-1").contains("05.11.2026"))
+                #expect(!row(body, "ep-1-1").contains(todayDisplay))
+            }
+            try await app.testing().test(.DELETE, "/tv/1399/episodes/1/1/watches/\(older.requireID())", headers: headers) { res async in
+                let body = res.body.string
+                #expect(body.contains("Staffel 1 · 0/2 gesehen"))
+                #expect(!row(body, "ep-1-1").contains("watched-mark"))
+                #expect(row(body, "ep-1-1").contains(#"class="watch-mark""#))
+                #expect(row(body, "ep-1-1").contains(#"aria-label="S01E01 als gesehen markieren""#))
+            }
+            #expect(try await userWatches(app, user).isEmpty)
+        }
+    }
+
+    @Test func staleWatchDeleteIs404() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { _ async in }
+            let watchID = try #require(try await userWatches(app, user).first).requireID()
+            try await app.testing().test(.DELETE, "/tv/1399/episodes/1/1/watches/\(watchID)", headers: headers) { res async in
+                #expect(res.status == .ok)
+            }
+            try await app.testing().test(.DELETE, "/tv/1399/episodes/1/1/watches/\(watchID)", headers: headers) { res async in
+                #expect(res.status == .notFound)
+            }
+        }
+    }
+
+    @Test func oldUnmarkRouteIsGone() async throws {
         try await withUser { app, user, headers in
             try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch", headers: headers) { _ async in }
             try await app.testing().test(.DELETE, "/tv/1399/episodes/1/1/watch", headers: headers) { res async in
-                #expect(res.status == .ok)
-                #expect(res.body.string.contains("Staffel 1 · 0/2 gesehen"))
+                #expect(res.status == .notFound)
             }
-            #expect(try await userWatches(app, user).isEmpty)
+            #expect(try await userWatches(app, user).count == 1)
+        }
+    }
+
+    @Test func episodeRowShowsCheckCircleAndList() async throws {
+        try await withUser { app, _, headers in
+            try await app.testing().test(.POST, "/tv/1399/seasons/1/watch", headers: headers) { _ async in }
+            try await app.testing().test(.GET, "/tv/1399", headers: headers) { res async in
+                let body = res.body.string
+                let watched = row(body, "ep-1-1"), unwatched = row(body, "ep-2-1")
+                #expect(!watched.contains("checkbox") && !unwatched.contains("checkbox"))
+                #expect(watched.contains(#"class="watched-mark""#))
+                #expect(watched.contains("ohne Datum"))
+                #expect(watched.contains(#"hx-delete="/tv/1399/episodes/1/1/watches/"#))
+                #expect(watched.contains(#"hx-confirm="Diese Sichtung löschen?""#))
+                #expect(watched.contains(">Löschen<"))
+                #expect(unwatched.contains(#"class="watch-mark""#))
+                #expect(unwatched.contains(#"aria-label="S02E01 als gesehen markieren""#))
+                #expect(!unwatched.contains("hx-delete"))
+            }
+        }
+    }
+
+    /// TMDB moved the air date after the episode was watched: its viewing must still be deletable.
+    @Test func watchedButUnairedEpisodeListsItsViewings() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 77, seasons: [1: 2], unaired: ["1x2"])
+            try await Watch(userID: user.requireID(), titleID: show.requireID(), episodeID: episode(app, show, 1, 2).requireID(),
+                            watchedOn: "2026-11-01", service: nil, origin: .manual).save(on: app.db)
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/77", headers: headers) { res async in
+                let watched = row(res.body.string, "ep-1-2")
+                #expect(watched.contains(#"class="watched-mark""#))
+                #expect(watched.contains(#"hx-delete="/tv/77/episodes/1/2/watches/"#))
+            }
+        }
+    }
+
+    @Test func unairedCircleIsNotClickable() async throws {
+        try await withTestApp { app in
+            try await createUser(app, "pat")
+            try await seedSeries(app, tmdbID: 77, seasons: [1: 2], unaired: ["1x2"])
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/77", headers: headers) { res async in
+                let unaired = row(res.body.string, "ep-1-2")
+                #expect(unaired.contains(#"class="watch-mark unaired""#))
+                #expect(unaired.contains(#"aria-label="S01E02 noch nicht erschienen""#))
+                #expect(!unaired.contains(#"hx-post="/tv/77/episodes/1/2/watch""#))   // the row runs to the page end
+            }
         }
     }
 
@@ -368,7 +458,7 @@ struct TitlePagesTests {
     }
 
     @Test func movieWatchedInCinema() async throws {
-        try await withUser { app, _, headers in
+        try await withUser { app, user, headers in
             try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
                 try req.content.encode(WatchFormInput(day: "2026-11-01", service: "cinema"), as: .urlEncodedForm)
             }, afterResponse: { res async in
@@ -379,11 +469,44 @@ struct TitlePagesTests {
             try await app.testing().test(.GET, "/movie/603", headers: headers) { res async in
                 #expect(res.body.string.contains("Matrix"))
                 #expect(res.body.string.contains("Erneut gesehen"))
+                #expect(res.body.string.contains(#"hx-delete="/movie/603/watches/"#))
+                #expect(res.body.string.contains(#"hx-confirm="Diese Sichtung löschen?""#))
+                #expect(!res.body.string.contains(">Nicht gesehen<"))
             }
-            try await app.testing().test(.DELETE, "/movie/603/watch", headers: headers) { res async in
+            let watchID = try #require(try await userWatches(app, user).first).requireID()
+            try await app.testing().test(.DELETE, "/movie/603/watches/\(watchID)", headers: headers) { res async in
                 #expect(res.status == .ok)
                 #expect(!res.body.string.contains("01.11.2026"))
+                #expect(res.body.string.contains("Noch nicht gesehen."))
             }
+        }
+    }
+
+    @Test func deleteOneMovieWatchKeepsTheOther() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-01", service: "cinema"), as: .urlEncodedForm)
+            }, afterResponse: { _ async in })
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers, beforeRequest: { req in
+                try req.content.encode(WatchFormInput(day: "2026-11-05", service: "", rewatch: "true"), as: .urlEncodedForm)
+            }, afterResponse: { _ async in })
+            let cinema = try #require(try await userWatches(app, user).first { $0.watchedOn == "2026-11-01" })
+            try await app.testing().test(.DELETE, "/movie/603/watches/\(cinema.requireID())", headers: headers) { res async in
+                #expect(res.status == .ok)
+                #expect(!res.body.string.contains("01.11.2026"))
+                #expect(res.body.string.contains("05.11.2026"))
+            }
+            #expect(try await userWatches(app, user).map(\.watchedOn) == ["2026-11-05"])
+        }
+    }
+
+    @Test func oldMovieUnmarkRouteIsGone() async throws {
+        try await withUser { app, user, headers in
+            try await app.testing().test(.POST, "/movie/603/watch", headers: headers) { _ async in }
+            try await app.testing().test(.DELETE, "/movie/603/watch", headers: headers) { res async in
+                #expect(res.status == .notFound)
+            }
+            #expect(try await userWatches(app, user).count == 1)
         }
     }
 

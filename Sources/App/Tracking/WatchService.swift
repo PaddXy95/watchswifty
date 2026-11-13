@@ -120,6 +120,14 @@ struct WatchService {
         try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$id == watchID))
     }
 
+    /// Deletes one viewing from the episode's or movie's own page; `episodeID` nil = a movie watch. A watch of another
+    /// title or episode counts as not found, like another user's.
+    func deleteWatch(userID: UUID, watchID: UUID, titleID: UUID, episodeID: UUID?) async throws {
+        let watch = try await ownWatch(userID: userID, watchID: watchID)
+        guard watch.$title.id == titleID, watch.$episode.id == episodeID else { throw TrackingError.notFound }
+        try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$id == watchID))
+    }
+
     // MARK: Library entry
 
     func setRating(userID: UUID, titleID: UUID, rating: Int?) async throws {
