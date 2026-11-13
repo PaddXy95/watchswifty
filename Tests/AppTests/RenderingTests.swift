@@ -158,6 +158,17 @@ struct RenderingTests {
         #expect(css.contains(".nav-toggle:checked"))
         #expect(css.contains(".history-table"))
     }
+
+    /// Phones give every button `min-height: 2.5rem`; the episode marker must stay a circle there, with a larger tap area.
+    @Test func episodeMarkerStaysRoundOnPhones() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        func rule(_ selector: String) -> Substring {
+            guard let start = css.range(of: "\n\(selector) {") else { return "" }
+            return css[start.upperBound...].prefix { $0 != "}" }
+        }
+        #expect(rule(".watch-mark, .watched-mark").contains("min-height: 0"))
+        #expect(rule(".watch-mark::after").contains("inset:"))
+    }
 }
 
 @Suite("LoadingBar")

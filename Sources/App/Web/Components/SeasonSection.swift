@@ -82,7 +82,8 @@ struct EpisodeRow: HTML {
 
     private var path: String { "/tv/\(tmdbID)/episodes/\(model.info.season)/\(model.info.number)" }
     private var target: String { "#season-\(model.info.season)" }
-    private var hasDetails: Bool { model.aired || !(model.info.overview ?? "").isEmpty }
+    /// Watched counts too: TMDB may move an air date after the episode was watched, and its viewings stay deletable.
+    private var hasDetails: Bool { model.aired || model.watched || !(model.info.overview ?? "").isEmpty }
 
     var body: some HTML {
         div(.class("episode-row"), .id("ep-\(model.info.season)-\(model.info.number)")) {

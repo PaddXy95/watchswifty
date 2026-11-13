@@ -77,8 +77,12 @@ details { background: var(--paper-2); border: 1px solid var(--line); border-radi
 summary { cursor: pointer; font-weight: 600; }
 .episode-row { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 /* Left of each episode: green check (watched), clickable circle (aired), dimmed circle (not aired yet). */
-.watch-mark, .watched-mark { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 1.125rem; height: 1.125rem; margin: 0.15rem 0 0; padding: 0; border-radius: 50%; }
-.watch-mark { border: 2px solid var(--ink-3); background: transparent; cursor: pointer; }
+/* min-height: 0 keeps them round on phones, where every button gets min-height: 2.5rem. */
+.watch-mark, .watched-mark { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 1.125rem; height: 1.125rem; min-height: 0; margin: 0.15rem 0 0; padding: 0; border-radius: 50%; }
+.watch-mark { position: relative; border: 2px solid var(--ink-3); background: transparent; cursor: pointer; }
+/* A larger tap area than the visible circle. */
+.watch-mark::after { content: ""; position: absolute; inset: -0.5rem; }
+.watch-mark.unaired::after { content: none; }
 .watch-mark:hover, .watch-mark:focus-visible { border-color: var(--ok); }
 .watch-mark.unaired { opacity: 0.4; cursor: default; }
 .watched-mark { color: var(--paper); background: var(--ok); font-size: 0.75rem; font-weight: 700; line-height: 1; }

@@ -267,6 +267,22 @@ struct TitlePagesTests {
         }
     }
 
+    /// TMDB moved the air date after the episode was watched: its viewing must still be deletable.
+    @Test func watchedButUnairedEpisodeListsItsViewings() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 77, seasons: [1: 2], unaired: ["1x2"])
+            try await Watch(userID: user.requireID(), titleID: show.requireID(), episodeID: episode(app, show, 1, 2).requireID(),
+                            watchedOn: "2026-11-01", service: nil, origin: .manual).save(on: app.db)
+            let headers = try await login(app, "pat").adding(.htmx)
+            try await app.testing().test(.GET, "/tv/77", headers: headers) { res async in
+                let watched = row(res.body.string, "ep-1-2")
+                #expect(watched.contains(#"class="watched-mark""#))
+                #expect(watched.contains(#"hx-delete="/tv/77/episodes/1/2/watches/"#))
+            }
+        }
+    }
+
     @Test func unairedCircleIsNotClickable() async throws {
         try await withTestApp { app in
             try await createUser(app, "pat")
