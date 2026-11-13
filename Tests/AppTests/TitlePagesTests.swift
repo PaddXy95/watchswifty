@@ -274,13 +274,20 @@ struct TitlePagesTests {
         return rest.range(of: "</label>").map { rest[..<$0.lowerBound] } ?? rest
     }
 
+    /// The series form (`<form class="series-action" …>` to its `</form>`); it comes out of band after a watch.
+    func seriesForm(_ body: String) -> Substring {
+        guard let start = body.range(of: #"<form class="series-action""#) else { return "" }
+        let rest = body[start.lowerBound...]
+        return rest.range(of: "</form>").map { rest[..<$0.lowerBound] } ?? rest
+    }
+
     @Test func markingRefreshesBulkServiceSelects() async throws {
         try await withUser { app, _, headers in
-            // „bis hier“ swaps all seasons; the series form outside `#seasons` comes out of band.
+            // „bis hier“ swaps all seasons; the series form outside `#seasons` comes out of band (whole form).
             try await app.testing().test(.POST, "/tv/1399/episodes/1/1/watch-up-to", headers: headers, beforeRequest: { req in
                 try req.content.encode(WatchFormInput(service: "wow"), as: .urlEncodedForm)
             }, afterResponse: { res async in
-                let series = labelFragment(res.body.string, id: "series-service")
+                let series = seriesForm(res.body.string)
                 #expect(series.contains(#"hx-swap-oob="true""#))
                 #expect(series.contains(#"<option value="wow" selected"#))
             })
@@ -289,7 +296,7 @@ struct TitlePagesTests {
                 try req.content.encode(WatchFormInput(day: "2026-11-01", service: "netflix"), as: .urlEncodedForm)
             }, afterResponse: { res async in
                 let body = res.body.string
-                let series = labelFragment(body, id: "series-service")
+                let series = seriesForm(body)
                 #expect(series.contains(#"hx-swap-oob="true""#))
                 #expect(series.contains(#"<option value="netflix" selected"#))
                 let other = labelFragment(body, id: "season-service-2")

@@ -3135,7 +3135,9 @@ components:
           description: If missing, the most recently used service for this series applies; `unknown` = no service.
         rewatch:
           type: boolean
-          description: Watched again (an additional watch instead of replacing).
+          description: >-
+            Watched again (an additional watch instead of replacing). For a season or the whole series: a new round,
+            every aired episode behind the highest watch count gets one more watch (all of them when they are level).
     HiddenInput:
       type: object
       required: [hidden]

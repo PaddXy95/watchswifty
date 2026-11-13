@@ -10,6 +10,10 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
   also finished series), titles without genres or runtime first. The block shows the progress and the result. Useful
   after an update that brings new data, such as the genres in 0.5.0.
 - **App API:** `POST /v1/library/refresh` starts the reload, `GET /v1/library/refresh` returns its progress.
+- **Watching a season or series again:** once every aired episode is watched, the buttons read „Ganze Staffel
+  erneut gesehen“ / „Gesamte Serie erneut gesehen“ (whole season / series watched again) and add one more watch per
+  episode; episodes already watched again one by one are not counted twice. In the App API with `rewatch: true` on
+  `POST /v1/tv/{id}/seasons/{n}/watch` and `/watch-all`.
 
 ### Changed
 - Episode titles on the series page are no longer underlined, and the episodes have more space between them.

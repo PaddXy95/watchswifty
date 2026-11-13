@@ -20,6 +20,18 @@ struct SeasonModel {
 
     var watchedCount: Int { episodes.filter(\.watched).count }
     var title: String { number == 0 ? "Specials" : "Staffel \(number)" }
+    /// Every aired episode is watched (and there is one): „Ganze Staffel erneut gesehen“.
+    var fullyWatched: Bool { Self.allWatched(episodes) }
+
+    /// Every aired regular episode (season ≥ 1) is watched: „Gesamte Serie erneut gesehen“.
+    static func seriesFullyWatched(_ seasons: [SeasonModel]) -> Bool {
+        allWatched(seasons.filter { $0.number > 0 }.flatMap(\.episodes))
+    }
+
+    private static func allWatched(_ episodes: [EpisodeRowModel]) -> Bool {
+        let aired = episodes.filter(\.aired)
+        return !aired.isEmpty && aired.allSatisfy(\.watched)
+    }
 }
 
 /// Watch summary line: "07.11.2026 · Netflix", "ohne Datum", "×2".
@@ -44,8 +56,10 @@ struct SeasonSection: HTML {
                 form(.class("season-action"), .hx.post("/tv/\(tmdbID)/seasons/\(season.number)/watch"),
                      .hx.target("#season-\(season.number)"), .hx.swap(.outerHTMLGuarded)) {
                     ServiceSelect(selected: defaultService, id: ServiceSelect.seasonID(season.number))
-                    button(.type(.submit)) { "Ganze Staffel gesehen" }
+                    if season.fullyWatched { input(.type(.hidden), .name("rewatch"), .value("true")) }
+                    button(.type(.submit)) { season.fullyWatched ? "Ganze Staffel erneut gesehen" : "Ganze Staffel gesehen" }
                 }
+                .attributes(.hx.confirm("Alle Folgen der Staffel noch einmal als gesehen markieren?"), when: season.fullyWatched)
             }
             for episode in season.episodes {
                 EpisodeRow(tmdbID: tmdbID, model: episode, today: today, defaultService: defaultService,

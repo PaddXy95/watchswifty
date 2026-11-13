@@ -32,17 +32,23 @@ struct WatchService {
         try await deleteDiscardingRows(watchesQuery(userID: userID).filter(\.$episode.$id == episodeID))
     }
 
-    func markSeason(userID: UUID, titleID: UUID, season: Int, service: StreamingService?) async throws -> Int {
+    /// „Ganze Staffel gesehen“; with `rewatch` („… erneut gesehen“) a new round, see `markRound`.
+    func markSeason(userID: UUID, titleID: UUID, season: Int, service: StreamingService?, rewatch: Bool = false) async throws -> Int {
         guard try await Title.find(titleID, on: db) != nil else { throw TrackingError.notFound }
         let episodes = try await Episode.query(on: db).filter(\.$title.$id == titleID).filter(\.$season == season).all()
-        return try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
+        return rewatch
+            ? try await markRound(userID: userID, titleID: titleID, episodes: episodes, service: service)
+            : try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
     }
 
-    /// All aired regular episodes (season ≥ 1) of a series, undated – „Gesamte Serie gesehen“.
-    func markSeries(userID: UUID, titleID: UUID, service: StreamingService?) async throws -> Int {
+    /// All aired regular episodes (season ≥ 1) of a series, undated – „Gesamte Serie gesehen“; with `rewatch` a new
+    /// round, see `markRound`.
+    func markSeries(userID: UUID, titleID: UUID, service: StreamingService?, rewatch: Bool = false) async throws -> Int {
         guard let title = try await Title.find(titleID, on: db), title.titleKind == .tv else { throw TrackingError.notFound }
         let episodes = try await Episode.query(on: db).filter(\.$title.$id == titleID).filter(\.$season >= 1).all()
-        return try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
+        return rewatch
+            ? try await markRound(userID: userID, titleID: titleID, episodes: episodes, service: service)
+            : try await markUndated(userID: userID, titleID: titleID, episodes: episodes, service: service)
     }
 
     func markUpTo(userID: UUID, episodeID: UUID, service: StreamingService?) async throws -> Int {
@@ -268,6 +274,28 @@ struct WatchService {
                             service: service, origin: .manual).save(on: db)
         }
         return toMark.count
+    }
+
+    /// „… erneut gesehen“: one more undated watch for every aired episode that is behind the current round – the
+    /// highest watch count among them, or the next round when all are level. Episodes watched again one by one
+    /// („Erneut gesehen“) are therefore not counted twice when the round is finished with the button.
+    private func markRound(userID: UUID, titleID: UUID, episodes: [Episode], service: StreamingService?) async throws -> Int {
+        let aired = episodes.filter(isAired)
+        guard !aired.isEmpty else { return 0 }
+        var counts: [UUID: Int] = [:]
+        for watch in try await watchesQuery(userID: userID).filter(\.$title.$id == titleID).all() {
+            if let episodeID = watch.$episode.id { counts[episodeID, default: 0] += 1 }
+        }
+        let current = aired.map { counts[$0.id!] ?? 0 }
+        let highest = current.max() ?? 0
+        let target = current.allSatisfy { $0 == highest } ? highest + 1 : highest
+        let behind = aired.filter { (counts[$0.id!] ?? 0) < target }
+        try await unhide(userID: userID, titleID: titleID)
+        for episode in behind {
+            try await Watch(userID: userID, titleID: titleID, episodeID: episode.requireID(), watchedOn: nil,
+                            service: service, origin: .manual).save(on: db)
+        }
+        return behind.count
     }
 }
 
