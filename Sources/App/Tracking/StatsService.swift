@@ -305,7 +305,7 @@ struct StatsService {
         return result
     }
 
-    /// The episodes the user watched (runtime, code and name), one SQL join instead of thousands of Fluent models.
+    /// The episodes the user watched (runtime, code and name), one projection instead of thousands of Fluent models.
     private func watchedEpisodes(userID: UUID) async throws -> [UUID: (titleID: UUID, info: EpisodeInfo)] {
         guard let sql = db as? any SQLDatabase else {
             let ids = Array(Set(try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$episode.$id != nil).all()
@@ -321,12 +321,17 @@ struct StatsService {
             let name: String
             let runtime: Int?
         }
-        let rows = try await sql.raw("""
-            SELECT DISTINCT e.id AS id, e.title_id AS title_id, e.season_number AS season_number,
-                   e.episode_number AS episode_number, e.name AS name, e.runtime AS runtime
-            FROM episodes e JOIN watches w ON w.episode_id = e.id
-            WHERE w.user_id = \(bind: userID)
-            """).all(decoding: Row.self)
+        // episodes WHERE id IN (the user's watched episode ids)
+        let watchedIDs = SQLSubquery.select { $0
+            .column("episode_id")
+            .from(Watch.schema)
+            .where(SQLColumn("user_id"), .equal, SQLBind(userID))
+        }
+        let rows = try await sql.select()
+            .columns("id", "title_id", "season_number", "episode_number", "name", "runtime")
+            .from(Episode.schema)
+            .where(SQLColumn("id"), .in, watchedIDs)
+            .all(decoding: Row.self)
         return Dictionary(rows.map { row in
             (row.id, (row.title_id, EpisodeInfo(id: row.id, season: row.season_number, number: row.episode_number, name: row.name,
                                                 airDate: nil, runtime: row.runtime)))
@@ -344,15 +349,36 @@ struct StatsService {
                 let title_id: UUID
                 let completions: Int
             }
-            counts = try await sql.raw("""
-                SELECT e.title_id AS title_id, MIN(COALESCE(w.cnt, 0)) AS completions
-                FROM episodes e
-                LEFT JOIN (SELECT episode_id, COUNT(*) AS cnt FROM watches
-                           WHERE user_id = \(bind: userID) AND episode_id IS NOT NULL GROUP BY episode_id) w ON w.episode_id = e.id
-                WHERE e.season_number >= 1 AND e.air_date IS NOT NULL AND e.air_date <= \(bind: today)
-                  AND e.title_id IN (SELECT title_id FROM watches WHERE user_id = \(bind: userID) AND episode_id IS NOT NULL)
-                GROUP BY e.title_id
-                """).all(decoding: Row.self).map { ($0.title_id, $0.completions) }
+            // Watches per episode of this user: (episode_id, cnt).
+            let watchCounts = SQLSubquery.select { $0
+                .column("episode_id")
+                .column(SQLFunction("COUNT", args: SQLLiteral.all), as: "cnt")
+                .from(Watch.schema)
+                .where(SQLColumn("user_id"), .equal, SQLBind(userID))
+                .where(SQLColumn("episode_id"), .isNot, SQLLiteral.null)
+                .groupBy("episode_id")
+            }
+            // Series of which the user watched at least one episode.
+            let watchedSeries = SQLSubquery.select { $0
+                .column("title_id")
+                .from(Watch.schema)
+                .where(SQLColumn("user_id"), .equal, SQLBind(userID))
+                .where(SQLColumn("episode_id"), .isNot, SQLLiteral.null)
+            }
+            // Per series: the fewest watches of any aired regular episode (unwatched episodes count 0).
+            let fewestWatches = SQLFunction("MIN", args: SQLFunction.coalesce(SQLColumn("cnt", table: "w"), SQLLiteral.numeric("0")))
+            counts = try await sql.select()
+                .column(SQLColumn("title_id", table: "e"), as: "title_id")
+                .column(fewestWatches, as: "completions")
+                .from(Episode.schema, as: "e")
+                .join(SQLAlias(watchCounts, as: "w"), method: SQLJoinMethod.left,
+                      on: SQLColumn("episode_id", table: "w"), .equal, SQLColumn("id", table: "e"))
+                .where(SQLColumn("season_number", table: "e"), .greaterThanOrEqual, SQLBind(1))
+                .where(SQLColumn("air_date", table: "e"), .isNot, SQLLiteral.null)
+                .where(SQLColumn("air_date", table: "e"), .lessThanOrEqual, SQLBind(today))
+                .where(SQLColumn("title_id", table: "e"), .in, watchedSeries)
+                .groupBy(SQLColumn("title_id", table: "e"))
+                .all(decoding: Row.self).map { ($0.title_id, $0.completions) }
         } else {
             var countByEpisode: [UUID: Int] = [:]
             for watch in watches { if let episodeID = watch.episodeID { countByEpisode[episodeID, default: 0] += 1 } }
