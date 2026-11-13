@@ -89,6 +89,22 @@ struct RenderingTests {
         }
     }
 
+    /// A later `.episode-row .name { flex: 1 }` once overrode the minimum width of episode titles on phones.
+    @Test func episodeTitleKeepsMinimumWidth() throws {
+        let css = try String(contentsOfFile: "Public/css/app.css", encoding: .utf8)
+        #expect(css.contains(".episode-summary .episode-title { flex: 1 1 10rem; }"))
+        #expect(!css.contains(".episode-row .name {"))
+    }
+
+    @Test func assetsFingerprintedFromTheServedDirectory() async throws {
+        #expect(AssetVersion.fingerprints(publicDirectory: "/gibt-es-nicht/").css == nil)
+        try await withTestApp { app in
+            let served = AssetVersion.fingerprints(publicDirectory: app.directory.publicDirectory)
+            #expect(served.css != nil && AssetVersion.css == served.css)
+            #expect(served.htmx != nil && AssetVersion.htmx == served.htmx)
+        }
+    }
+
     @Test func assetFingerprintFollowsContent() throws {
         let a = AssetVersion.fingerprint(Data("a".utf8))
         #expect(a != AssetVersion.fingerprint(Data("b".utf8)))

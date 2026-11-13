@@ -30,6 +30,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.middleware.use(FrameDenyMiddleware())
     app.middleware.use(HTMLErrorMiddleware())
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    AssetVersion.configure(publicDirectory: app.directory.publicDirectory, logger: app.logger)
     app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
     app.sessions.use(.fluent)
     app.sessions.configuration = .init(cookieName: "watchswifty_session") { sessionID in

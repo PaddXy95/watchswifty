@@ -136,7 +136,7 @@ struct StatsPage: HTML {
                     h2 { "Meistgesehene Folgen" }
                     RankedList(items: stats.mostWatchedEpisodes.map {
                         RankedItem(href: "/tv/\($0.tmdbID)", posterPath: $0.posterPath, name: $0.seriesName,
-                                   detail: "\($0.code) \($0.name) · \($0.watches)×", rating: nil)
+                                   detail: [$0.code, $0.name].filter { !$0.isEmpty }.joined(separator: " ") + " · \($0.watches)×", rating: nil)
                     })
                 }
             }

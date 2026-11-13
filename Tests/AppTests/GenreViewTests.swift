@@ -61,6 +61,15 @@ struct GenreViewTests {
         }
     }
 
+    @Test func activeGenreAlwaysShown() async throws {
+        try await withLibrary { app, _ in
+            // Western is a valid genre but not in pat's library (e.g. an old link): the choice still shows it.
+            let body = try await page(app, "/library?genre=western").1
+            #expect(body.contains(#"<option value="western" selected>Western</option>"#))
+            #expect(!body.contains("Dunkel"))
+        }
+    }
+
     @Test func unknownGenreIsIgnored() async throws {
         try await withLibrary { app, _ in
             let (status, body) = try await page(app, "/library?genre=quatsch")

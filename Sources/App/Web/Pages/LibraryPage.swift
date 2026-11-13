@@ -19,6 +19,12 @@ struct LibraryPage: HTML {
     private let filters = [("all", "Alle"), ("tv", "Serien"), ("movie", "Filme"), ("hidden", "Ausgeblendet")]
     private let sorts = [("recent", "Zuletzt gesehen"), ("rating", "Bewertung"), ("name", "Name")]
 
+    /// The library's genres plus the active one, so a filter from an old link stays visible and can be cleared.
+    private var choices: [Genre] {
+        guard let genre, !genres.contains(genre) else { return genres }
+        return Genre.sortedByLabel(genres + [genre])
+    }
+
     private func href(filter: String, sort: String) -> String {
         "/library?filter=\(filter)&sort=\(sort)" + (genre.map { "&genre=\($0.rawValue)" } ?? "")
     }
@@ -37,7 +43,7 @@ struct LibraryPage: HTML {
                         .attributes(.class("active"), .custom(name: "aria-current", value: "true"), when: key == sort)
                 }
             }
-            if !genres.isEmpty {
+            if !choices.isEmpty {
                 // Reloads on change (htmx); `main` is swapped and the address updated, like a filter link.
                 form(.method(.get), .action("/library"), .class("genre-filter"), .hx.get("/library"),
                      .custom(name: "hx-trigger", value: "change"), .hx.target("main"), .hx.select("main"), .hx.swap(.outerHTML),
@@ -48,7 +54,7 @@ struct LibraryPage: HTML {
                         "Genre"
                         select(.name("genre")) {
                             option(.value("")) { "Alle Genres" }
-                            for choice in genres {
+                            for choice in choices {
                                 option(.value(choice.rawValue)) { choice.label }.attributes(.selected, when: choice == genre)
                             }
                         }

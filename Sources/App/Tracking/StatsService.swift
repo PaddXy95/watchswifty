@@ -173,8 +173,9 @@ struct StatsService {
 
     static let monthLabels = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
 
-    /// `year` (nil = all years) selects the range for period, chart, services, ratings and top series; the yearly table
-    /// (`years`, `undated`, `total`) always covers everything.
+    /// `year` (nil = all years) selects the range for period, chart, services, ratings, genres and the top lists (longest
+    /// series and movies, most watched movies and episodes); `mostCompletedSeries` and the yearly table (`years`,
+    /// `undated`, `total`) always cover everything.
     func stats(userID: UUID, year selectedYear: Int?) async throws -> Stats {
         let watches = try await WatchRow.all(userID: userID, on: db)
         let titleIDs = Array(Set(watches.map(\.titleID)))
@@ -275,7 +276,8 @@ struct StatsService {
             guard let title = titleByID[titleID] else { return nil }
             return TopSeries(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, episodes: tally.episodes,
                              minutes: tally.minutes, rating: ratingByTitle[titleID] ?? nil)
-        }.sorted { ($0.minutes, $0.episodes, $1.name) > ($1.minutes, $1.episodes, $0.name) }.prefix(Self.listLimit).map { $0 }
+        }.sorted { ($0.minutes, $0.episodes, $1.name, $1.tmdbID) > ($1.minutes, $1.episodes, $0.name, $0.tmdbID) }
+            .prefix(Self.listLimit).map { $0 }
 
         let movies = movieTally.compactMap { titleID, tally -> MovieStat? in
             guard let title = titleByID[titleID] else { return nil }
@@ -283,9 +285,11 @@ struct StatsService {
                              minutes: tally.minutes, rating: ratingByTitle[titleID] ?? nil)
         }
         result.longestMovies = movies.filter { $0.minutes > 0 }
-            .sorted { ($0.minutes, $0.watches, $1.name) > ($1.minutes, $1.watches, $0.name) }.prefix(Self.listLimit).map { $0 }
+            .sorted { ($0.minutes, $0.watches, $1.name, $1.tmdbID) > ($1.minutes, $1.watches, $0.name, $0.tmdbID) }
+            .prefix(Self.listLimit).map { $0 }
         result.mostWatchedMovies = movies.filter { $0.watches >= 2 }
-            .sorted { ($0.watches, $0.minutes, $1.name) > ($1.watches, $1.minutes, $0.name) }.prefix(Self.listLimit).map { $0 }
+            .sorted { ($0.watches, $0.minutes, $1.name, $1.tmdbID) > ($1.watches, $1.minutes, $0.name, $0.tmdbID) }
+            .prefix(Self.listLimit).map { $0 }
 
         result.mostWatchedEpisodes = episodeWatches.filter { $0.value >= 2 }.compactMap { episodeID, watches -> EpisodeStat? in
             guard let (titleID, episode) = episodeByID[episodeID], let title = titleByID[titleID] else { return nil }
@@ -339,7 +343,8 @@ struct StatsService {
     }
 
     /// How often each watched series was seen completely: the fewest watches of any aired regular episode (season ≥ 1,
-    /// air date ≤ today; specials and episodes without a date do not count). Uses all watches, not only the period.
+    /// air date ≤ today; specials, episodes without a date and rows the last refresh no longer returned – see
+    /// `Episode.isCurrent` – do not count). Uses all watches, not only the period.
     /// Counted in SQL: one row per series instead of every episode of every watched series.
     private func completedSeries(userID: UUID, watches: [WatchRow], titleByID: [UUID: Title],
                                  ratingByTitle: [UUID: Int?]) async throws -> [CompletedSeries] {
@@ -373,26 +378,38 @@ struct StatsService {
                 .from(Episode.schema, as: "e")
                 .join(SQLAlias(watchCounts, as: "w"), method: SQLJoinMethod.left,
                       on: SQLColumn("episode_id", table: "w"), .equal, SQLColumn("id", table: "e"))
+                .join(SQLAlias(SQLIdentifier(Title.schema), as: SQLIdentifier("t")), method: SQLJoinMethod.inner,
+                      on: SQLColumn("id", table: "t"), .equal, SQLColumn("title_id", table: "e"))
                 .where(SQLColumn("season_number", table: "e"), .greaterThanOrEqual, SQLBind(1))
                 .where(SQLColumn("air_date", table: "e"), .isNot, SQLLiteral.null)
                 .where(SQLColumn("air_date", table: "e"), .lessThanOrEqual, SQLBind(today))
                 .where(SQLColumn("title_id", table: "e"), .in, watchedSeries)
+                // Episode.isCurrent: still returned by the title's latest refresh.
+                .where(group: { $0
+                    .where(SQLColumn("last_seen_at", table: "e"), .is, SQLLiteral.null)
+                    .orWhere(SQLColumn("refreshed_at", table: "t"), .is, SQLLiteral.null)
+                    .orWhere(SQLColumn("last_seen_at", table: "e"), .greaterThanOrEqual, SQLColumn("refreshed_at", table: "t"))
+                })
                 .groupBy(SQLColumn("title_id", table: "e"))
                 .all(decoding: Row.self).map { ($0.title_id, $0.completions) }
         } else {
             var countByEpisode: [UUID: Int] = [:]
             for watch in watches { if let episodeID = watch.episodeID { countByEpisode[episodeID, default: 0] += 1 } }
             let seriesIDs = Array(Set(watches.filter { $0.episodeID != nil }.map(\.titleID)))
-            for (titleID, episodes) in try await Episode.infos(ofTitles: seriesIDs, minSeason: 1, on: db) {
-                let aired = episodes.filter { $0.isAired(today: today) }
-                if let fewest = aired.map({ countByEpisode[$0.id] ?? 0 }).min() { counts.append((titleID, fewest)) }
+            let regular = seriesIDs.isEmpty ? []
+                : try await Episode.query(on: db).filter(\.$title.$id ~~ seriesIDs).filter(\.$season >= 1).all()
+            for (titleID, episodes) in Dictionary(grouping: regular, by: { $0.$title.id }) {
+                let counted = episodes.filter {
+                    ($0.airDate.map { $0 <= today } ?? false) && $0.isCurrent(titleRefreshedAt: titleByID[titleID]?.refreshedAt)
+                }
+                if let fewest = counted.map({ $0.id.flatMap { countByEpisode[$0] } ?? 0 }).min() { counts.append((titleID, fewest)) }
             }
         }
         return counts.filter { $0.completions > 0 }.compactMap { titleID, completions -> CompletedSeries? in
             guard let title = titleByID[titleID] else { return nil }
             return CompletedSeries(tmdbID: title.tmdbID, name: title.name, posterPath: title.posterPath, completions: completions,
                                    rating: ratingByTitle[titleID] ?? nil)
-        }.sorted { ($0.completions, $1.name) > ($1.completions, $0.name) }.prefix(Self.listLimit).map { $0 }
+        }.sorted { ($0.completions, $1.name, $1.tmdbID) > ($1.completions, $0.name, $0.tmdbID) }.prefix(Self.listLimit).map { $0 }
     }
 
     /// Months of the selected year (up to `monthCount`) or one bar per year; undated viewings have no bar.

@@ -112,7 +112,6 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 .season-action .service-select, .series-action .service-select { margin: 0; }
 .season-action .service-select select, .series-action .service-select select { width: auto; }
 .episode-row .code { font-variant-numeric: tabular-nums; color: var(--ink-3); }
-.episode-row .name { flex: 1; }
 .episode-row .runtime { color: var(--ink-3); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .title-meta { margin: calc(-1 * var(--space-3)) 0 var(--space-3); font-size: var(--text-sm); }
 .watch-form { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin: var(--space-2) 0; }

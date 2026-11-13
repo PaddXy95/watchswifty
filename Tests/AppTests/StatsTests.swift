@@ -1,4 +1,5 @@
 @testable import App
+import Elementary
 import Fluent
 import Testing
 import VaporTesting
@@ -451,6 +452,70 @@ struct StatsListsTests {
                 #expect(!body.contains(text), "unexpected \(text)")
             }
         }
+    }
+
+    @Test func completionsIgnoreEpisodesTMDBDropped() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 34, name: "Umnummeriert", seasons: [1: 2])
+            // 1x2 was not returned by the last refresh (renumbered or dropped at TMDB): it must not block „komplett“.
+            let dropped = try await episode(app, show, 1, 2)
+            dropped.lastSeenAt = try #require(show.refreshedAt).addingTimeInterval(-86_400)
+            try await dropped.save(on: app.db)
+            try await watch(app, user, show, try await episode(app, show, 1, 1))
+            #expect(try await stats(app, user).mostCompletedSeries.map(\.completions) == [1])
+        }
+    }
+
+    @Test func sameNamedTitlesSortByTMDBID() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            for id in [438_631, 841, 9_000] {
+                try await watch(app, user, try await seedMovie(app, tmdbID: id, name: "Dune", runtime: 100), times: 2)
+            }
+            let result = try await stats(app, user)
+            #expect(result.longestMovies.map(\.tmdbID) == [841, 9_000, 438_631])
+            #expect(result.mostWatchedMovies.map(\.tmdbID) == [841, 9_000, 438_631])
+        }
+    }
+
+    @Test func newListsIgnoreOtherUsers() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat")
+            let other = try await createUser(app, "other")
+            let show = try await seedSeries(app, tmdbID: 35, name: "Geteilt", seasons: [1: 2], runtime: 45, genres: "drama")
+            try await watch(app, pat, show, try await episode(app, show, 1, 1), service: .netflix)
+            // The other user finishes the series, rewatches an episode and a movie – none of it counts for pat.
+            try await watch(app, other, show, try await episode(app, show, 1, 1), service: .wow, times: 2)
+            try await watch(app, other, show, try await episode(app, show, 1, 2), service: .wow, times: 2)
+            try await watch(app, other, try await seedMovie(app, tmdbID: 36, name: "Fremd", runtime: 90, genres: "comedy"), times: 3)
+            let result = try await stats(app, pat)
+            #expect(result.mostCompletedSeries.isEmpty)
+            #expect(result.mostWatchedEpisodes.isEmpty && result.mostWatchedMovies.isEmpty && result.longestMovies.isEmpty)
+            #expect(result.genres == [GenreStat(genre: .drama, seriesMinutes: 45, movieMinutes: 0, series: 1, movies: 0)])
+            #expect(result.services == [ServiceShare(service: .netflix, minutes: 45, episodes: 1, movies: 0)])
+        }
+    }
+
+    @Test func episodeWithoutNameHasNoDoubleSpace() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let show = try await seedSeries(app, tmdbID: 37, name: "Namenlos", seasons: [1: 1])
+            let nameless = try await episode(app, show, 1, 1)
+            nameless.name = ""
+            try await nameless.save(on: app.db)
+            try await watch(app, user, show, nameless, times: 2)
+            let body = try await page(app)
+            #expect(body.contains("S01E01 · 2×"))
+            #expect(!body.contains("S01E01  ·"))
+        }
+    }
+
+    @Test func zeroMinuteServiceHasNoBar() {
+        let html = ServiceBars(services: [ServiceShare(service: .netflix, minutes: 90, episodes: 2),
+                                          ServiceShare(service: .wow, minutes: 0, movies: 1)]).render()
+        #expect(html.contains("width: 100%"))
+        #expect(html.contains("width: 0%"))
     }
 
     @Test func listsCapAtFive() async throws {

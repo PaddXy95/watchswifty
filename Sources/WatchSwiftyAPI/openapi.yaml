@@ -749,8 +749,9 @@ paths:
       tags: [Statistics]
       summary: Films, series, episodes and time – period with chart, services, genres, longest and most watched titles, ratings
       description: >-
-        `year` selects the period for `period`, `previous`, `chart`, `services`, `topSeries` and `ratings`.
-        `total`, `undated` and `years` always cover everything.
+        `year` selects the period for `period`, `previous`, `chart`, `services`, `topSeries`, `longestMovies`,
+        `mostWatchedMovies`, `mostWatchedEpisodes`, `genres` and `ratings`. `mostCompletedSeries`, `total`, `undated`
+        and `years` always cover everything.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: year

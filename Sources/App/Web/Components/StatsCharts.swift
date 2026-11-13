@@ -170,7 +170,7 @@ struct ServiceBars: HTML {
                     }
                     span(.class("bar"), .custom(name: "aria-hidden", value: "true")) {
                         span(.class("bar-fill"),
-                             .style("width: \(largest > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
+                             .style("width: \(largest > 0 && share.minutes > 0 ? max(1, Int((Double(share.minutes) / Double(largest) * 100).rounded())) : 0)%")) {}
                     }
                     span(.class("service-value")) { "\(formatDuration(minutes: share.minutes)) · \(percent) %" }
                 }

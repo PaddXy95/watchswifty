@@ -57,8 +57,10 @@ enum Genre: String, CaseIterable, Sendable {
         return result
     }
 
+    private static let collation = Locale(identifier: "de_DE")
+
     static func sortedByLabel(_ genres: some Sequence<Genre>) -> [Genre] {
-        genres.sorted { $0.label.compare($1.label, locale: Locale(identifier: "de_DE")) == .orderedAscending }
+        genres.sorted { $0.label.compare($1.label, locale: collation) == .orderedAscending }
     }
 }
 
