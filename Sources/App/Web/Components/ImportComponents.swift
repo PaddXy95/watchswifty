@@ -60,18 +60,46 @@ struct CandidateList: HTML {
                 p(.class("muted")) { "Keine Treffer." }
             }
             for result in results {
-                button(.class("candidate"), .hx.post("/import/mappings/\(mappingID.uuidString)/\(action)"),
-                       .hx.vals(#"{"kind":"\#(result.kind.rawValue)","tmdbID":"\#(result.id)"}"#),
-                       .hx.target(target), .hx.swap(.outerHTML)) {
-                    Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
-                    span {
-                        result.name
-                        if let year = result.year { " (\(year))" }
-                        " · "
-                        span(.class("candidate-action")) { "Übernehmen" }
-                    }
-                }
+                CandidateRow(result: result, popoverID: CandidateRow.newPopoverID(),
+                             acceptURL: "/import/mappings/\(mappingID.uuidString)/\(action)",
+                             vals: #"{"kind":"\#(result.kind.rawValue)","tmdbID":"\#(result.id)"}"#, target: target)
             }
+        }
+    }
+}
+
+/// One TMDB candidate: poster (click → large popover), name (year), TMDB link and „Übernehmen“.
+struct CandidateRow: HTML {
+    let result: TMDBSearchResult
+    /// Unique on the page: the same candidate can appear in several lists (review, own search, film list).
+    let popoverID: String
+    let acceptURL: String
+    /// `hx-vals` JSON sent with „Übernehmen“.
+    let vals: String
+    let target: String
+
+    static func newPopoverID() -> String { "poster-\(UUID().uuidString.lowercased())" }
+
+    var body: some HTML {
+        div(.class("candidate")) {
+            if result.posterPath != nil {
+                button(.type(.button), .class("poster-button"), .custom(name: "popovertarget", value: popoverID),
+                       .custom(name: "aria-label", value: "Poster von \(result.name) vergrößern")) {
+                    Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
+                }
+                div(.id(popoverID), .custom(name: "popover", value: ""), .class("poster-popover")) {
+                    Poster(path: result.posterPath, alt: result.name, displayWidth: 342)
+                }
+            } else {
+                Poster(path: nil, alt: result.name, displayWidth: 40)
+            }
+            span(.class("candidate-name")) {
+                result.name
+                if let year = result.year { " (\(year))" }
+            }
+            a(.href("https://www.themoviedb.org/\(result.kind.rawValue)/\(result.id)"), .target(.blank),
+              .custom(name: "rel", value: "noopener noreferrer"), .class("candidate-link")) { "TMDB ↗" }
+            button(.class("primary"), .hx.post(acceptURL), .hx.vals(vals), .hx.target(target), .hx.swap(.outerHTML)) { "Übernehmen" }
         }
     }
 }

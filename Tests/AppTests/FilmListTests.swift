@@ -222,7 +222,9 @@ struct FilmListImportTests {
             _ = try await app.filmListWorker.processAll()
             try await app.testing().test(.GET, "/import/films", headers: headers) { res async in
                 let body = res.body.string
-                #expect(body.contains("Das Inselrätsel (2010) · Übernehmen"))
+                #expect(body.contains("Das Inselrätsel (2010)"))
+                #expect(body.contains(#"href="https://www.themoviedb.org/movie/604""#))
+                #expect(body.contains(">Übernehmen</button>"))
                 #expect(body.contains("Nachtfahrt"))
             }
             let list = try await entries(app, user)

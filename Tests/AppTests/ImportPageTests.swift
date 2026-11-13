@@ -306,11 +306,37 @@ struct ImportPageLightTests {
 struct CandidateLabelTests {
     @Test func candidateLabel() {
         let html = CandidateList(mappingID: UUID(), results: [
-            TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: nil),
+            TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: "/a.jpg"),
         ], action: "accept", target: "x").render()
-        #expect(html.contains("Aftermath (2021) · "))
-        #expect(html.contains("Übernehmen"))
+        #expect(html.contains("Aftermath (2021)"))
+        #expect(html.contains(#"href="https://www.themoviedb.org/movie/1" target="_blank""#))
+        #expect(html.contains("TMDB ↗"))
+        #expect(html.contains(">Übernehmen</button>"))
+        #expect(html.contains("popovertarget="))
+        #expect(html.contains("w342/a.jpg"))
         #expect(!html.contains("Film"))
-        #expect(!html.contains("FilmÜbernehmen"))
+    }
+
+    @Test func candidateWithoutPosterHasNoPopover() {
+        let html = CandidateList(mappingID: UUID(), results: [
+            TMDBSearchResult(id: 2, kind: .tv, name: "Ohne Bild", originalName: nil, year: nil, posterPath: nil),
+        ], action: "accept", target: "x").render()
+        #expect(!html.contains("popovertarget="))
+        #expect(html.contains(#"href="https://www.themoviedb.org/tv/2""#))
+    }
+
+    @Test func candidatePopoverIDsUnique() {
+        let result = TMDBSearchResult(id: 1, kind: .movie, name: "Aftermath", originalName: nil, year: 2021, posterPath: "/a.jpg")
+        let first = CandidateList(mappingID: UUID(), results: [result], action: "accept", target: "x").render()
+        let second = CandidateList(mappingID: UUID(), results: [result], action: "accept", target: "x").render()
+        func popoverID(_ html: String) -> String? {
+            guard let start = html.range(of: #"popovertarget=""#)?.upperBound,
+                  let end = html[start...].firstIndex(of: "\"") else { return nil }
+            return String(html[start..<end])
+        }
+        let a = try? #require(popoverID(first))
+        let b = try? #require(popoverID(second))
+        #expect(a != nil && a != b)
+        if let a { #expect(first.contains(#"id="\#(a)" popover"#)) }
     }
 }

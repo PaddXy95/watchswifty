@@ -111,11 +111,8 @@ struct FilmEntryCard: HTML {
                     if entry.filmStatus == .notFound { p(.class("muted")) { "Bei TMDB nicht gefunden." } }
                     div(.class("candidates")) {
                         for result in entry.candidateList {
-                            button(.class("candidate"), .hx.post("\(path)/accept"), .hx.vals(#"{"tmdbID":"\#(result.id)"}"#),
-                                   .hx.target("closest .film-entry"), .hx.swap(.outerHTML)) {
-                                Poster(path: result.posterPath, alt: result.name, displayWidth: 40)
-                                span { "\(result.name)\(result.year.map { " (\($0))" } ?? "") · Übernehmen" }
-                            }
+                            CandidateRow(result: result, popoverID: CandidateRow.newPopoverID(), acceptURL: "\(path)/accept",
+                                         vals: #"{"tmdbID":"\#(result.id)"}"#, target: "closest .film-entry")
                         }
                     }
                     form(.class("inline-form"), .hx.post("\(path)/search"), .hx.target("closest .film-entry"), .hx.swap(.outerHTML)) {
