@@ -127,7 +127,8 @@ Spec `2026-11-11-notifications-design.md`.
 
 ## Releases and CI
 
-- `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`) and a test image build. **A push to
+- `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`); `image-check.yml` adds a test image
+  build only for PRs that touch the Docker build (Dockerfile, entrypoint, `Package.*`, workflows). **A push to
   `main` publishes**: image to `ghcr.io/paddxy95/watchswifty` and a GitHub release. A push to `beta` (or a manual
   "Run workflow" on any branch) pushes only `:beta` / `:beta-<sha7>` with `APP_VERSION=<next>-beta`; no tag, no
   release.
