@@ -38,10 +38,10 @@ nach 60 Tagen neu geholt.
 | Wer | jeder Nutzer für die eigene Bibliothek, mit eigenem Token | Admin startet den täglichen Lauf (nur Admins, lädt nur Fehlendes und laufende Serien nach, verschickt fällige Benachrichtigungen) |
 | Wie | Hintergrundlauf in einem Actor im `Application.storage`, Status per htmx-Polling | synchron in der Anfrage (Hunderte TMDB-Anfragen, Timeout im Browser und hinter Proxys) |
 
-## Release *(Claude)*
+## Release *(Nutzer)*
 
-Zusammen mit dem Fix für den Update-Hinweis (Branch `fix/update-notice`) als **0.6.0** (neue Funktion → Minor);
-der CHANGELOG-Abschnitt `0.5.1` wird zu `0.6.0`.
+Zusammen mit dem Fix für den Update-Hinweis und den Folgentiteln als **0.5.1** („das wird die 0.5.1“); `VERSION`
+bleibt `0.5.0`, `next-version.sh` erhöht die Patch-Stelle.
 
 ## Tests
 

@@ -102,12 +102,12 @@
 - [ ] **Step 4:** `swift test --filter APILibraryRefreshTests` → pass.
 - [ ] **Step 5:** Commit `feat(api): start and read the TMDB refresh of the library`.
 
-### Task 4: Docs and release 0.6.0
+### Task 4: Docs and release 0.5.1
 
 **Files:**
-- Modify: `VERSION` (`0.6.0`), `CHANGELOG.md` (section `0.5.1` becomes `## [0.6.0] – 2026-11-13` with `### Added` (button, API) above the existing `### Fixed`, plus `### Changed`: episode titles on the series page no longer underlined, more space between episodes), `docs/tmdb.md` (cached data: manual reload under **Konto**), `docs/app-api.md` (scope line mentions the reload).
+- Modify: `CHANGELOG.md` (section `## [0.5.1] – 2026-11-13` gets `### Added` (button, API) above the existing `### Fixed`, plus `### Changed`: episode titles on the series page no longer underlined, more space between episodes), `docs/tmdb.md` (cached data: manual reload under **Konto**), `docs/app-api.md` (scope line mentions the reload). `VERSION` stays `0.5.0` *(user: „das wird die 0.5.1“; `next-version.sh` bumps the patch because `v0.5.0` exists)*.
 
 - [ ] **Step 1:** Edit the files.
-- [ ] **Step 2:** `sh scripts/release-notes.sh 0.6.0 | head -3` → starts with `### Added`; `sh scripts/next-version.sh` → `0.6.0`.
+- [ ] **Step 2:** `sh scripts/release-notes.sh 0.5.1 | head -3` → starts with `### Added`; `sh scripts/next-version.sh` → `0.5.1`.
 - [ ] **Step 3:** `swift test` → all pass.
-- [ ] **Step 4:** Commit `docs: release 0.6.0 – reload from TMDB, update notice fix`.
+- [ ] **Step 4:** Commit `docs: release 0.5.1 – reload from TMDB, update notice fix`.
