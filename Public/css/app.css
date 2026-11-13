@@ -331,6 +331,13 @@ details.episode > summary:hover .episode-title { color: var(--accent); }
 
 /* System / update check */
 .update-note { max-width: 46rem; }
+.system-block { padding: var(--space-3) var(--space-4); }
+.system-block > summary { list-style: none; }
+.system-block > summary::-webkit-details-marker { display: none; }
+.system-block > summary h2 { display: inline; margin: 0; }
+.system-block > summary h2::before { content: "▸ "; color: var(--ink-3); }
+.system-block[open] > summary h2::before { content: "▾ "; }
+.system-block[open] > summary { margin-bottom: var(--space-3); }
 .update-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .update-actions .inline-form { align-items: center; gap: var(--space-3); margin: 0; }
 .update-result { margin-top: var(--space-3); }

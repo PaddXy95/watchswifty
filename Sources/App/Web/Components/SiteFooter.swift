@@ -18,7 +18,7 @@ struct SiteFooter: HTML {
                     }
                     if let updateVersion {
                         " · "
-                        a(.href("/admin/system"), .class("update-hint")) { "Update auf v\(updateVersion) verfügbar" }
+                        a(.href("/admin/system?open=updates"), .class("update-hint")) { "Update auf v\(updateVersion) verfügbar" }
                     }
                 }
             }

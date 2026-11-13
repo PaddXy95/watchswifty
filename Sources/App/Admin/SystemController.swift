@@ -21,7 +21,8 @@ struct SystemController {
     }
 
     func show(req: Request) async throws -> HTMLResponse {
-        try await page(req)
+        // `?open=updates` (update hint in the footer); unknown values open nothing.
+        try await page(req, open: (try? req.query.get(String.self, at: "open")).flatMap(SystemBlock.init(rawValue:)))
     }
 
     /// Turning automatic checks on asks GitHub at once, so the admin sees the result.
@@ -32,12 +33,13 @@ struct SystemController {
         let wasEnabled = try await updates.settings().updateCheck
         try await updates.setEnabled(enabled)
         if enabled && !wasEnabled { try await updates.checkNow() }
-        return try await page(req, notice: enabled ? "Automatische Prüfung eingeschaltet." : "Automatische Prüfung ausgeschaltet.")
+        return try await page(req, notice: enabled ? "Automatische Prüfung eingeschaltet." : "Automatische Prüfung ausgeschaltet.",
+                              open: .updates)
     }
 
     func checkNow(req: Request) async throws -> HTMLResponse {
         try await req.application.updates.checkNow()
-        return try await page(req)
+        return try await page(req, open: .updates)
     }
 
     func saveMail(req: Request) async throws -> HTMLResponse {
@@ -45,14 +47,14 @@ struct SystemController {
         do {
             try await req.mailSettings.save(input)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message, mailForm: MailFormValues(input))
+            return try await page(req, status: error.status, error: error.message, mailForm: MailFormValues(input), open: .mail)
         }
-        return try await page(req, notice: "E-Mail-Einstellungen gespeichert.")
+        return try await page(req, notice: "E-Mail-Einstellungen gespeichert.", open: .mail)
     }
 
     func deleteMail(req: Request) async throws -> HTMLResponse {
         try await req.mailSettings.delete()
-        return try await page(req, notice: "E-Mail-Einstellungen gelöscht.")
+        return try await page(req, notice: "E-Mail-Einstellungen gelöscht.", open: .mail)
     }
 
     func testMail(req: Request) async throws -> HTMLResponse {
@@ -60,12 +62,12 @@ struct SystemController {
         do {
             try await req.mail.sendTest(to: to)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message, testRecipient: to)
+            return try await page(req, status: error.status, error: error.message, testRecipient: to, open: .mail)
         } catch let error as MailError {
             let apiError = APIError.from(error)
-            return try await page(req, status: apiError.status, error: apiError.message, testRecipient: to)
+            return try await page(req, status: apiError.status, error: apiError.message, testRecipient: to, open: .mail)
         }
-        return try await page(req, notice: "Testmail gesendet.", testRecipient: to)
+        return try await page(req, notice: "Testmail gesendet.", testRecipient: to, open: .mail)
     }
 
     // MARK: - Benachrichtigungen
@@ -81,14 +83,14 @@ struct SystemController {
             try await req.notificationSettings.save(dailyRunTime: input.dailyRunTime, webhookURL: input.webhookURL)
         } catch let error as APIError {
             return try await page(req, status: error.status, error: error.message,
-                                  notificationsForm: (input.dailyRunTime, input.webhookURL ?? ""))
+                                  notificationsForm: (input.dailyRunTime, input.webhookURL ?? ""), open: .notifications)
         }
-        return try await page(req, notice: "Benachrichtigungen gespeichert.")
+        return try await page(req, notice: "Benachrichtigungen gespeichert.", open: .notifications)
     }
 
     func deleteWebhook(req: Request) async throws -> HTMLResponse {
         try await req.notificationSettings.removeWebhook()
-        return try await page(req, notice: "Webhook entfernt.")
+        return try await page(req, notice: "Webhook entfernt.", open: .notifications)
     }
 
     // MARK: - Anmeldung (SSO)
@@ -99,23 +101,24 @@ struct SystemController {
         do {
             saved = try await req.oidcSettings.save(input)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message, oidcForm: OIDCFormValues(input))
+            return try await page(req, status: error.status, error: error.message, oidcForm: OIDCFormValues(input), open: .oidc)
         }
         let notice = "Anmelde-Einstellungen gespeichert."
-        guard let config = saved.config else { return try await page(req, notice: notice) }
+        guard let config = saved.config else { return try await page(req, notice: notice, open: .oidc) }
         switch await Self.check(req, config) {
-        case .success(let text): return try await page(req, notice: notice + " " + text)
-        case .failure(let failure): return try await page(req, error: "Gespeichert, aber die Prüfung schlug fehl: \(failure.message)")
+        case .success(let text): return try await page(req, notice: notice + " " + text, open: .oidc)
+        case .failure(let failure):
+            return try await page(req, error: "Gespeichert, aber die Prüfung schlug fehl: \(failure.message)", open: .oidc)
         }
     }
 
     func testOIDC(req: Request) async throws -> HTMLResponse {
         guard let config = req.application.loginSettings.current.oidc else {
-            return try await page(req, status: .unprocessableEntity, error: OIDCSettingsService.needsOIDCMessage)
+            return try await page(req, status: .unprocessableEntity, error: OIDCSettingsService.needsOIDCMessage, open: .oidc)
         }
         switch await Self.check(req, config) {
-        case .success(let text): return try await page(req, notice: text)
-        case .failure(let failure): return try await page(req, status: .serviceUnavailable, error: failure.message)
+        case .success(let text): return try await page(req, notice: text, open: .oidc)
+        case .failure(let failure): return try await page(req, status: .serviceUnavailable, error: failure.message, open: .oidc)
         }
     }
 
@@ -123,9 +126,9 @@ struct SystemController {
         do {
             try await req.oidcSettings.delete()
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, status: error.status, error: error.message, open: .oidc)
         }
-        return try await page(req, notice: "Anmelde-Einstellungen gelöscht.")
+        return try await page(req, notice: "Anmelde-Einstellungen gelöscht.", open: .oidc)
     }
 
     func setPasswordLogin(req: Request) async throws -> HTMLResponse {
@@ -133,9 +136,9 @@ struct SystemController {
         do {
             try await req.oidcSettings.setPasswordLogin(enabled, actingUser: try req.currentUser)
         } catch let error as APIError {
-            return try await page(req, status: error.status, error: error.message)
+            return try await page(req, status: error.status, error: error.message, open: .oidc)
         }
-        return try await page(req, notice: enabled ? "Passwort-Login eingeschaltet." : "Passwort-Login abgeschaltet.")
+        return try await page(req, notice: enabled ? "Passwort-Login eingeschaltet." : "Passwort-Login abgeschaltet.", open: .oidc)
     }
 
     /// „Verbindung testen“: discovery and keys afresh; the text for the page either way.
@@ -155,7 +158,8 @@ struct SystemController {
 
     private func page(_ req: Request, status: HTTPStatus = .ok, notice: String? = nil, error: String? = nil,
                       mailForm: MailFormValues? = nil, testRecipient: String? = nil,
-                      oidcForm: OIDCFormValues? = nil, notificationsForm: (time: String, url: String)? = nil) async throws -> HTMLResponse {
+                      oidcForm: OIDCFormValues? = nil, notificationsForm: (time: String, url: String)? = nil,
+                      open: SystemBlock? = nil) async throws -> HTMLResponse {
         let settings = try await req.application.updates.settings()
         let mail = try await req.mailSettings.state()
         let form = mailForm ?? mail.settings.map(MailFormValues.init) ?? MailFormValues(baseURL: Self.requestOrigin(req))
@@ -173,7 +177,7 @@ struct SystemController {
                                                        mailForm: form, testRecipient: testRecipient ?? ownAddress,
                                                        oidc: OIDCSection(state: oidc, values: oidcValues, passwordLogin: login.passwordLogin,
                                                                          passwordLoginForced: login.passwordLoginForced),
-                                                       notifications: notifications))
+                                                       notifications: notifications, openBlock: open))
     }
 
     /// Suggestion for „Adresse von WatchSwifty“ (only pre-fills the form; links use the stored value only).
