@@ -26,6 +26,6 @@ WatchSwifty keeps a local copy of the titles and episodes its users track. Follo
 
 - cached titles are fetched again after 60 days at the latest, with the token of a user who uses the title;
 - titles nobody uses any more are deleted;
-- TMDB texts are removed after 180 days without a refresh.
+- TMDB texts (synopsis, runtimes, genres) are removed after 180 days without a refresh.
 
 The language of the TMDB data is set with `TMDB_LANGUAGE` (default `de-DE`), see [Configuration](configuration.md).

@@ -2,6 +2,52 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.5.0] – 2026-11-13
+
+### Added
+- **Genres:** series and movies show their TMDB genres below the title, and the library can be filtered by genre
+  (only genres that occur in your own library). Series and movies share one list with German names; TMDB's mixed
+  series genres are split („Action & Adventure“ → Action + Abenteuer, „Sci-Fi & Fantasy“ → Science-Fiction + Fantasy,
+  „War & Politics“ → Krieg + Politik). Existing titles get their genres when their page is opened or in the daily run.
+- **More statistics:** „Längste Filme“ (longest movies), „Meistgesehene Filme“ (most watched movies),
+  „Meistgesehene Folgen“ (most watched episodes), „Meistgesehene Serien“ (how often a series was watched completely,
+  over all years) and „Genres“ (series and movie time per genre). „Dienste“ (services) also counts episodes and movies
+  per service. The former „Meistgesehen“ list is now called „Längste Serien“ (longest series).
+- **Service for a whole season or series:** „Ganze Staffel gesehen“ and „Gesamte Serie gesehen“ (whole season / whole
+  series watched) let you choose the streaming service, preset to the one last used for the series.
+- **Netflix import, „Zu prüfen“ (to review):** every entry shows when Netflix says it was watched, and the single rows
+  fold out under „Zeilen anzeigen“ (show rows). Candidates have a larger poster (click to enlarge) and a link to TMDB.
+- **App API:** `genres` on `SeriesDetail`, `MovieDetail` and `LibraryEntry`, `GET /v1/library?genre=`;
+  `GET /v1/stats` returns `longestMovies`, `mostWatchedMovies`, `mostWatchedEpisodes`, `mostCompletedSeries`,
+  `genres`, and `episodes`/`movies` per service; `MappingReview` returns `firstDay`, `lastDay` and `rows`. All new
+  response fields are optional, so apps keep working with older servers. The Swift client gets the open type
+  `GenreValue`.
+
+### Changed
+- **Episodes on the series page** are folded: the episode title opens description and watch form (replacing
+  „Details“), the checkbox still marks it watched right away. After „Gesehen“ (watched) the episode stays open.
+- **System** and **Konto** (account) are split into collapsible blocks; the block of the last action stays open. The
+  update notice in the footer opens „Version & Updates“.
+- **Webhook key** under **Konto → Benachrichtigungen** (account → notifications) no longer needs the current password,
+  in the web UI and the API (`currentPassword` is still accepted and ignored).
+- **Pocket ID** is the example identity provider in the SSO setup and in [docs/sso.md](docs/sso.md), with a short
+  setup section.
+- The Netflix instructions name the current path (**Konto → Einstellungen → Titelverlauf → Alle herunterladen**).
+- Pages without login (sign-in, forgotten password, new SSO account) no longer show the version in the footer.
+- TMDB genres count as TMDB texts and are removed with them after 180 days without a refresh.
+
+### Fixed
+- Episode titles stay readable on phones.
+- The service choice for a season and the whole series is refreshed after every watch.
+- Browsers no longer fill the login password into the webhook key field.
+- After an update, a cached old stylesheet or htmx file no longer styles the page: asset links carry a version.
+- More space between the buttons under **Konto → Benachrichtigungen** and between the buttons of an episode.
+
+### Performance
+- Statistics, library and „Weiterschauen“ (continue watching) read watches as a lean SQL projection instead of full
+  models, and the library is loaded once per page. Measured with 4,152 watches (release build): `/stats` 0.71 s →
+  0.11 s, `/library` 0.35 s → 0.07 s, `/` 0.21 s → 0.11 s.
+
 ## [0.4.0] – 2026-11-11
 
 ### Added
