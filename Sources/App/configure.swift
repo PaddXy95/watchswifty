@@ -82,6 +82,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddNotificationSettings())
     app.migrations.add(AddNotificationPrefs())
     app.migrations.add(CreateEpisodeNotice())
+    app.migrations.add(AddTitleGenres())
 
     try routes(app)
     try await app.autoMigrate()

@@ -31,6 +31,7 @@ struct CatalogService {
             title.overview = movie.overview ?? ""
             title.imdbID = movie.imdbID ?? ""
             title.runtime = movie.runtime ?? 0
+            title.genreList = Genre.from(tmdbIDs: movie.genreIDs)
             title.refreshedAt = now
             try await title.save(on: db)
         case .tv:
@@ -49,6 +50,7 @@ struct CatalogService {
             title.overview = series.overview ?? ""
             title.imdbID = imdbID ?? ""
             title.runtime = series.episodeRunTime ?? 0
+            title.genreList = Genre.from(tmdbIDs: series.genreIDs)
             title.refreshedAt = now
             let episodes = seasons.flatMap { $0 }
             try await db.transaction { db in

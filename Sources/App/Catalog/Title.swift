@@ -20,6 +20,8 @@ final class Title: Model, @unchecked Sendable {
     @OptionalField(key: "imdb_id") var imdbID: String?
     /// Minutes: movie runtime, or typical episode length of a series; 0 = unknown, nil = not fetched yet.
     @OptionalField(key: "runtime") var runtime: Int?
+    /// Genre keys, comma-separated (see `Genre`, `genreList`); "" = TMDB has none, nil = not fetched yet.
+    @OptionalField(key: "genres") var genres: String?
 
     init() {}
 

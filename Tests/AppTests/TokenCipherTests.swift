@@ -101,7 +101,7 @@ struct TokenCipherTests {
             try await Watch(userID: user.requireID(), titleID: movie.requireID(), episodeID: nil, watchedOn: nil,
                             service: nil, origin: .manual).save(on: app.db)
             #expect(try await backfillToken(for: movie.requireID(), on: app.db, cipher: app.tokenCipher) == "secret-token")
-            _ = await backfillRuntimes(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger)
+            _ = await backfillDetails(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger)
             #expect(tokens.withLockedValue { $0 } == ["secret-token"])
         }
     }

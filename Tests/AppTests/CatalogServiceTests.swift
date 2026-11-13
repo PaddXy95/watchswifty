@@ -33,6 +33,20 @@ struct CatalogServiceTests {
         }
     }
 
+    @Test func refreshStoresGenres() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.addSeries(TMDBSeries(id: 1, name: "Serie", originalName: nil, year: nil, posterPath: nil, status: nil, seasonNumbers: [],
+                                  genreIDs: [10759, 80]), episodes: [:])
+        tmdb.addMovie(TMDBMovie(id: 2, name: "Film", originalName: nil, year: nil, posterPath: nil))
+        try await withTestApp(tmdb: tmdb) { app in
+            let catalog = CatalogService(db: app.db, tmdb: tmdb)
+            let series = try await catalog.title(kind: .tv, tmdbID: 1)
+            let movie = try await catalog.title(kind: .movie, tmdbID: 2)
+            #expect(series.genres == "action,adventure,crime")
+            #expect(movie.genres == "")
+        }
+    }
+
     @Test func cachedTitleMakesNoCalls() async throws {
         let tmdb = fake()
         try await withTestApp(tmdb: tmdb) { app in

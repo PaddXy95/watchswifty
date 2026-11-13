@@ -19,14 +19,14 @@ struct SeriesDetailService {
     let watches: WatchService
     let logger: Logger
 
-    /// Stale caches are refreshed; titles cached before overviews/runtimes existed fetch them once.
+    /// Stale caches are refreshed; titles cached before overviews/runtimes/genres existed fetch them once.
     /// Failures (no token, TMDB down) only log – the cached data is shown.
     func refreshForDetails(_ title: Title) async {
         do {
             let episodesMissingOverview = title.titleKind == .tv
                 ? try await Episode.query(on: db).filter(\.$title.$id == title.requireID()).filter(\.$overview == nil).count() > 0
                 : false
-            if title.overview == nil || title.runtime == nil || episodesMissingOverview {
+            if title.overview == nil || title.runtime == nil || title.genres == nil || episodesMissingOverview {
                 try await catalog.refresh(title)
             } else {
                 try await catalog.refreshIfStale(title)

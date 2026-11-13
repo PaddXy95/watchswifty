@@ -8,10 +8,11 @@ import VaporTesting
 func seedSeries(_ app: Application, tmdbID: Int, name: String = "Serie", seasons: [Int: Int],
                 unaired: Set<String> = [], noAirDate: Set<String> = [], airDates: [String: String] = [:],
                 status: String? = "Returning Series", runtime: Int? = nil,
-                episodeRuntimes: [String: Int] = [:]) async throws -> Title {
+                episodeRuntimes: [String: Int] = [:], genres: String? = "") async throws -> Title {
     let title = Title(tmdbID: tmdbID, kind: .tv, name: name)
     title.tmdbStatus = status
     title.runtime = runtime
+    title.genres = genres
     title.refreshedAt = .now
     try await title.save(on: app.db)
     for (season, count) in seasons.sorted(by: { $0.key < $1.key }) where count > 0 {
@@ -28,9 +29,11 @@ func seedSeries(_ app: Application, tmdbID: Int, name: String = "Serie", seasons
 }
 
 @discardableResult
-func seedMovie(_ app: Application, tmdbID: Int, name: String = "Film", runtime: Int? = nil) async throws -> Title {
+func seedMovie(_ app: Application, tmdbID: Int, name: String = "Film", runtime: Int? = nil,
+               genres: String? = "") async throws -> Title {
     let title = Title(tmdbID: tmdbID, kind: .movie, name: name)
     title.runtime = runtime
+    title.genres = genres
     title.refreshedAt = .now
     try await title.save(on: app.db)
     return title

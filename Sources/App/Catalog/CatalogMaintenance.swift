@@ -110,15 +110,18 @@ func maintainCatalog(db: any Database, provider: TMDBProvider, cipher: TokenCiph
     return result
 }
 
-/// Clears texts and runtimes (name, episodes and air dates stay for the user's history); true if anything was set.
+/// Clears texts, runtimes and genres (name, episodes and air dates stay for the user's history); true if anything was set.
 private func clearTMDBTexts(_ title: Title, on db: any Database) async throws -> Bool {
     let titleID = try title.requireID()
     let episodes = try await Episode.query(on: db).filter(\.$title.$id == titleID)
         .group(.or) { $0.filter(\.$overview != nil).filter(\.$runtime != nil) }.all()
-    guard title.overview != nil || title.imdbID != nil || title.runtime != nil || !episodes.isEmpty else { return false }
+    guard title.overview != nil || title.imdbID != nil || title.runtime != nil || title.genres != nil || !episodes.isEmpty else {
+        return false
+    }
     title.overview = nil
     title.imdbID = nil
     title.runtime = nil
+    title.genres = nil
     try await title.save(on: db)
     for episode in episodes {
         episode.overview = nil
