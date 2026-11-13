@@ -88,7 +88,9 @@ struct AccountRefreshTests {
     @Test func removingTheTokenStopsARunningReload() async throws {
         let tmdb = FakeTMDBClient()
         for id in 1...3 { tmdb.addMovie(RefreshSeed.movie(id)) }
-        tmdb.delay = .milliseconds(200)
+        // Longer than any test machine needs for the request below: the run cannot finish on its own, only the
+        // cancellation (which interrupts the fake's sleep) ends it.
+        tmdb.delay = .seconds(30)
         try await withTestApp(tmdb: tmdb) { app in
             let user = try await createUser(app, "anna")
             for id in 1...3 { try await RefreshSeed.watch(app, user, try await seedMovie(app, tmdbID: id)) }
@@ -99,7 +101,7 @@ struct AccountRefreshTests {
             }
             await app.libraryRefresh.wait(userID: try user.requireID())
             #expect(await app.libraryRefresh.state(userID: try user.requireID()) == .idle)
-            #expect(tmdb.calls.count < 3)
+            #expect(tmdb.calls.count <= 1)   // at most the first title was asked for, then the run stopped
         }
     }
 

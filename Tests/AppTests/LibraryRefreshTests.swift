@@ -122,7 +122,7 @@ struct LibraryRefreshTests {
         let tmdb = FakeTMDBClient()
         tmdb.addMovie(RefreshSeed.movie(1))
         tmdb.addMovie(RefreshSeed.movie(2))
-        tmdb.delay = .milliseconds(100)
+        tmdb.delay = .seconds(30)   // the first run cannot finish before the second start, however slow the machine
         try await withTestApp(tmdb: tmdb) { app in
             let user = try await createUser(app, "anna")
             try await RefreshSeed.watch(app, user, try await seedMovie(app, tmdbID: 1))
@@ -131,8 +131,8 @@ struct LibraryRefreshTests {
             _ = try await app.libraryRefresh.start(userID: userID, token: "test-token")
             let second = try await app.libraryRefresh.start(userID: userID, token: "test-token")
             #expect(second.running)
-            await app.libraryRefresh.wait(userID: userID)
-            #expect(tmdb.calls.sorted() == ["movie:1", "movie:2"])
+            await app.libraryRefresh.cancel(userID: userID)
+            #expect(tmdb.calls.count <= 1)   // one run asked for its first title at most; a second run would add another
         }
     }
 }
