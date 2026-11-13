@@ -88,6 +88,9 @@ summary { cursor: pointer; font-weight: 600; }
 .inline-form { display: inline-flex; gap: var(--space-1); margin: 0 var(--space-2) var(--space-1) 0; }
 .notification-prefs > button[type=submit] { margin-top: var(--space-2); }
 .notification-test { margin-top: var(--space-3); align-items: center; }
+.genre-filter { margin: 0 0 var(--space-3); }
+.genre-filter label { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; }
+.genre-filter select { display: inline-block; margin: 0; width: auto; }
 .title-header { display: flex; gap: var(--space-4); align-items: flex-start; margin-bottom: var(--space-6); }
 .title-header .poster { width: 140px; }
 .rating-control { margin: var(--space-2) 0; }

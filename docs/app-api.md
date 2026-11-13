@@ -29,11 +29,11 @@ address under **Konto**, or through the KNot webhook when they chose it.
 ## Scope
 
 Everything the web UI can do: continue watching and notices, search, series and movies (mark as watched, rate,
-comment, follow, hide), history, library, statistics, account and devices, Netflix import and film list, and for admins
+comment, follow, hide; with their genres), history, library (filterable by `genre`), statistics, account and devices, Netflix import and film list, and for admins
 user management and system settings. Details and "Try it out" at `/api`.
 
 ## Swift client
 
 The Swift package also offers the library `WatchSwiftyClient`, generated from the same OpenAPI description as the
-server. Values that may grow with new versions (streaming services, import and matching states, device kind) are open
+server. Values that may grow with new versions (streaming services, genres, import and matching states, device kind) are open
 there, so older apps keep understanding newer servers.

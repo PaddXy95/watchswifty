@@ -30,5 +30,9 @@ import WatchSwiftyClient
         #expect(FilmStatusValue.known.map(\.rawValue) == ["pending", "imported", "review", "not_found", "skipped"])
         #expect(DeviceKindValue.known.map(\.rawValue) == ["device", "manual"])
         #expect(ServiceValue.primeVideo.isKnown)
+        #expect(GenreValue.known.map(\.rawValue) == ["action", "adventure", "animation", "comedy", "crime", "documentary", "drama",
+                                                      "family", "fantasy", "history", "horror", "music", "mystery", "romance",
+                                                      "science_fiction", "tv_movie", "thriller", "war", "western", "kids", "news",
+                                                      "reality", "soap", "talk", "politics"])
     }
 }

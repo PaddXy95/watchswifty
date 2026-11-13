@@ -21,6 +21,9 @@ struct SeriesPage: HTML {
                         title.name
                         if let year = title.year { span(.class("muted")) { " (\(year))" } }
                     }
+                    if let genres = title.genreList, !genres.isEmpty {
+                        p(.class("muted title-meta")) { genres.map(\.label).joined(separator: " · ") }
+                    }
                     if let overview = title.overview, !overview.isEmpty {
                         p(.class("overview")) { overview }
                     }

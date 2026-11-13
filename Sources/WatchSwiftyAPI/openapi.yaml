@@ -727,6 +727,11 @@ paths:
             type: string
             enum: [recent, rating, name]
             default: recent
+        - name: genre
+          in: query
+          description: Only titles with this genre
+          schema:
+            $ref: "#/components/schemas/Genre"
       responses:
         "200":
           description: Titles
@@ -2135,7 +2140,7 @@ components:
           type: integer
     MovieDetail:
       type: object
-      required: [tmdbId, name, links, watches]
+      required: [tmdbId, name, links, watches, genres]
       properties:
         tmdbId:
           type: integer
@@ -2150,6 +2155,11 @@ components:
         runtime:
           type: integer
           description: Minutes
+        genres:
+          type: array
+          description: Genres of the title; empty until loaded from TMDB
+          items:
+            $ref: "#/components/schemas/Genre"
         links:
           $ref: "#/components/schemas/Links"
         rating:
@@ -2214,9 +2224,15 @@ components:
           description: Day `yyyy-MM-dd`; if missing, the watch is undated afterwards.
         service:
           $ref: "#/components/schemas/Service"
+    Genre:
+      type: string
+      description: >-
+        Genre key; one list for series and movies (TMDB's mixed series genres are split, e.g. "Action & Adventure" →
+        action + adventure). May grow in newer versions.
+      enum: [action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, history, horror, music, mystery, romance, science_fiction, tv_movie, thriller, war, western, kids, news, reality, soap, talk, politics]
     LibraryEntry:
       type: object
-      required: [kind, tmdbId, name, hidden]
+      required: [kind, tmdbId, name, hidden, genres]
       properties:
         kind:
           type: string
@@ -2231,6 +2247,11 @@ components:
           type: integer
         hidden:
           type: boolean
+        genres:
+          type: array
+          description: Genres of the title; empty until loaded from TMDB
+          items:
+            $ref: "#/components/schemas/Genre"
     Period:
       type: object
       required: [movies, series, episodes, minutes, unknownRuntime]
@@ -3052,7 +3073,7 @@ components:
             $ref: "#/components/schemas/Episode"
     SeriesDetail:
       type: object
-      required: [tmdbId, name, links, hidden, followed, seasons]
+      required: [tmdbId, name, links, hidden, followed, seasons, genres]
       properties:
         tmdbId:
           type: integer
@@ -3069,6 +3090,11 @@ components:
         runtime:
           type: integer
           description: Typical episode length in minutes
+        genres:
+          type: array
+          description: Genres of the title; empty until loaded from TMDB
+          items:
+            $ref: "#/components/schemas/Genre"
         links:
           $ref: "#/components/schemas/Links"
         rating:

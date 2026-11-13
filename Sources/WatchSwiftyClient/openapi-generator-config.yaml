@@ -12,3 +12,4 @@ typeOverrides:
     FilmStatus: FilmStatusValue
     DeviceKind: DeviceKindValue
     NotifyChannel: NotifyChannelValue
+    Genre: GenreValue
