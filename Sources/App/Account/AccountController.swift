@@ -16,6 +16,8 @@ struct AccountController {
         protected.post("account", "email", use: setEmail)
         protected.post("account", "tmdb-token", use: saveToken)
         protected.post("account", "tmdb-token", "remove", use: removeToken)
+        protected.get("account", "tmdb-refresh", use: refreshStatus)
+        protected.post("account", "tmdb-refresh", use: startRefresh)
         protected.post("account", "devices", use: createDeviceToken)
         protected.post("account", "devices", ":deviceID", "revoke", use: revokeDevice)
         protected.post("account", "oidc", "link", use: startLink)
@@ -187,6 +189,24 @@ struct AccountController {
         return try await page(req, open: .tmdb, notice: "TMDB-Token entfernt.")
     }
 
+    // MARK: - Alle Daten von TMDB neu laden
+
+    func refreshStatus(req: Request) async throws -> HTMLResponse {
+        HTMLResponse(LibraryRefreshStatus(state: await req.application.libraryRefresh.state(userID: try req.userID)))
+    }
+
+    func startRefresh(req: Request) async throws -> HTMLResponse {
+        let refresh = req.application.libraryRefresh
+        let userID = try req.userID
+        guard let token = req.tmdbToken else {
+            let message = TMDBError.missingToken.description
+            guard req.isHTMX else { return try await page(req, open: .tmdb, status: .unprocessableEntity, error: message) }
+            return HTMLResponse(status: .unprocessableEntity, LibraryRefreshStatus(state: await refresh.state(userID: userID), error: message))
+        }
+        let state = try await refresh.start(userID: userID, token: token)
+        return req.isHTMX ? HTMLResponse(LibraryRefreshStatus(state: state)) : try await page(req, open: .tmdb)
+    }
+
     private func page(_ req: Request, open: AccountBlock? = nil, status: HTTPStatus = .ok, error: String? = nil,
                       notice: String? = nil, newToken: String? = nil) async throws -> HTMLResponse {
         let stored = try req.currentUser.tmdbToken
@@ -212,6 +232,7 @@ struct AccountController {
                                                         mailConfigured: mailConfigured, sso: sso,
                                                         passwordChange: user.hasPassword && config.passwordLogin,
                                                         tokenNeedsReauth: try tokenNeedsReauth(req), notifications: notifications,
-                                                        openBlock: open))
+                                                        openBlock: open,
+                                                        libraryRefresh: await req.application.libraryRefresh.state(userID: try req.userID)))
     }
 }

@@ -32,6 +32,8 @@ struct AccountPage: HTML {
     var notifications: AccountNotifications? = nil
     /// Block of the last action (or `?open=`); the token block is also open while no usable token is stored.
     var openBlock: AccountBlock? = nil
+    /// Reload of all titles from TMDB (shown while a token is stored).
+    var libraryRefresh: LibraryRefreshState? = nil
 
     private func isOpen(_ block: AccountBlock) -> Bool {
         openBlock == block || (block == .tmdb && tokenSuffix == nil)
@@ -65,6 +67,9 @@ struct AccountPage: HTML {
                 if tokenSuffix != nil {
                     form(.method(.post), .action("/account/tmdb-token/remove"), .class("inline-form")) {
                         button(.type(.submit)) { "Entfernen" }
+                    }
+                    if let libraryRefresh {
+                        LibraryRefreshStatus(state: libraryRefresh)
                     }
                 }
             }
