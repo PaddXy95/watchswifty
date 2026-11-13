@@ -3,19 +3,23 @@ import Elementary
 struct SiteFooter: HTML {
     /// Shown to admins when the update check found a newer release.
     var updateVersion: String? = nil
+    /// Pages without login (sign-in, password reset, …) do not reveal the version.
+    var showVersion = true
 
     var body: some HTML {
         footer(.class("site-footer")) {
             let version = AppVersion.current
-            span(.class("version")) {
-                if let url = version.releaseURL {
-                    a(.href(url), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { version.label }
-                } else {
-                    version.label
-                }
-                if let updateVersion {
-                    " · "
-                    a(.href("/admin/system"), .class("update-hint")) { "Update auf v\(updateVersion) verfügbar" }
+            if showVersion {
+                span(.class("version")) {
+                    if let url = version.releaseURL {
+                        a(.href(url), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) { version.label }
+                    } else {
+                        version.label
+                    }
+                    if let updateVersion {
+                        " · "
+                        a(.href("/admin/system"), .class("update-hint")) { "Update auf v\(updateVersion) verfügbar" }
+                    }
                 }
             }
             p(.class("made-with")) {

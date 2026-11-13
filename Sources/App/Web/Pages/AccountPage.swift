@@ -328,7 +328,7 @@ struct AccountNotificationsSection: HTML, Sendable {
             }
         }
         if let active = state.active {
-            form(.method(.post), .action("/account/notifications/test"), .class("inline-form")) {
+            form(.method(.post), .action("/account/notifications/test"), .class("inline-form notification-test")) {
                 button(.type(.submit)) { "Testnachricht senden" }
                 span(.class("muted")) { " (per \(channelName(active)))" }
             }

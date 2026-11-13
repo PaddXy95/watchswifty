@@ -91,6 +91,19 @@ struct RenderingTests {
         }
     }
 
+    @Test func footerHidesVersionWithoutLogin() async throws {
+        try await withTestApp { app in
+            _ = try await createUser(app, "pat")
+            try await app.testing().test(.GET, "/login") { res async in
+                #expect(res.status == .ok)
+                #expect(!res.body.string.contains(#"class="version""#))
+            }
+            try await app.testing().test(.GET, "/library", headers: try await login(app, "pat")) { res async in
+                #expect(res.body.string.contains(#"class="version""#))
+            }
+        }
+    }
+
     @Test func burgerMenuMarkup() {
         let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: true, active: .history)) { p { "x" } }.render()
         #expect(html.contains(#"id="nav-toggle""#))

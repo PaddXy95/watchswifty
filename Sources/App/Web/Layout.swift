@@ -55,7 +55,7 @@ struct PageLayout<Content: HTML>: HTMLDocument {
             div(.id("flash"), .custom(name: "aria-live", value: "polite")) {}
             content
         }
-        SiteFooter(updateVersion: nav?.updateVersion)
+        SiteFooter(updateVersion: nav?.updateVersion, showVersion: nav != nil)
     }
 }
 
