@@ -2,7 +2,7 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
-## [0.5.3] – 2026-11-13
+## [0.6.0] – 2026-11-14
 
 ### Fixed
 - **Suche** (search): the results no longer stick to the search field; there is space between them, so the focus
