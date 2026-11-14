@@ -160,6 +160,21 @@ struct OriginBehindProxyTests {
             }
         }
     }
+
+    /// A host made only of separators must fail the comparison, not trap the process (security audit F01).
+    @Test(arguments: [":", "::", ":8080"])
+    func malformedHostIsRejected(host: String) async throws {
+        try await withTestApp { app in
+            try await app.testing().test(.POST, "/logout", headers: [
+                "Host": "app:8080", "X-Forwarded-Host": host, "Origin": "http://evil.example",
+            ]) { res async in
+                #expect(res.status == .forbidden)
+            }
+            try await app.testing().test(.POST, "/logout", headers: ["Host": host, "Origin": "http://evil.example"]) { res async in
+                #expect(res.status == .forbidden)
+            }
+        }
+    }
 }
 
 @Suite("BoostedAuth")

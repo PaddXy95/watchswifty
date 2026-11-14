@@ -72,4 +72,20 @@ struct APIReviewFixTests {
             }
         }
     }
+
+    /// Out-of-range years count as "all years" instead of trapping in `year - 1` (security audit F09).
+    @Test(arguments: ["-9223372036854775808", "9223372036854775807"])
+    func extremeStatsYearDoesNotCrash(year: String) async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let token = try await apiToken(app, user)
+            try await app.testing().test(.GET, "/api/v1/stats?year=\(year)", headers: .bearer(token)) { res async in
+                #expect(res.status == .ok)
+            }
+            let web = try await login(app, "pat")
+            try await app.testing().test(.GET, "/stats?year=\(year)", headers: web) { res async in
+                #expect(res.status == .ok)
+            }
+        }
+    }
 }

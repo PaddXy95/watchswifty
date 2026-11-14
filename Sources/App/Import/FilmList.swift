@@ -62,7 +62,7 @@ func parseFilmList(_ text: String) throws -> [FilmListRow] {
         let checked: Set<String> = ["wahr", "true", "ja", "x", "1"]
         return FilmListRow(
             title: title,
-            year: Int(value(column("Erscheinungsjahr"))),
+            year: Int(value(column("Erscheinungsjahr"))).flatMap { (1800...9999).contains($0) ? $0 : nil },
             day: germanDay(value(column("Datum"))),
             service: StreamingService(label: value(column("Streamingdienst"))),
             rating: filmRating(detail: value(column("Detail")), stars: value(column("Bewertung"))),
@@ -87,9 +87,11 @@ func germanDay(_ raw: String) -> String? {
     return CalendarDay.isValid(iso) ? iso : nil
 }
 
-/// „Detail“ 0–100 → 1–10 (rounded, at least 1); without it, stars (0,5–5) × 2.
+/// „Detail“ 0–100 → 1–10 (rounded, at least 1); without it, stars (0,5–5) × 2. Non-finite values count as missing.
 func filmRating(detail: String, stars: String) -> Int? {
-    func number(_ text: String) -> Double? { Double(text.replacingOccurrences(of: ",", with: ".")) }
+    func number(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: ".")).flatMap { $0.isFinite ? $0 : nil }
+    }
     let raw: Double
     if let detail = number(detail) {
         raw = detail / 10
@@ -98,7 +100,8 @@ func filmRating(detail: String, stars: String) -> Int? {
     } else {
         return nil
     }
-    return min(10, max(1, Int(raw.rounded())))
+    // Clamp before converting: `Int(Double)` traps outside Int's range.
+    return Int(min(10, max(1, raw.rounded())))
 }
 
 extension StreamingService {
@@ -160,6 +163,12 @@ enum FilmChoice: Equatable {
     case notFound
 }
 
+/// Distance between two years that never traps, also for entries stored before years were range-checked.
+private func yearGap(_ a: Int, _ b: Int) -> Int {
+    let (difference, overflow) = a.subtractingReportingOverflow(b)
+    return overflow || difference == .min ? .max : abs(difference)
+}
+
 /// Picks the TMDB movie for a list entry: an exact title among results within ±1 year of the list's year, or the only
 /// result in that range, is taken automatically; anything else goes to review (at most 5 candidates).
 func chooseFilm(query: String, year: Int?, results: [TMDBSearchResult]) -> FilmChoice {
@@ -169,11 +178,11 @@ func chooseFilm(query: String, year: Int?, results: [TMDBSearchResult]) -> FilmC
         normalizeTitle(result.name) == wanted || result.originalName.map(normalizeTitle) == wanted
     }
     let inRange = year.map { year in
-        results.filter { result in result.year.map { abs($0 - year) <= 1 } ?? false }
-            .sorted { abs(($0.year ?? 0) - year) < abs(($1.year ?? 0) - year) }
+        results.filter { result in result.year.map { yearGap($0, year) <= 1 } ?? false }
+            .sorted { yearGap($0.year ?? 0, year) < yearGap($1.year ?? 0, year) }
     } ?? results
     let exact = inRange.filter(isExact)
-    func distance(_ result: TMDBSearchResult) -> Int { year.map { abs((result.year ?? 0) - $0) } ?? 0 }
+    func distance(_ result: TMDBSearchResult) -> Int { year.map { yearGap(result.year ?? 0, $0) } ?? 0 }
     // Several exact titles: the one closest to the list's year wins, unless two are equally close.
     if exact.count == 1 || (exact.count > 1 && year != nil && distance(exact[0]) < distance(exact[1])) { return .match(exact[0]) }
     if inRange.count == 1 { return .match(inRange[0]) }

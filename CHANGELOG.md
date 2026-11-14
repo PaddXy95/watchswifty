@@ -9,6 +9,15 @@ All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org)
   ring no longer overlaps the first result. Typing a new search replaces the result list instead of nesting a second
   one inside it.
 
+### Security
+- A request with a malformed `Host` or `X-Forwarded-Host` header (for example `:`) no longer crashes the server; the
+  origin check rejects it with 403. Before, a single anonymous request ended the process for every user.
+- **Statistik** (statistics): a year outside 1–9999 in `/stats?year=` or `GET /api/v1/stats` now shows all years
+  instead of crashing the server.
+- **Filmliste** (film list) import: ratings such as `1e300`, `nan` or `inf` in „Detail“ or „Bewertung“ no longer crash
+  the server; huge values are capped and non-numbers ignored. Release years outside 1800–9999 are dropped when the list
+  is read, and entries stored earlier with such a year no longer crash the film-list matching for everyone.
+
 ## [0.5.2] – 2026-11-13
 
 ### Changed
