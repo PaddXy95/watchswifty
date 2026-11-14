@@ -32,6 +32,10 @@ Everything the web UI can do: continue watching and notices, search, series and 
 comment, follow, hide; with their genres), history, library (filterable by `genre`, reload from TMDB), statistics (including genres and the longest and most watched titles), account and devices, Netflix import and film list, and for admins
 user management and system settings. Details and "Try it out" at `/api`.
 
+Granting admin rights (`POST /v1/admin/users` with `isAdmin`, `PUT /v1/admin/users/{id}/admin`) and setting the
+password of, or a linking link for, another admin need the acting admin's current password as `currentPassword` in the
+request (`403 confirmationRequired` otherwise). Admins without a password do this in the browser (`403 confirmInBrowser`).
+
 ## Swift client
 
 The Swift package also offers the library `WatchSwiftyClient`, generated from the same OpenAPI description as the

@@ -110,6 +110,7 @@ extension Application {
 
 extension Application {
     private struct OIDCIdentityLockKey: StorageKey { typealias Value = AsyncMutex }
+    private struct ForgotPasswordLockKey: StorageKey { typealias Value = AsyncMutex }
     private struct OIDCUsedStatesKey: StorageKey { typealias Value = OIDCUsedStates }
 
     /// States of OIDC flows already completed (single-use flow cookies).
@@ -128,6 +129,15 @@ extension Application {
             return lock
         }
         set { storage[OIDCIdentityLockKey.self] = newValue }
+    }
+
+    /// Makes the „Passwort vergessen“ throttle check and the new token one step (one mail per user and period).
+    var forgotPasswordLock: AsyncMutex {
+        get {
+            guard let lock = storage[ForgotPasswordLockKey.self] else { fatalError("Forgot-password lock not configured") }
+            return lock
+        }
+        set { storage[ForgotPasswordLockKey.self] = newValue }
     }
 }
 

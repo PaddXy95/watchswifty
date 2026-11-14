@@ -80,6 +80,8 @@ struct AdminTests {
         try await withTestApp { app in
             let pat = try await createUser(app, "pat")
             let headers = try await login(app, "admin", password: "adminpass123")
+            // Granting admin rights needs a confirmation first (security audit F10, see AdminConfirmationTests).
+            #expect(try await browserPost(app, "/admin/users/confirm", form: ["password": "adminpass123"], headers: headers).status == .seeOther)
             try await app.testing().test(.POST, "/admin/users/\(pat.requireID())/admin", headers: headers, beforeRequest: { req in
                 try req.content.encode(AdminFlagForm(isAdmin: true), as: .urlEncodedForm)
             }, afterResponse: { res async in

@@ -5,12 +5,12 @@ import Foundation
 /// Returns how many rows went back to pending.
 @discardableResult
 func requeueUnmatchedRows(titleID: UUID, on db: any Database) async throws -> Int {
-    let mappings = try await NetflixMapping.query(on: db).filter(\.$title.$id == titleID).all().compactMap(\.id)
-    guard !mappings.isEmpty else { return 0 }
-    let rows = try await NetflixRow.query(on: db).filter(\.$mapping.$id ~~ mappings)
-        .filter(\.$status == RowStatus.unmatched.rawValue).all()
-    guard !rows.isEmpty else { return 0 }
-    try await NetflixRow.query(on: db).filter(\.$id ~~ rows.compactMap(\.id))
-        .set(\.$status, to: RowStatus.pending.rawValue).update()
+    let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.unmatched.rawValue)
+        .join(NetflixMapping.self, on: \NetflixRow.$mapping.$id == \NetflixMapping.$id)
+        .filter(NetflixMapping.self, \.$title.$id == titleID)
+        .all(\.$id).compactMap { $0 }
+    for chunk in rows.chunked() {
+        try await NetflixRow.query(on: db).filter(\.$id ~~ chunk).set(\.$status, to: RowStatus.pending.rawValue).update()
+    }
     return rows.count
 }

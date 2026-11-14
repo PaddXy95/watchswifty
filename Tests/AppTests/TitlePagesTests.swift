@@ -553,18 +553,25 @@ struct SearchWithoutTokenTests {
         }
     }
 
-    @Test func cachedSeriesPageWorksWithoutToken() async throws {
+    /// Without a token only the user's own cached titles open; another user's cached title answers like an uncached
+    /// one (security audit F14).
+    @Test func ownCachedSeriesPageWorksWithoutToken() async throws {
         try await withTestApp { app in
-            try await createUser(app, "pat", tmdbToken: nil)
-            _ = try await seedSeries(app, tmdbID: 5, name: "Schon bekannt", seasons: [1: 2])
+            let pat = try await createUser(app, "pat", tmdbToken: nil)
+            let known = try await seedSeries(app, tmdbID: 5, name: "Schon bekannt", seasons: [1: 2])
+            _ = try await seedSeries(app, tmdbID: 7, name: "Fremde Serie", seasons: [1: 2])
+            try await WatchService(db: app.db).setFollowed(userID: pat.requireID(), titleID: known.requireID(), followed: true)
             let headers = try await login(app, "pat").adding(.htmx)
             try await app.testing().test(.GET, "/tv/5", headers: headers) { res async in
                 #expect(res.status == .ok)
                 #expect(res.body.string.contains("Schon bekannt"))
             }
-            try await app.testing().test(.GET, "/tv/6", headers: headers) { res async in
-                #expect(res.status == .unprocessableEntity)
-                #expect(res.body.string.contains("Kein TMDB-Token hinterlegt"))
+            for path in ["/tv/6", "/tv/7"] {
+                try await app.testing().test(.GET, path, headers: headers) { res async in
+                    #expect(res.status == .unprocessableEntity)
+                    #expect(res.body.string.contains("Kein TMDB-Token hinterlegt"))
+                    #expect(!res.body.string.contains("Fremde Serie"))
+                }
             }
         }
     }

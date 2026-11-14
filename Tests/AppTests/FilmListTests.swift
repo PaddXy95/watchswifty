@@ -35,6 +35,11 @@ struct FilmListParsingTests {
         #expect(germanDay("") == nil)
     }
 
+    @Test func overlongTitlesAreCut() throws {
+        let rows = try parseFilmList("Filmname;Erscheinungsjahr\n" + String(repeating: "x", count: 600) + ";2020\n")
+        #expect(rows.first?.title == String(repeating: "x", count: maxImportTitleLength))
+    }
+
     @Test func ratingFromDetail() {
         #expect(filmRating(detail: "99", stars: "5") == 10)
         #expect(filmRating(detail: "95", stars: "5") == 10)

@@ -6,6 +6,13 @@ under **Benutzer** (users) or, with [mail](email.md) set up, invites people by m
 themselves, the link is valid for 7 days. With [single sign-on](sso.md), accounts can also be created on the first
 sign-in through the provider.
 
+Admins never act on their own account under **Benutzer**; their own password changes under **Konto**. Granting admin
+rights (a new admin account or „Zum Admin machen“ (make admin)) and setting the password of, or a linking link for,
+another admin first need a confirmation that it is really them: the page asks for the admin's password, or for a
+sign-in through the provider for accounts without a password, and the confirmation lasts 5 minutes. In the
+[App API](app-api.md) these requests carry the admin's current password. This way a stolen device or session cannot
+create a second admin and use it to take over the owner's account.
+
 Every user enters their own [TMDB token](tmdb.md) and, optionally, their e-mail address under **Konto** (account).
 Changing the address requires the current password. Admins only see other users' addresses shortened, for example
 `p•••@example.org`.
@@ -27,6 +34,7 @@ The command asks for the new password twice without echoing it, so it ends up ne
 
 ## Sessions and apps
 
-A web session stays signed in as long as it is used; every use extends it by 30 days. Signing in starts a new
-session. Apps connect through the browser and get a device token valid for 90 days, see [App API](app-api.md). Under
+A web session stays signed in as long as it is used; every use extends it by 30 days, and a session unused for 30 days
+ends. Signing in starts a new session. The database holds only a fingerprint of the session cookie, so a copy of it
+cannot be used to sign in. Apps connect through the browser and get a device token valid for 90 days, see [App API](app-api.md). Under
 **Konto → Geräte** (account → devices) users sign out apps or create a token for scripts.

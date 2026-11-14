@@ -83,9 +83,9 @@ struct RefreshTokenTests {
             let ws = WatchService(db: app.db)
             try await ws.setHidden(userID: hiddenOwner.requireID(), titleID: show.requireID(), hidden: true)
             try await ws.setHidden(userID: noToken.requireID(), titleID: show.requireID(), hidden: false)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == nil)
+            #expect(try await refreshTokens(for: show.requireID(), on: app.db, cipher: app.tokenCipher).first == nil)
             try await ws.setHidden(userID: visible.requireID(), titleID: show.requireID(), hidden: false)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "visible-token")
+            #expect(try await refreshTokens(for: show.requireID(), on: app.db, cipher: app.tokenCipher).first == "visible-token")
         }
     }
 
@@ -96,7 +96,7 @@ struct RefreshTokenTests {
             let ws = WatchService(db: app.db)
             try await ws.setFollowed(userID: pat.requireID(), titleID: show.requireID(), followed: true)
             try await ws.setHidden(userID: pat.requireID(), titleID: show.requireID(), hidden: true)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "follower-token")
+            #expect(try await refreshTokens(for: show.requireID(), on: app.db, cipher: app.tokenCipher).first == "follower-token")
         }
     }
 }

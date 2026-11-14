@@ -47,7 +47,9 @@ SSO have no password; their e-mail address comes from the provider.
 1. Set up OIDC under **System** as above and **keep password login on** (no restart needed).
 2. Everyone signs in as usual and clicks „Mit SSO verknüpfen“ (link with SSO) under **Konto** (account). People who
    forgot their password use „Passwort vergessen?“ (forgot password) or a **„Verknüpfungslink“** (linking link) from
-   the admin (users page, by mail or to pass on, valid for 7 days). Open invitations can be accepted through SSO directly.
+   the admin (users page, by mail or to pass on, valid for 7 days). After the sign-in at the provider, the page „SSO
+   verknüpfen“ (link with SSO) shows both accounts; they are linked only after „Verknüpfen“ (link). If another
+   account is signed in in that browser, sign out first. Open invitations can be accepted through SSO directly.
 3. Check on the **Benutzer** (users) page: „x von y Konten verknüpft · Admin verknüpft: ja“ (x of y accounts linked,
    admin linked).
 4. Under **System**, click „Passwort-Login abschalten“ (turn off password login); this only works once your own account

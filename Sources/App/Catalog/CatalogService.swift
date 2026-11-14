@@ -7,12 +7,19 @@ struct CatalogService {
     let db: any Database
     let tmdb: any TMDBClient
 
+    /// Set for a request of a user without a TMDB token: a cached title is only served when this user uses it, so the
+    /// answer is the same as for an uncached title and does not reveal what other users track (security audit F14).
+    var tokenlessUser: UUID?
+
     static let maxAge: TimeInterval = 7 * 86_400
 
     /// Cached title, or fetched from TMDB (a new series also loads all episodes).
     func title(kind: TitleKind, tmdbID: Int) async throws -> Title {
         if let cached = try await Title.query(on: db)
             .filter(\.$kind == kind.rawValue).filter(\.$tmdbID == tmdbID).first() {
+            if let tokenlessUser, try await !usesTitle(userID: tokenlessUser, title: cached, on: db) {
+                throw TMDBError.missingToken
+            }
             return cached
         }
         let title = Title(tmdbID: tmdbID, kind: kind, name: "")
@@ -107,5 +114,7 @@ struct CatalogService {
 }
 
 extension Request {
-    var catalog: CatalogService { CatalogService(db: db, tmdb: tmdb) }
+    var catalog: CatalogService {
+        CatalogService(db: db, tmdb: tmdb, tokenlessUser: tmdbToken == nil ? auth.get(User.self)?.id : nil)
+    }
 }

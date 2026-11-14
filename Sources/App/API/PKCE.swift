@@ -11,9 +11,10 @@ func base64URL(_ data: Data) -> String {
         .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
 }
 
-/// Only the app login may be the target after signing in (no open redirects).
+/// Only the app login may be the target after signing in (no open redirects). Control characters are checked per
+/// Unicode scalar: a CR LF pair is a single Character and would slip past `contains("\n")` into the Location header.
 func isSafeReturnTo(_ path: String) -> Bool {
-    path.hasPrefix("/api/auth/authorize?") && !path.contains("\n") && !path.contains("\r")
+    path.hasPrefix("/api/auth/authorize?") && !path.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7F }
 }
 
 /// Decodes Base64URL without padding (JWT segments, tokens); nil for invalid input.

@@ -75,6 +75,23 @@ func browserPost(_ app: Application, _ path: String, form: [String: String], hea
     return try #require(result)
 }
 
+/// The value of one cookie in a request's `Cookie` header.
+func cookieValue(_ headers: HTTPHeaders, _ name: String) -> String? {
+    (headers.first(name: .cookie) ?? "").split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+        .first { $0.hasPrefix(name + "=") }.map { String($0.dropFirst(name.count + 1)) }
+}
+
+/// Runs a link-token flow, shows the confirmation page and confirms it with „Verknüpfen“. Returns the first response
+/// that is not the expected next step (an error page), else the confirmation's response.
+func confirmLinkToken(_ app: Application, _ fake: FakeOIDCProvider, token: String,
+                      headers: HTTPHeaders = .sameOrigin) async throws -> OIDCFlowResult {
+    let flow = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)", headers: headers)
+    guard flow.location == "/auth/oidc/link" else { return flow }
+    let page = try await browserGet(app, "/auth/oidc/link", headers: flow.headers)
+    guard page.status == .ok else { return page }
+    return try await browserPost(app, "/auth/oidc/link", form: [:], headers: page.headers)
+}
+
 /// Runs the flow for `fake.identity` up to the „Neues Konto anlegen“ page and returns the page with the parked cookie.
 func newAccountPage(_ app: Application, _ fake: FakeOIDCProvider, start: String = "/auth/oidc/start") async throws -> OIDCFlowResult {
     let flow = try await oidcFlow(app, fake, start: start)

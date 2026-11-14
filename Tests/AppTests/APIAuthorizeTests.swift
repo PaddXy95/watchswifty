@@ -192,6 +192,22 @@ struct APIAuthorizeTests {
         }
     }
 
+    /// A CR LF pair is one Character in Swift; it must still be rejected, or it becomes a header line (security audit F07).
+    @Test func returnToRejectsControlCharacters() async throws {
+        #expect(!isSafeReturnTo("/api/auth/authorize?x\r\nX-Audit: 1"))
+        #expect(!isSafeReturnTo("/api/auth/authorize?x\nX-Audit: 1"))
+        #expect(!isSafeReturnTo("/api/auth/authorize?x\rX-Audit: 1"))
+        #expect(!isSafeReturnTo("/api/auth/authorize?x\u{0}"))
+        #expect(!isSafeReturnTo("/api/auth/authorize?x\u{7F}"))
+        try await withTestApp { app in
+            try await createUser(app, "pat")
+            let web = try await login(app, "pat")
+            try await app.testing().test(.GET, "/login?returnTo=%2Fapi%2Fauth%2Fauthorize%3Fx%0D%0AX-Audit%3A%201", headers: web) { res async in
+                #expect(res.headers.first(name: .location) == "/")
+            }
+        }
+    }
+
     @Test func consentPageEscapesDeviceName() async throws {
         try await withTestApp { app in
             try await createUser(app, "pat")

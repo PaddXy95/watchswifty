@@ -57,7 +57,7 @@ func parseFilmList(_ text: String) throws -> [FilmListRow] {
             guard let index, index < record.fields.count else { return "" }
             return clean(record.fields[index])
         }
-        let title = value(titleColumn)
+        let title = String(value(titleColumn).prefix(maxImportTitleLength))
         guard !title.isEmpty else { return nil }
         let checked: Set<String> = ["wahr", "true", "ja", "x", "1"]
         return FilmListRow(

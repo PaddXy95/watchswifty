@@ -26,6 +26,8 @@ struct OIDCFlowCookie: Codable, Sendable {
     var verifier: String
     var startedAt: Date
     var intent: OIDCIntent
+    /// The signed-in user who started a `link`/`reauth` flow; the callback must run in that user's session.
+    var userID: UUID?
     var returnTo: String?
     var linkToken: String?
     var inviteToken: String?

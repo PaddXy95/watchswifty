@@ -112,8 +112,9 @@ test seeds). `LiveOIDCProvider`
 ### TMDB cache rule
 `CatalogMaintenance` enforces the TMDB terms: titles are re-fetched after 60 days with the token of a user who uses
 them, unused titles are deleted, TMDB texts are cleared after 180 days without refresh. `titleUsers(on:)` lists every
-table that counts as "using" a title; **a new per-user table referencing titles must be added there**, or its titles
-get deleted. `episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
+table that counts as "using" a title; **a new per-user table referencing titles must be added there** (and to
+`usesTitle`, which decides which cached titles a user without a TMDB token may open), or its titles get deleted.
+`episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
 
 ### Notifications
 `DailyRefreshLifecycle` runs `runDailyPass` at the admin's time (`app_settings.daily_run_time`, server time zone,
