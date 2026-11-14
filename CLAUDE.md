@@ -16,7 +16,8 @@ linked from App Store Connect; keep `docs/privacy-ios-app.md` in sync). Commit m
 Commits (`feat(mail): …`, `fix(auth): …`, `docs: …`, `perf: …`).
 
 **Documentation:** the README stays short (features, quick start, links). Details go into the topic pages under
-`docs/` (installation, configuration, operations, accounts, tmdb, sso, email, import, app-api, releases, development).
+`docs/` (installation, configuration, operations, accounts, tmdb, sso, email, notifications, import, app-api, releases,
+development).
 UI hints point to those pages with `DocsLink` (`Web/Components/DocsLink.swift`), not to the README.
 
 ## Commands
@@ -34,8 +35,9 @@ docker build -t watchswifty .
 `.claude/launch.json` defines the `watchswifty` preview server (DB `.dev/accept.sqlite`, admin password read from
 `.dev/admin-password`, port 8080). No linter or formatter is configured.
 
-The package enables upcoming features `ExistentialAny` (write `any Protocol`), `InternalImportsByDefault` and
-`MemberImportVisibility` (import every module whose members a file uses, e.g. `import Fluent` for queries).
+`App` and the test targets enable the upcoming features `ExistentialAny` (write `any Protocol`),
+`InternalImportsByDefault`, `MemberImportVisibility` (import every module whose members a file uses, e.g.
+`import Fluent` for queries), `InferIsolatedConformances` and `ImmutableWeakCaptures`.
 
 ## Architecture
 
@@ -44,20 +46,26 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   swift-openapi-generator from `Sources/WatchSwiftyAPI/openapi.yaml` (`accessModifier: package`). That YAML is the
   single source of the App API; `Public/api/openapi.yaml` is a symlink to it (served at `/api/openapi.yaml`, the
   Dockerfile copies `Public` with `cp -RL`).
+- `WatchSwiftyClient`: public library product for the iOS app, generated (types + client) from the same spec
+  (`Sources/WatchSwiftyClient/openapi.yaml` is a symlink). Growing string enums (`Service`, `Genre`, …) are mapped to
+  open types in `OpenValues.swift` via `typeOverrides` in its `openapi-generator-config.yaml`, so older apps decode
+  values a newer server adds. A new value or a new growing enum in the spec needs updating there; the `known` lists
+  are checked by `Tests/WatchSwiftyClientTests`.
 - `App`: the executable. To change the API, edit `openapi.yaml` first, then implement the generated operation in
   `Sources/App/API/APIHandler+<Group>.swift` (`APIHandler` conforms to `APIProtocol`).
 
 ### Startup and dependency wiring
 - `entrypoint.swift` builds `AppConfig` from the environment and a `TMDBProvider`, then calls `configure(...)`.
-  Tests call the same `configure` with fakes (TMDB, mail sender, release fetcher), so everything wired there is
-  exercised by tests.
+  Tests call the same `configure` with fakes (TMDB, release fetcher, mail sender, OIDC provider, webhook sender), so
+  everything wired there is exercised by tests.
 - `configure.swift` holds the middleware order, the **explicit, ordered migration list** (append new migrations at
-  the end), auto-migration, admin bootstrap, and the background workers (Netflix matching, daily catalog refresh,
-  update check). Workers only start for `serve` with `backgroundJobsEnabled` (off in tests).
+  the end), auto-migration, admin bootstrap, and the background workers (Netflix matching `MatchingWorker`, film list
+  matching `FilmListWorker`, daily pass, update check). They only start for `serve` with `backgroundJobsEnabled` (off
+  in tests). `LibraryRefreshWorker` (the user-started reload of all data from TMDB) runs on demand.
 - App-wide singletons live in `Application.storage` behind typed accessors (`Config/Application+Services.swift`
   and similar). Services are cheap structs over `db` + collaborators, exposed per request through `Request`
   extensions at the bottom of each service file (`req.watches`, `req.catalog`, `req.history`, `req.seriesDetails`, …).
-- "Today" is `AppConfig.today` (a `YYYY-MM-DD` string, see `CalendarDay`), not `Date()`; tests pin it to
+- "Today" is `AppConfig.today()` (a `YYYY-MM-DD` string, see `CalendarDay`), not `Date()`; tests pin it to
   `2026-11-07`.
 
 ### Two front doors, shared services
@@ -65,12 +73,15 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   `routes.swift`) and returns `HTMLResponse(<Elementary page or component>)`. Pages are in `Web/Pages`, reusable
   fragments in `Web/Components`, the shell in `Web/Layout.swift`. htmx requests (`req.isHTMX`) usually get just
   the fragment to swap; error responses are swapped too (htmx-config in `Layout`), typically into `#flash`.
-- **App API** (`/api/v1`): handlers must only call the services shared with the web UI, so new behavior goes into
-  the service and both front doors get it. Errors are `{"code", "message"}` via `APIError`/`APIErrorMiddleware`.
-- Feature folders: `Auth` (incl. `Auth/OIDC`: OIDC login, see below), `Account`, `Admin`, `Catalog` (local cache of TMDB titles/episodes), `Tracking`
-  (watches, ratings, comments, continue watching, history, library, stats), `Import` (Netflix CSV, film list,
-  `MatchingWorker`), `Mail`, `Notify` (daily run schedule, new-episode notices, KNot webhook, per-user channel),
-  `TMDB`, `Web`, `API`.
+- **App API** (`/api/v1`): `registerAPI` (`API/APIRoutes.swift`) mounts the generated handlers under `/api` (spec
+  paths start with `/v1/`); `/api` itself is the API docs page. Handlers must only call the services shared with the
+  web UI, so new behavior goes into the service and both front doors get it. Errors are `{"code", "message"}` via
+  `APIError`/`APIErrorMiddleware`.
+- Feature folders: `Auth` (incl. `Auth/OIDC`: OIDC login, see below), `Account`, `Admin`, `Catalog` (local cache
+  of TMDB titles/episodes), `Tracking` (watches, ratings, comments, continue watching, history, library, stats,
+  search), `Import` (Netflix CSV, film list, `MatchingWorker`), `Mail`, `Notify` (daily run schedule, new-episode
+  notices, KNot webhook, per-user channel), `TMDB`, `Web`, `API`, `Config` (`AppConfig`, `CalendarDay`, storage
+  accessors).
 
 ### Auth and security rules
 - Web: Fluent sessions (cookie `watchswifty_session`), `User.sessionAuthenticator()` + `AuthRedirectMiddleware`;
@@ -82,9 +93,9 @@ The package enables upcoming features `ExistentialAny` (write `any Protocol`), `
   or, without `Origin`, the request is from htmx.
 - Per-user isolation: user-owned records are always loaded through the logged-in user; another user's IDs must
   yield 404 (covered by `IsolationTests`).
-- Secrets at rest (each user's TMDB token, SMTP settings, user e-mail addresses) are AES-GCM encrypted with
-  `TokenCipher` (key from `TOKEN_KEY` / `TOKEN_KEY_FILE` / generated `token.key`). `req.tmdb` is a client for the
-  logged-in user's own token; all users share one TMDB `RateLimiter`.
+- Secrets at rest (each user's TMDB token and KNot webhook key, SMTP settings, the OIDC setup, user e-mail addresses)
+  are AES-GCM encrypted with `TokenCipher` (key from `TOKEN_KEY` / `TOKEN_KEY_FILE` / generated `token.key`).
+  `req.tmdb` is a client for the logged-in user's own token; all users share one TMDB `RateLimiter`.
 
 ### OIDC login (SSO)
 Optional, one provider, configured under System (`OIDCSettingsService`, sealed in `app_settings.oidc_config`, cached in
@@ -101,8 +112,9 @@ test seeds). `LiveOIDCProvider`
 ### TMDB cache rule
 `CatalogMaintenance` enforces the TMDB terms: titles are re-fetched after 60 days with the token of a user who uses
 them, unused titles are deleted, TMDB texts are cleared after 180 days without refresh. `titleUsers(on:)` lists every
-table that counts as "using" a title; **a new per-user table referencing titles must be added there**, or its titles
-get deleted. `episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
+table that counts as "using" a title; **a new per-user table referencing titles must be added there** (and to
+`usesTitle`, which decides which cached titles a user without a TMDB token may open), or its titles get deleted.
+`episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
 
 ### Notifications
 `DailyRefreshLifecycle` runs `runDailyPass` at the admin's time (`app_settings.daily_run_time`, server time zone,
@@ -115,19 +127,34 @@ Spec `2026-11-11-notifications-design.md`.
 
 - Swift Testing (`@Suite`, `@Test`, `#expect`), not XCTest.
 - `withTestApp { app in … }` (`Tests/AppTests/Support/TestApp.swift`) runs the real `configure` with in-memory
-  SQLite and `AppConfig.testing` (bcrypt cost 4, no login delay, background jobs off, fixed today).
+  SQLite and `AppConfig.testing` (bcrypt cost 4, no login delay, background jobs off, fixed today). Fakes are passed
+  as `tmdb:`, `releases:`, `mail:`, `oidc:`, `webhook:` (`Support/Fake*.swift`).
 - OIDC tests: `withTestApp(config: .testingOIDC, oidc: FakeOIDCProvider())`, `oidcFlow`/`browserGet`/`browserPost`/
   `newAccountPage`/`linkOIDC` (`Support/OIDCFlow.swift`), `OIDCTestKeys` + `FakeOIDCTransport` for token/provider tests.
 - Helpers: `createUser`, `login` (real login form, returns headers with session cookie + same Origin),
   `HTTPHeaders.sameOrigin` / `.htmx` for state-changing web requests, `apiToken` + `HTTPHeaders.bearer` for the API,
   `seedSeries` / `seedMovie` / `episode` in `Support/Seed.swift`, `FakeTMDBClient` (records `calls`, can inject
-  failures), `FakeMailSender`.
+  failures), `FakeMailSender`, `FakeWebhookSender`, `FakeReleaseFetcher`.
 - `Tests/AppTests/Fixtures/netflix-sample.csv` holds representative rows; never commit a real user's export.
 - `ReleaseScriptTests` run `scripts/*.sh` in throwaway git repos.
 
+## Git workflow
+
+- Changes are made only on `dev` or on a branch off `dev`, never on `main` or any other branch.
+- Every task gets its own branch from an up-to-date `dev`:
+  `git switch dev && git pull && git switch -c feature/<short-description>`
+- A task is done when all tests are green and the user has confirmed the result.
+- When it is done, merge the branch back into `dev`:
+  `git switch dev && git merge --no-ff feature/<short-description>`
+- On merge conflicts run `git merge --abort` and ask the user. Never resolve conflicts on your own.
+- Delete the branch only after a successful merge:
+  - locally: `git branch -d feature/<short-description>` (never `-D`)
+  - on the remote, if it exists: `git push origin --delete feature/<short-description>`
+
 ## Releases and CI
 
-- `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`) and a test image build. **A push to
+- `.github/workflows/docker.yml`: PRs run `swift test` (in `swift:6.4-noble`); `image-check.yml` adds a test image
+  build only for PRs that touch the Docker build (Dockerfile, entrypoint, `Package.*`, workflows). **A push to
   `main` publishes**: image to `ghcr.io/paddxy95/watchswifty` and a GitHub release. A push to `beta` (or a manual
   "Run workflow" on any branch) pushes only `:beta` / `:beta-<sha7>` with `APP_VERSION=<next>-beta`; no tag, no
   release.

@@ -1481,7 +1481,7 @@ paths:
     post:
       operationId: createUser
       tags: [Admin]
-      summary: Create a user (admins only)
+      summary: Create a user (admins only; an admin account needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1499,7 +1499,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "409":
           description: Initial password although password login is switched off (`passwordLoginDisabled`) – only invitations are possible then
           content:
@@ -1549,7 +1549,7 @@ paths:
     put:
       operationId: resetUserPassword
       tags: [Admin]
-      summary: Set another user's password (not your own – use PUT /v1/me/password for that)
+      summary: Set another user's password (not your own – use PUT /v1/me/password for that; another admin's needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1570,7 +1570,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1595,6 +1595,13 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        description: Needed when the account is an admin's (security confirmation)
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminConfirmation"
       responses:
         "200":
           description: Created
@@ -1605,7 +1612,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           description: User unknown or OIDC not set up (`notFound`)
           content:
@@ -1622,7 +1629,7 @@ paths:
     put:
       operationId: setUserAdmin
       tags: [Admin]
-      summary: Set the admin right of another user
+      summary: Set the admin right of another user (granting it needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1647,7 +1654,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -1998,6 +2005,13 @@ components:
             $ref: "#/components/schemas/Error"
     Forbidden:
       description: Admins only (`forbidden`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ForbiddenOrUnconfirmed:
+      description: Admins only (`forbidden`), or `currentPassword` is missing or wrong (`confirmationRequired`); an account
+        without a password confirms in the browser (`confirmInBrowser`)
       content:
         application/json:
           schema:
@@ -2910,6 +2924,10 @@ components:
           type: string
         isAdmin:
           type: boolean
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     AdminPassword:
       type: object
       required: [password]
@@ -2917,12 +2935,27 @@ components:
         password:
           type: string
           minLength: 8
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     AdminFlag:
       type: object
       required: [isAdmin]
       properties:
         isAdmin:
           type: boolean
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
+    AdminConfirmation:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     UpdateCheck:
       type: object
       required: [enabled]

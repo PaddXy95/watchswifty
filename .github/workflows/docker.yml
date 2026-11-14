@@ -1,6 +1,6 @@
 name: CI/CD
 
-# Pull requests: tests and a test build of the image (nothing is pushed).
+# Pull requests: tests only; the image is built only when a pull request touches the Docker build (image-check.yml).
 # Push to main: tests and image build in parallel → (only if the tests are green) push to GHCR → GitHub release.
 # Push to beta, or "Run workflow" on any branch: same, but only the :beta and :beta-<commit> tags are pushed
 # (no git tag, no GitHub release, :latest stays untouched).
@@ -33,6 +33,7 @@ jobs:
         run: swift test
 
   image:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

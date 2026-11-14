@@ -23,6 +23,8 @@ struct AccountService {
         if let error = AccountValidation.passwordError(new) { throw APIError.validation(error) }
         user.passwordHash = try await hasher.hash(new)
         try await user.save(on: db)
+        // Like every other way of setting a password: open reset and invitation links end.
+        try await PasswordTokenService(db: db).deleteAll(userID: user.requireID())
     }
 
     /// Sets (or with an empty value removes) the user's own address. Needs the current password, so a hijacked session

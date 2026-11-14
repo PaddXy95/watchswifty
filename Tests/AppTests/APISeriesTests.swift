@@ -163,11 +163,14 @@ struct APISeriesTests {
 
     @Test func seriesWithoutTMDBToken() async throws {
         try await withTestApp { app in
-            let (_, token) = try await setup(app, token: nil)
-            _ = try await seedSeries(app, tmdbID: 1, seasons: [1: 1])
+            let (user, token) = try await setup(app, token: nil)
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 1])
             let (status, _, error) = try await get(app, token, "/api/v1/tv/999")
             #expect(status == .unprocessableEntity)
             #expect(error?.code == "missingTMDBToken")
+            // A cached series opens without a token only when the user uses it (security audit F14).
+            #expect(try await get(app, token, "/api/v1/tv/1").0 == .unprocessableEntity)
+            try await WatchService(db: app.db).setFollowed(userID: user.requireID(), titleID: show.requireID(), followed: true)
             #expect(try await get(app, token, "/api/v1/tv/1").0 == .ok)
         }
     }

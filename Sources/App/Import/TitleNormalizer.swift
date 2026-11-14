@@ -1,13 +1,15 @@
 import Foundation
 
+/// Longest title kept from an import file; real titles are far shorter, and matching cost grows with the length
+/// (security audit F05).
+let maxImportTitleLength = 500
+
 /// Lowercased, diacritics folded (ß → ss), dashes/colons → spaces, other punctuation dropped,
 /// trailing "(n)" removed, whitespace collapsed.
 func normalizeTitle(_ s: String) -> String {
     var text = s.replacingOccurrences(of: "ß", with: "ss").replacingOccurrences(of: "ẞ", with: "SS")
     text = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "de_DE")).lowercased()
-    if let range = text.range(of: #"\s*\(\d+\)\s*$"#, options: .regularExpression) {
-        text.removeSubrange(range)
-    }
+    text = removingTrailingNumber(text)
     var out = ""
     for scalar in text.unicodeScalars {
         if CharacterSet.alphanumerics.contains(scalar) {
@@ -17,6 +19,25 @@ func normalizeTitle(_ s: String) -> String {
         }
     }
     return out.split(separator: " ").joined(separator: " ")
+}
+
+/// Removes a trailing "(n)" and the whitespace around it, like the regex `\s*\(\d+\)\s*$` but in linear time: the
+/// regex backtracks quadratically over long whitespace runs (security audit F05).
+func removingTrailingNumber(_ text: String) -> String {
+    func isDigit(_ c: Character) -> Bool { c.unicodeScalars.count == 1 && c.unicodeScalars.first!.properties.generalCategory == .decimalNumber }
+    var end = text.endIndex
+    while end > text.startIndex, text[text.index(before: end)].isWhitespace { end = text.index(before: end) }
+    guard end > text.startIndex, text[text.index(before: end)] == ")" else { return text }
+    var start = text.index(before: end)
+    var digits = 0
+    while start > text.startIndex, isDigit(text[text.index(before: start)]) {
+        start = text.index(before: start)
+        digits += 1
+    }
+    guard digits > 0, start > text.startIndex, text[text.index(before: start)] == "(" else { return text }
+    start = text.index(before: start)
+    while start > text.startIndex, text[text.index(before: start)].isWhitespace { start = text.index(before: start) }
+    return String(text[..<start])
 }
 
 /// Levenshtein distance over Unicode scalars.

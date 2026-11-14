@@ -43,11 +43,11 @@ struct OIDCLoginTests {
 
     @Test func anonymousStartCreatesNoSession() async throws {
         try await withTestApp(config: .testingOIDC) { app in
-            let before = try await SessionRecord.query(on: app.db).count()
+            let before = try await WebSession.query(on: app.db).count()
             let start = try await browserGet(app, "/auth/oidc/start", headers: .sameOrigin)
             #expect(start.status == .seeOther)
             #expect(!(start.headers.first(name: .cookie) ?? "").contains("watchswifty_session"))
-            #expect(try await SessionRecord.query(on: app.db).count() == before)
+            #expect(try await WebSession.query(on: app.db).count() == before)
         }
     }
 

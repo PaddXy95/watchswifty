@@ -19,6 +19,13 @@ struct NetflixCSVTests {
         #expect(result.rows.first { $0.title == "Das fünfte Element" }?.day == "2020-12-24")
     }
 
+    /// Real titles stay far below the limit; longer ones are cut so matching stays cheap (security audit F05).
+    @Test func overlongTitlesAreCut() throws {
+        let rows = try parseNetflixCSV("Title,Date\n" + String(repeating: "x", count: 600) + ",1/1/20").rows
+        #expect(rows.first?.title == String(repeating: "x", count: maxImportTitleLength))
+        #expect(rows.first?.fingerprint == "2020-01-01#0#" + String(repeating: "x", count: maxImportTitleLength))
+    }
+
     @Test func duplicateSameDayGetsOccurrence() throws {
         let pilots = try parseNetflixCSV(try fixtureText()).rows.filter { $0.title == "The Mentalist: Staffel 1: Pilot" }
         #expect(pilots.map(\.fingerprint) == ["2020-01-01#0#The Mentalist: Staffel 1: Pilot", "2020-01-01#1#The Mentalist: Staffel 1: Pilot"])

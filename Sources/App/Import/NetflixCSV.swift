@@ -16,6 +16,8 @@ struct NetflixCSVResult: Sendable, Equatable {
 enum NetflixCSVError: Error, Equatable {
     case notNetflixHistory
     case invalidDate(line: Int, value: String)
+    /// The upload would store more rows than one user may keep (`ImportService.maxStoredRows`).
+    case tooManyRows(limit: Int)
 }
 
 /// Parses Netflix's "Wiedergabeaktivität" export (`Title,Date`, dates `M/D/YY`).
@@ -37,7 +39,7 @@ func parseNetflixCSV(_ text: String) throws -> NetflixCSVResult {
     for record in records.dropFirst() {
         if record.fields.count == 1 && record.fields[0].trimmingCharacters(in: .whitespaces).isEmpty { continue }
         guard record.fields.count >= 2 else { throw NetflixCSVError.invalidDate(line: record.line, value: "") }
-        let title = record.fields[0]
+        let title = String(record.fields[0].prefix(maxImportTitleLength))
         let rawDate = record.fields[1].trimmingCharacters(in: .whitespaces)
         guard let day = netflixDay(rawDate) else { throw NetflixCSVError.invalidDate(line: record.line, value: rawDate) }
         let trimmed = title.trimmingCharacters(in: .whitespaces)

@@ -33,7 +33,7 @@ struct ForgotPasswordTests {
     }
 
     func service(_ app: Application) -> ForgotPasswordService {
-        ForgotPasswordService(db: app.db, cipher: app.tokenCipher, mail: app.mail, logger: app.logger)
+        ForgotPasswordService(db: app.db, cipher: app.tokenCipher, mail: app.mail, logger: app.logger, lock: app.forgotPasswordLock)
     }
 
     @Test func sameAnswerForEveryone() async throws {
@@ -81,6 +81,21 @@ struct ForgotPasswordTests {
             #expect(fake.sent.count == 1)
             await service(app).handle(username: "pat", now: Date().addingTimeInterval(301))
             #expect(fake.sent.count == 2)
+        }
+    }
+
+    /// Concurrent requests must not slip past the throttle between its check and the new token (security audit F11).
+    @Test func concurrentRequestsSendOneMail() async throws {
+        let fake = FakeMailSender()
+        try await withTestApp(mail: fake) { app in
+            try await configureMail(app)
+            try await userWithEmail(app, "pat", email: "pat@x.de")
+            let forgot = service(app)
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<10 { group.addTask { await forgot.handle(username: "pat") } }
+            }
+            #expect(fake.sent.count == 1)
+            #expect(try await PasswordToken.query(on: app.db).count() == 1)
         }
     }
 

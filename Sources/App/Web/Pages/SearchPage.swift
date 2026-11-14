@@ -21,7 +21,7 @@ struct SearchPage: HTML {
                       .custom(name: "placeholder", value: "Serie oder Film"),
                       .custom(name: "aria-label", value: "Serie oder Film suchen"),
                       .hx.get("/search/results"), .custom(name: "hx-trigger", value: "input changed delay:300ms, search"),
-                      .hx.target("#results"))
+                      .hx.target("#results"), .hx.swap(.outerHTML))
             }
             SearchResults(results: results, hasToken: hasToken)
         }

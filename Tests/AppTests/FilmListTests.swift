@@ -35,6 +35,11 @@ struct FilmListParsingTests {
         #expect(germanDay("") == nil)
     }
 
+    @Test func overlongTitlesAreCut() throws {
+        let rows = try parseFilmList("Filmname;Erscheinungsjahr\n" + String(repeating: "x", count: 600) + ";2020\n")
+        #expect(rows.first?.title == String(repeating: "x", count: maxImportTitleLength))
+    }
+
     @Test func ratingFromDetail() {
         #expect(filmRating(detail: "99", stars: "5") == 10)
         #expect(filmRating(detail: "95", stars: "5") == 10)
@@ -46,6 +51,16 @@ struct FilmListParsingTests {
         #expect(filmRating(detail: "", stars: "0,5") == 1)
         #expect(filmRating(detail: "", stars: "") == nil)
         #expect(filmRating(detail: "abc", stars: "") == nil)
+    }
+
+    /// Huge numbers are clamped and non-finite ones ignored instead of trapping in `Int(Double)` (security audit F02).
+    @Test func ratingSurvivesExtremeNumbers() {
+        #expect(filmRating(detail: "1e300", stars: "") == 10)
+        #expect(filmRating(detail: "-1e300", stars: "") == 1)
+        #expect(filmRating(detail: "", stars: "1e300") == 10)
+        #expect(filmRating(detail: "nan", stars: "") == nil)
+        #expect(filmRating(detail: "inf", stars: "") == nil)
+        #expect(filmRating(detail: "nan", stars: "4,5") == 9)
     }
 
     @Test func serviceLabels() {
@@ -114,6 +129,19 @@ struct FilmListMatchingTests {
         #expect(chooseFilm(query: "Pirates of the Caribbean 3", year: 2007, results: two) == .review(two))
         #expect(chooseFilm(query: "X", year: 2020, results: [movie(3, "X", 1990)]) == .review([movie(3, "X", 1990)]))
         #expect(chooseFilm(query: "Nichts", year: 2020, results: []) == .notFound)
+    }
+
+    /// A stored out-of-range year must not trap in the year distance (security audit F03).
+    @Test(arguments: [Int.min, Int.max])
+    func extremeYearGoesToReview(year: Int) {
+        let matrix = [movie(1, "Matrix", 1999)]
+        #expect(chooseFilm(query: "Matrix", year: year, results: matrix) == .review(matrix))
+    }
+
+    /// Implausible years are dropped when the list is read, so they are never stored (security audit F03).
+    @Test func parserDropsImplausibleYears() throws {
+        let rows = try parseFilmList("Filmname;Erscheinungsjahr\nMatrix;-9223372036854775808\nUhrwerk Orange;1971\nZukunft;99999\n")
+        #expect(rows.map(\.year) == [nil, 1971, nil])
     }
 }
 

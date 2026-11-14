@@ -2,6 +2,51 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.6.0] – 2026-11-14
+
+### Fixed
+- **Suche** (search): the results no longer stick to the search field; there is space between them, so the focus
+  ring no longer overlaps the first result. Typing a new search replaces the result list instead of nesting a second
+  one inside it.
+
+### Security
+- A request with a malformed `Host` or `X-Forwarded-Host` header (for example `:`) no longer crashes the server; the
+  origin check rejects it with 403. Before, a single anonymous request ended the process for every user.
+- **Statistik** (statistics): a year outside 1–9999 in `/stats?year=` or `GET /api/v1/stats` now shows all years
+  instead of crashing the server.
+- **Filmliste** (film list) import: ratings such as `1e300`, `nan` or `inf` in „Detail“ or „Bewertung“ no longer crash
+  the server; huge values are capped and non-numbers ignored. Release years outside 1800–9999 are dropped when the list
+  is read, and entries stored earlier with such a year no longer crash the film-list matching for everyone.
+- **Web sessions** are stored only as a fingerprint of the session cookie, so a copy of the database can no longer be
+  used to sign in, and a session unused for 30 days ends (the daily pass removes it). Requests without a valid session
+  no longer leave empty sessions behind. **Everyone has to sign in once more after the update.**
+- **„Mit SSO verknüpfen“** (link with SSO): the provider's answer is only accepted in the browser session that started
+  the link, so a prepared link can no longer attach someone else's provider account to yours.
+- **„Verknüpfungslink“** (linking link): opening one now shows the confirmation page „SSO verknüpfen“ with the provider
+  account and the WatchSwifty account; the accounts are linked only after „Verknüpfen“ (link). While another account
+  is signed in in that browser, the link is refused.
+- App sign-in: a return address with control characters (such as a line break) is refused instead of ending up in the
+  redirect header.
+- Changing the password under **Konto** (account) ends open links for setting a password.
+- **„Passwort vergessen“** (forgot password): requests sent at the same moment no longer get around the 5-minute limit
+  and send at most one mail.
+- **Import:** one account's very large Netflix history can no longer stop the matching for everyone: the matching
+  queries stay small however much is stored, each account keeps at most 200,000 Netflix rows (a larger upload is
+  refused with a message), and the import progress is counted in the database instead of loading every row. Titles
+  longer than 500 characters are cut when a Netflix history or film list is read, and long runs of spaces in titles no
+  longer slow the server down.
+- One user's rejected TMDB token no longer holds back others: their Netflix rows are still matched from the cache or
+  with their own token, and the daily refresh, the cache upkeep and the loading of runtimes and genres try the next
+  user's token.
+- **Benutzer** (users): granting admin rights, and setting the password of or a linking link for another admin, now
+  need a confirmation with the admin's own password (or a sign-in through the provider for accounts without a
+  password), valid for 5 minutes. In the App API these requests carry `currentPassword` (`403 confirmationRequired`;
+  `confirmInBrowser` for admins without a password). Before, a stolen admin device could create a second admin and
+  use it to take over the owner's account. Apps need an update to create admins.
+- Without a TMDB token, only titles you use (watched, in your library or followed, with season comments, or matched by
+  an import) open from the cache; other titles answer as if they were not cached, so you can no longer tell what other
+  users track. Search shows episode counts only for series in your library.
+
 ## [0.5.2] – 2026-11-13
 
 ### Changed
