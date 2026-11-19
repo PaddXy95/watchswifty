@@ -44,9 +44,10 @@ struct OriginCheckMiddleware: AsyncMiddleware {
         if forwardedHost != nil, !host.contains(":"), let port = request.headers.first(name: "X-Forwarded-Port").flatMap({ Int($0) }) {
             host += ":\(port)"
         }
-        // Compare without default ports on either side.
-        let parts = host.split(separator: ":", maxSplits: 1)
-        let requestAuthority = Self.authority(host: String(parts[0]), port: parts.count > 1 ? Int(parts[1]) : nil, defaultPort: defaultPort)
+        // Compare without default ports on either side. A host made only of separators (":", ":8080") never matches.
+        let parts = host.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let name = parts.first, !name.isEmpty else { return false }
+        let requestAuthority = Self.authority(host: String(name), port: parts.count > 1 ? Int(parts[1]) : nil, defaultPort: defaultPort)
         return originAuthority == requestAuthority
     }
 

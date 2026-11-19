@@ -11,7 +11,8 @@
    appear under **Nicht zugeordnet** (not matched). Wrong matches can be changed or reset under **Zuordnungen**
    (matches).
 
-Matching needs your [TMDB token](tmdb.md).
+Matching needs your [TMDB token](tmdb.md). Each account keeps up to 200,000 Netflix rows; an upload that would go
+beyond that is refused. Titles longer than 500 characters are cut.
 
 ## Your own film list
 

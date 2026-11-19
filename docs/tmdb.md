@@ -13,8 +13,9 @@ Every user stores their own free TMDB *Read Access Token* under **Konto** (accou
 4. Copy the long **API Read Access Token** (starts with `eyJ`), **not** the short "API Key".
 5. Paste it in WatchSwifty under **Konto** and save.
 
-Without a token, search and Netflix matching do not work; titles already known, „Weiterschauen“ (continue watching),
-history and library still do. WatchSwifty checks the token with TMDB when you save it, stores it encrypted (see
+Without a token, search and Netflix matching do not work; titles you already use (watched, in your library or followed,
+or matched by an import), „Weiterschauen“ (continue watching), history and library still do. Other titles do not open
+without a token, even if another user has them, so nobody can tell what others track. WatchSwifty checks the token with TMDB when you save it, stores it encrypted (see
 [Encryption key](configuration.md#encryption-key)) and afterwards only shows its last four characters. Admins cannot
 see it either.
 
@@ -24,7 +25,8 @@ All users share one rate limit towards TMDB.
 
 WatchSwifty keeps a local copy of the titles and episodes its users track. Following the TMDB terms:
 
-- cached titles are fetched again after 60 days at the latest, with the token of a user who uses the title;
+- cached titles are fetched again after 60 days at the latest, with the token of a user who uses the title (the next
+  user's if TMDB rejects one);
 - titles nobody uses any more are deleted;
 - TMDB texts (synopsis, runtimes, genres) are removed after 180 days without a refresh.
 

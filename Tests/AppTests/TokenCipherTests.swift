@@ -95,12 +95,12 @@ struct TokenCipherTests {
             let user = try await createUser(app, "pat", tmdbToken: try app.tokenCipher.seal("secret-token"))
             let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 1])
             try await WatchService(db: app.db).setHidden(userID: user.requireID(), titleID: show.requireID(), hidden: false)
-            #expect(try await refreshToken(for: show.requireID(), on: app.db, cipher: app.tokenCipher) == "secret-token")
+            #expect(try await refreshTokens(for: show.requireID(), on: app.db, cipher: app.tokenCipher).first == "secret-token")
 
             let movie = try await seedMovie(app, tmdbID: 603)
             try await Watch(userID: user.requireID(), titleID: movie.requireID(), episodeID: nil, watchedOn: nil,
                             service: nil, origin: .manual).save(on: app.db)
-            #expect(try await backfillToken(for: movie.requireID(), on: app.db, cipher: app.tokenCipher) == "secret-token")
+            #expect(try await backfillTokens(for: movie.requireID(), on: app.db, cipher: app.tokenCipher).first == "secret-token")
             _ = await backfillDetails(db: app.db, provider: provider, cipher: app.tokenCipher, logger: app.logger)
             #expect(tokens.withLockedValue { $0 } == ["secret-token"])
         }

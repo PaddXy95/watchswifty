@@ -10,6 +10,8 @@ struct OIDCController {
         sessioned.get("callback", use: callback)
         sessioned.get("new-account", use: newAccountPage)
         sessioned.post("new-account", use: createAccount)
+        sessioned.get("link", use: linkConfirmPage)
+        sessioned.post("link", use: confirmLink)
         sessioned.get("cancel", use: cancel)
     }
 
@@ -17,8 +19,11 @@ struct OIDCController {
 
     static let expiredMessage = "Anmeldung abgelaufen – bitte erneut versuchen."
     static let invalidLinkMessage = "Der Verknüpfungslink ist ungültig oder abgelaufen – bitte den Admin um einen neuen bitten."
+    static let otherAccountMessage = "In diesem Browser ist ein anderes Konto angemeldet – bitte erst abmelden und den Link dann erneut öffnen."
     /// Session key for intents only a signed-in user can start (`link`, `reauth`); never taken from the URL.
     static let intentKey = "oidc.intent"
+    /// Session key: state of the `link`/`reauth` flow this session started (binds the flow cookie to the session).
+    static let flowStateKey = "oidc.flowState"
     /// Session key: where a server-started re-check returns to (set by the server, never from the URL).
     static let returnToKey = "oidc.returnTo"
     /// Session key: when the provider last confirmed the signed-in account (seconds since 1970).
@@ -64,8 +69,13 @@ struct OIDCController {
             intent = .invite
             inviteToken = token
         }
-        let flow = OIDCFlowCookie(state: Self.randomToken(), nonce: Self.randomToken(), verifier: verifier, startedAt: .now,
+        var flow = OIDCFlowCookie(state: Self.randomToken(), nonce: Self.randomToken(), verifier: verifier, startedAt: .now,
                                   intent: intent, returnTo: returnTo, linkToken: linkToken, inviteToken: inviteToken)
+        if intent == .link || intent == .reauth {
+            // The sealed cookie alone could be planted in another browser: remember who started the flow, here and there.
+            flow.userID = try req.auth.get(User.self)?.requireID()
+            req.session.data[Self.flowStateKey] = flow.state
+        }
         let url: URL
         do {
             url = try await provider.authorizationURL(state: flow.state, nonce: flow.nonce, codeChallenge: pkceChallenge(verifier))
@@ -87,6 +97,14 @@ struct OIDCController {
               await req.application.oidcUsedStates.consume(flow.state) else {
             return try await page(req, status: .badRequest, error: Self.expiredMessage)
         }
+        if flow.intent == .link || flow.intent == .reauth {
+            // Only the session that started the flow may finish it.
+            let bound = req.hasSession ? req.session.data[Self.flowStateKey] : nil
+            if req.hasSession { req.session.data[Self.flowStateKey] = nil }
+            guard let user = req.auth.get(User.self), let starter = flow.userID, user.id == starter, bound == flow.state else {
+                return try await page(req, status: .badRequest, error: Self.expiredMessage)
+            }
+        }
         if let error = try? req.query.get(String.self, at: "error") {
             req.logger.notice("OIDC: Provider meldet \(error.prefix(40))")
             return try await failure(req, error == "access_denied" ? .denied : .failed(logReason: "Provider-Fehler"),
@@ -103,18 +121,14 @@ struct OIDCController {
         }
         let service = try req.oidcLogin
         if flow.intent == .linkToken, let token = flow.linkToken {
-            let tokens = OIDCLinkTokenService(db: req.db)
-            guard let record = try await tokens.check(token), let user = try await User.find(record.$user.id, on: req.db) else {
-                return try await page(req, status: .badRequest, error: Self.invalidLinkMessage)
-            }
-            do {
-                try await service.link(user, to: identity)
-            } catch let error as APIError where error.status == .unprocessableEntity {
-                return try await page(req, status: .unprocessableEntity, error: error.message)
-            }
-            _ = try await tokens.consume(token)
-            try await PasswordTokenService(db: req.db).deleteAll(userID: user.requireID())
-            return try await signIn(req, user, redirect: "/account?sso=linked")
+            // Never bind silently: park the identity and let the visitor confirm the target account first.
+            if let problem = try await linkTokenProblem(req, token) { return problem }
+            var parked = flow
+            parked.pending = identity
+            parked.pendingAt = .now
+            let response = req.redirect(to: "/auth/oidc/link", redirectType: .normal)
+            response.cookies[OIDCFlowCookie.name] = try parked.cookie(cipher, secure: oidc.redirectURL.scheme == "https")
+            return response
         }
         if flow.intent == .invite, let token = flow.inviteToken {
             if let problem = try await Self.inviteProblem(req, token) {
@@ -203,6 +217,69 @@ struct OIDCController {
                                                          username: input.username, error: error.message)).encodeResponse(for: req)
         }
         return try await signIn(req, user, redirect: flow.returnTo ?? "/account?welcome=1")
+    }
+
+    // MARK: - Link token confirmation
+
+    /// Either a value or the error page to answer with.
+    private enum Checked<Value> {
+        case ok(Value)
+        case page(Response)
+    }
+
+    /// The account a link token belongs to, or the error page when the token is unusable or another account is
+    /// signed in to this browser.
+    private func linkTokenTarget(_ req: Request, _ token: String) async throws -> Checked<User> {
+        guard let record = try await OIDCLinkTokenService(db: req.db).check(token),
+              let user = try await User.find(record.$user.id, on: req.db) else {
+            return .page(try await page(req, status: .badRequest, error: Self.invalidLinkMessage))
+        }
+        if let signedIn = req.auth.get(User.self), signedIn.id != user.id {
+            return .page(try await page(req, status: .forbidden, error: Self.otherAccountMessage))
+        }
+        return .ok(user)
+    }
+
+    private func linkTokenProblem(_ req: Request, _ token: String) async throws -> Response? {
+        if case .page(let response) = try await linkTokenTarget(req, token) { return response }
+        return nil
+    }
+
+    /// The parked link-token flow and its target account.
+    private func parkedLink(_ req: Request) async throws -> Checked<(OIDCFlowCookie, OIDCIdentity, User)> {
+        guard let (flow, identity) = parked(req), flow.intent == .linkToken, let token = flow.linkToken else {
+            return .page(try await page(req, status: .badRequest, error: Self.expiredMessage))
+        }
+        switch try await linkTokenTarget(req, token) {
+        case .ok(let user): return .ok((flow, identity, user))
+        case .page(let response): return .page(response)
+        }
+    }
+
+    func linkConfirmPage(req: Request) async throws -> Response {
+        let (oidc, _) = try configured(req)
+        switch try await parkedLink(req) {
+        case .page(let response): return response
+        case .ok(let (_, identity, user)):
+            return try await HTMLResponse(LinkConfirmPage(ssoName: oidc.displayName, username: user.username, identity: identity))
+                .encodeResponse(for: req)
+        }
+    }
+
+    func confirmLink(req: Request) async throws -> Response {
+        _ = try configured(req)
+        switch try await parkedLink(req) {
+        case .page(let response): return response
+        case .ok(let (flow, identity, user)):
+            do {
+                try await req.oidcLogin.link(user, to: identity)
+            } catch let error as APIError where error.status == .unprocessableEntity {
+                return try await page(req, status: .unprocessableEntity, error: error.message)
+            }
+            if let token = flow.linkToken { _ = try await OIDCLinkTokenService(db: req.db).consume(token) }
+            try await PasswordTokenService(db: req.db).deleteAll(userID: user.requireID())
+            return try await signIn(req, user, redirect: "/account?sso=linked")
+        }
     }
 
     func cancel(req: Request) async throws -> Response {

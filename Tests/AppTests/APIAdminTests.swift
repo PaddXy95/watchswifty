@@ -77,12 +77,12 @@ struct APIAdminTests {
             let (_, token) = try await admin(app)
             let pat = try await createUser(app, "pat")
             try await app.testing().test(.PUT, "/api/v1/admin/users/\(try pat.requireID())/admin", headers: .bearer(token), beforeRequest: { req in
-                try req.content.encode(AdminFlagBody(isAdmin: true), as: .json)
+                try req.content.encode(ConfirmedAdminFlagBody(isAdmin: true, currentPassword: "password123"), as: .json)
             }, afterResponse: { res async throws in
                 #expect(try res.content.decode(UserSummaryBody.self).isAdmin == true)
             })
             try await app.testing().test(.PUT, "/api/v1/admin/users/\(try pat.requireID())/password", headers: .bearer(token), beforeRequest: { req in
-                try req.content.encode(AdminPasswordBody(password: "neuespasswort"), as: .json)
+                try req.content.encode(ConfirmedPasswordBody(password: "neuespasswort", currentPassword: "password123"), as: .json)
             }, afterResponse: { res async in
                 #expect(res.status == .noContent)
             })

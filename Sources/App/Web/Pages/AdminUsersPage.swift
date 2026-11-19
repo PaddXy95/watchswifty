@@ -15,6 +15,8 @@ struct AdminUsersPage: HTML {
     var ssoLink: AdminSSOLink? = nil
     var readiness: OIDCReadiness? = nil
     var passwordLogin = true
+    /// How to confirm before granting admin rights or acting on another admin; nil while a confirmation is fresh.
+    var confirm: AdminConfirmBox? = nil
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
@@ -25,6 +27,25 @@ struct AdminUsersPage: HTML {
                     "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
                     if passwordLogin {
                         " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."
+                    }
+                }
+            }
+            if let confirm {
+                div(.class("admin-confirm")) {
+                    p(.class("muted")) {
+                        "Admin-Rechte vergeben sowie Passwort oder Verknüpfungslink für andere Admins: erst bestätigen, dass du es bist (gilt 5 Minuten)."
+                    }
+                    switch confirm {
+                    case .password:
+                        form(.method(.post), .action("/admin/users/confirm"), .class("inline-form")) {
+                            input(.type(.password), .name("password"), .required, .custom(name: "placeholder", value: "Dein Passwort"),
+                                  .custom(name: "aria-label", value: "Dein Passwort"), .custom(name: "autocomplete", value: "current-password"))
+                            button(.type(.submit)) { "Bestätigen" }
+                        }
+                    case let .sso(name):
+                        form(.method(.post), .action("/admin/users/confirm-sso"), .class("inline-form")) {
+                            button(.type(.submit)) { "Über \(name) bestätigen" }
+                        }
                     }
                 }
             }
@@ -74,6 +95,12 @@ struct AdminUsersPage: HTML {
             }
         }
     }
+}
+
+/// How the signed-in admin confirms (security audit F10): with their password, or through the provider.
+enum AdminConfirmBox: Equatable, Sendable {
+    case password
+    case sso(String)
 }
 
 /// A „Verknüpfungslink“ to show once on the users page.

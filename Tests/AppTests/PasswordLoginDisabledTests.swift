@@ -126,7 +126,8 @@ struct PasswordLoginDisabledTests {
                 try await account.changePassword(user: user, current: "password123", new: "newpassword1")
             }
             await #expect(throws: APIError.passwordLoginDisabled()) {
-                try await app.userAdmin.resetPassword(id: other.requireID(), password: "newpassword1", actingUserID: user.requireID())
+                try await app.userAdmin.resetPassword(id: other.requireID(), password: "newpassword1", actingUserID: user.requireID(),
+                                                    confirmation: .recent(true))
             }
             #expect(APIError.passwordLoginDisabled().status == .conflict)
             #expect(APIError.passwordLoginDisabled().code == "passwordLoginDisabled")

@@ -176,7 +176,9 @@ struct StatsService {
     /// `year` (nil = all years) selects the range for period, chart, services, ratings, genres and the top lists (longest
     /// series and movies, most watched movies and episodes); `mostCompletedSeries` and the yearly table (`years`,
     /// `undated`, `total`) always cover everything.
-    func stats(userID: UUID, year selectedYear: Int?) async throws -> Stats {
+    func stats(userID: UUID, year rawYear: Int?) async throws -> Stats {
+        // Calendar years only; anything else (e.g. Int.min) counts as "all years" and can never overflow in `year - 1`.
+        let selectedYear = rawYear.flatMap { (1...9999).contains($0) ? $0 : nil }
         let watches = try await statsWatches(userID: userID)
         let titles = try await TitleRow.all(Array(Set(watches.map(\.titleID))), on: db)
         let titleByID = Dictionary(titles.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })

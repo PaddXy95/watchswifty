@@ -159,6 +159,25 @@ struct PasswordResetTests {
         }
     }
 
+    /// Changing the own password ends open reset links, like every other way of setting a password (security audit F12).
+    @Test func passwordChangeEndsResetLinks() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat")
+            let link = try await tokens(app).issue(userID: pat.requireID(), purpose: .reset)
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.POST, "/account/password", headers: headers, beforeRequest: { req in
+                try req.content.encode(ChangePasswordForm(currentPassword: "password123", newPassword: "newpassword1"), as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                #expect(res.status == .ok)
+            })
+            #expect(try await tokens(app).lookup(link) == nil)
+            try await post(app, token: link, password: "linkpassword1") { res async in
+                #expect(res.status != .seeOther)
+            }
+            _ = try await login(app, "pat", password: "newpassword1")
+        }
+    }
+
     @Test func passwordRules() async throws {
         try await withTestApp { app in
             let pat = try await createUser(app, "pat")
