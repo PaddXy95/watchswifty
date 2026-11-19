@@ -111,11 +111,20 @@ struct ImportUploadSummary: Sendable, Equatable {
 
 /// The user's standard import list: upload, retry, skip, lookup.
 struct ImportEntryService {
+    /// Titles one upload may hold; far above a real history, but it bounds what the page and the worker handle per
+    /// user (like `ImportService.maxStoredRows` for Netflix).
+    static let maxTitles = 20_000
+
     let db: any Database
+    var maxTitles = ImportEntryService.maxTitles
 
     static let noHeaderMessage =
         "Kein Standard-Import erkannt – erwartet wird eine CSV mit einer Kopfzeile, die „type“ und „title“ enthält."
     static let emptyMessage = "Die Datei enthält keine Titel."
+
+    static func tooManyTitlesMessage(limit: Int) -> String {
+        "Die Datei enthält mehr als \(limit.formatted(.number.locale(Locale(identifier: "de_DE")))) Titel – bitte in mehrere Dateien aufteilen."
+    }
 
     /// A new upload replaces the user's earlier entries (watches already recorded stay).
     func replace(userID: UUID, drafts: [ImportDraft]) async throws {
@@ -137,6 +146,7 @@ struct ImportEntryService {
         }
         let drafts = groupStandardImport(file.rows)
         guard !drafts.isEmpty else { throw APIError.validation(Self.emptyMessage) }
+        guard drafts.count <= maxTitles else { throw APIError.validation(Self.tooManyTitlesMessage(limit: maxTitles)) }
         try await replace(userID: userID, drafts: drafts)
         return ImportUploadSummary(titles: drafts.count, skippedRows: file.skippedRows)
     }

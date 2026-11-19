@@ -307,6 +307,20 @@ struct StandardImportTests {
         }
     }
 
+    @Test func tooManyTitlesAreRejected() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let service = ImportEntryService(db: app.db, maxTitles: 2)
+            _ = try await service.upload(userID: user.requireID(), text: "type,title\nmovie,A\nmovie,A\nmovie,B\n")
+            await #expect(throws: APIError.validation(ImportEntryService.tooManyTitlesMessage(limit: 2))) {
+                _ = try await service.upload(userID: user.requireID(), text: "type,title\nmovie,A\nmovie,B\nmovie,C\n")
+            }
+            #expect(try await service.entries(userID: user.requireID()).map(\.title) == ["A", "B"])
+            #expect(ImportEntryService.tooManyTitlesMessage(limit: 20_000)
+                    == "Die Datei enthält mehr als 20.000 Titel – bitte in mehrere Dateien aufteilen.")
+        }
+    }
+
     @Test func resolveOfDeletedEntryIsHarmless() async throws {
         let tmdb = Self.fake()
         try await withTestApp(tmdb: tmdb) { app in

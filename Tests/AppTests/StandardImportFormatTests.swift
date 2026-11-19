@@ -153,4 +153,23 @@ struct StandardImportFormatTests {
         let drafts = groupStandardImport(try parseStandardImport("type,title,comment\nmovie,Dune,\(long)\n").rows)
         #expect(drafts.first?.comment?.count == WatchService.maxCommentLength)
     }
+
+    // Hardening as for the other import parsers in 0.6.0 (security audit F02, F03, F05).
+
+    @Test func overlongTitlesAreCut() throws {
+        let row = try #require(try parseStandardImport("type,title\nmovie," + String(repeating: "x", count: 600) + "\n").rows.first)
+        #expect(row.title.count == 500)
+    }
+
+    @Test func implausibleYearsAreDropped() throws {
+        let text = "type,title,year\nmovie,A,-9223372036854775808\nmovie,B,1971\nmovie,C,99999\nmovie,D,9223372036854775807\n"
+        #expect(try parseStandardImport(text).rows.map(\.year) == [nil, 1971, nil, nil])
+    }
+
+    @Test func ratingSurvivesExtremeNumbers() {
+        #expect(importRating("1e300") == 10)
+        #expect(importRating("-1e300") == nil)
+        #expect(importRating("nan") == nil)
+        #expect(importRating("inf") == nil)
+    }
 }

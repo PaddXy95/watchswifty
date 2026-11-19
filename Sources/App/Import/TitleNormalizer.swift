@@ -1,5 +1,9 @@
 import Foundation
 
+/// Longest title kept from an import file; real titles are far shorter, and matching cost grows with the length
+/// (security audit F05).
+let maxImportTitleLength = 500
+
 /// Lowercased, diacritics folded (ß → ss), dashes/colons → spaces, other punctuation dropped,
 /// trailing "(n)" removed, whitespace collapsed.
 func normalizeTitle(_ s: String) -> String {

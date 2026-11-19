@@ -67,7 +67,7 @@ func parseStandardImport(_ text: String) throws -> StandardImportFile {
             return clean(record.fields[index])
         }
         if record.fields.allSatisfy({ clean($0).isEmpty }) { continue }
-        let title = value(columns.title)
+        let title = String(value(columns.title).prefix(maxImportTitleLength))
         guard let type = StandardRowType(rawValue: value(columns.type).lowercased()), !title.isEmpty else {
             skipped += 1
             continue
@@ -82,7 +82,7 @@ func parseStandardImport(_ text: String) throws -> StandardImportFile {
         rows.append(StandardImportRow(
             type: type,
             title: title,
-            year: Int(value(columns.year)),
+            year: Int(value(columns.year)).flatMap { (1800...9999).contains($0) ? $0 : nil },
             tmdbID: Int(value(columns.tmdb)).flatMap { $0 > 0 ? $0 : nil },
             imdbID: imdb.wholeMatch(of: /tt\d+/) != nil ? imdb : nil,
             season: type == .episode ? season : nil,
@@ -105,11 +105,12 @@ func importDay(_ raw: String) -> String? {
     return netflixDay(text)
 }
 
-/// 1–10; decimals (`7.5`, `7,5`) rounded, values above 10 capped, 0 or empty = no rating.
+/// 1–10; decimals (`7.5`, `7,5`) rounded, values above 10 capped, 0, negative, non-finite or empty = no rating.
 func importRating(_ raw: String) -> Int? {
     guard let value = Double(raw.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")),
           value.isFinite, value > 0 else { return nil }
-    return min(10, max(1, Int(value.rounded())))
+    // Clamp before converting: `Int(Double)` traps outside Int's range.
+    return Int(min(10, max(1, value.rounded())))
 }
 
 extension StreamingService {

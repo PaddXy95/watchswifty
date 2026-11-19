@@ -41,9 +41,12 @@ func titleUsers(on db: any Database) async throws -> [UUID: Set<UUID>] {
     for kind in TitleKind.allCases {
         let entries = imported.filter { $0.titleKind == kind }
         guard !entries.isEmpty else { continue }
-        let titles = try await Title.query(on: db).filter(\.$kind == kind.rawValue)
-            .filter(\.$tmdbID ~~ Array(Set(entries.compactMap(\.tmdbID)))).all()
-        let byTMDB = Dictionary(titles.compactMap { title in title.id.map { (title.tmdbID, $0) } }, uniquingKeysWith: { a, _ in a })
+        var byTMDB: [Int: UUID] = [:]
+        for tmdbIDs in Array(Set(entries.compactMap(\.tmdbID))).chunked() {
+            for title in try await Title.query(on: db).filter(\.$kind == kind.rawValue).filter(\.$tmdbID ~~ Array(tmdbIDs)).all() {
+                if let id = title.id, byTMDB[title.tmdbID] == nil { byTMDB[title.tmdbID] = id }
+            }
+        }
         for entry in entries {
             if let titleID = entry.tmdbID.flatMap({ byTMDB[$0] }) { users[titleID, default: []].insert(entry.$user.id) }
         }

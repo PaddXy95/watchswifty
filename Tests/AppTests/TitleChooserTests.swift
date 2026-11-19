@@ -43,4 +43,13 @@ struct TitleChooserTests {
         #expect(!plausibleIDMatch(title: "Severance", year: 2024, found: dune))
         #expect(plausibleIDMatch(title: "Foo", year: nil, found: dune))
     }
+
+    /// Stored or crafted out-of-range years must not trap in the year distance (security audit F03).
+    @Test(arguments: [Int.min, Int.max])
+    func extremeYearsDoNotTrap(year: Int) {
+        let matrix = [movie(1, "Matrix", 1999)]
+        #expect(chooseTitle(query: "Matrix", year: year, results: matrix) == .review(matrix))
+        #expect(!plausibleIDMatch(title: "Other", year: year, found: movie(1, "Matrix", 1999)))
+        #expect(!plausibleIDMatch(title: "Other", year: 2000, found: movie(1, "Matrix", Int.min)))
+    }
 }
