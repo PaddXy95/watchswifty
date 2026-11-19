@@ -140,32 +140,6 @@ private func commentParts(_ row: FilmListRow) -> [String] {
     return parts
 }
 
-enum FilmChoice: Equatable {
-    case match(TMDBSearchResult)
-    case review([TMDBSearchResult])
-    case notFound
-}
-
-/// Picks the TMDB movie for a list entry: an exact title among results within ±1 year of the list's year, or the only
-/// result in that range, is taken automatically; anything else goes to review (at most 5 candidates).
-func chooseFilm(query: String, year: Int?, results: [TMDBSearchResult]) -> FilmChoice {
-    guard !results.isEmpty else { return .notFound }
-    let wanted = normalizeTitle(query)
-    func isExact(_ result: TMDBSearchResult) -> Bool {
-        normalizeTitle(result.name) == wanted || result.originalName.map(normalizeTitle) == wanted
-    }
-    let inRange = year.map { year in
-        results.filter { result in result.year.map { abs($0 - year) <= 1 } ?? false }
-            .sorted { abs(($0.year ?? 0) - year) < abs(($1.year ?? 0) - year) }
-    } ?? results
-    let exact = inRange.filter(isExact)
-    func distance(_ result: TMDBSearchResult) -> Int { year.map { abs((result.year ?? 0) - $0) } ?? 0 }
-    // Several exact titles: the one closest to the list's year wins, unless two are equally close.
-    if exact.count == 1 || (exact.count > 1 && year != nil && distance(exact[0]) < distance(exact[1])) { return .match(exact[0]) }
-    if inRange.count == 1 { return .match(inRange[0]) }
-    return .review(Array((inRange.isEmpty ? results : inRange).prefix(5)))
-}
-
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }

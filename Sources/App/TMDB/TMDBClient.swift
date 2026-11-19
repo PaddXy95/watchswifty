@@ -53,6 +53,13 @@ struct TMDBMovie: Sendable, Equatable {
     var genreIDs: [Int] = []
 }
 
+/// Titles TMDB knows under an external id (`GET /find/{id}`); an episode id yields its series in `episodeShowIDs`.
+struct TMDBFindResult: Sendable, Equatable {
+    var movies: [TMDBSearchResult] = []
+    var series: [TMDBSearchResult] = []
+    var episodeShowIDs: [Int] = []
+}
+
 enum TMDBError: Error, Equatable, CustomStringConvertible {
     case missingToken, unauthorized, notFound, rateLimited, invalidResponse
     case http(UInt)
@@ -81,6 +88,8 @@ protocol TMDBClient: Sendable {
     func movie(id: Int) async throws -> TMDBMovie
     /// IMDb id of a series (`GET /tv/{id}/external_ids`); nil when TMDB has none.
     func seriesIMDbID(id: Int) async throws -> String?
+    /// Titles with this IMDb id (`GET /find/{id}?external_source=imdb_id`).
+    func find(imdbID: String) async throws -> TMDBFindResult
 }
 
 /// Builds a TMDB client for one user's token.
@@ -101,4 +110,5 @@ struct MissingTokenTMDBClient: TMDBClient {
     func season(seriesID: Int, number: Int) async throws -> [TMDBEpisode] { throw TMDBError.missingToken }
     func movie(id: Int) async throws -> TMDBMovie { throw TMDBError.missingToken }
     func seriesIMDbID(id: Int) async throws -> String? { throw TMDBError.missingToken }
+    func find(imdbID: String) async throws -> TMDBFindResult { throw TMDBError.missingToken }
 }

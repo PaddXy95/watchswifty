@@ -94,29 +94,6 @@ struct FilmListParsingTests {
     }
 }
 
-@Suite("FilmListMatching")
-struct FilmListMatchingTests {
-    func movie(_ id: Int, _ name: String, _ year: Int?) -> TMDBSearchResult {
-        TMDBSearchResult(id: id, kind: .movie, name: name, originalName: nil, year: year, posterPath: nil)
-    }
-
-    @Test func choosesUniqueYearMatch() {
-        let results = [movie(1, "Die Mumie", 2017), movie(2, "Die Mumie", 1999), movie(3, "Die Mumie", 1932)]
-        #expect(chooseFilm(query: "Die Mumie", year: 1999, results: results) == .match(movie(2, "Die Mumie", 1999)))
-        let single = [movie(4, "Inglourious Basterds", 2009), movie(5, "Basterds – Doku", 2015)]
-        #expect(chooseFilm(query: "Inglorious Bastard", year: 2009, results: single) == .match(movie(4, "Inglourious Basterds", 2009)))
-        #expect(chooseFilm(query: "Sternenreise", year: nil, results: [movie(6, "Sternenreise", 2014), movie(7, "Sternenreise 2", 2018)])
-                == .match(movie(6, "Sternenreise", 2014)))
-    }
-
-    @Test func ambiguousGoesToReview() {
-        let two = [movie(1, "Fluch der Karibik – Am Ende der Welt", 2007), movie(2, "Fluch der Karibik – Making-of", 2007)]
-        #expect(chooseFilm(query: "Pirates of the Caribbean 3", year: 2007, results: two) == .review(two))
-        #expect(chooseFilm(query: "X", year: 2020, results: [movie(3, "X", 1990)]) == .review([movie(3, "X", 1990)]))
-        #expect(chooseFilm(query: "Nichts", year: 2020, results: []) == .notFound)
-    }
-}
-
 @Suite("FilmListImport")
 struct FilmListImportTests {
     static func fake() -> FakeTMDBClient {

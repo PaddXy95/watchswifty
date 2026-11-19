@@ -51,6 +51,11 @@ struct LiveTMDBClient: TMDBClient {
         return try Self.decoding { try Self.decodeExternalIDs(data) }
     }
 
+    func find(imdbID: String) async throws -> TMDBFindResult {
+        let data = try await get("find/\(imdbID)", ["external_source": "imdb_id"])
+        return try Self.decoding { try Self.decodeFind(data) }
+    }
+
     // MARK: HTTP
 
     private func get(_ path: String, _ query: [String: String]) async throws -> Data {
@@ -139,6 +144,19 @@ struct LiveTMDBClient: TMDBClient {
 
     static func decodeSearch(_ data: Data, kind: TitleKind) throws -> [TMDBSearchResult] {
         try JSONDecoder().decode(ResultList.self, from: data).results.compactMap { $0.result(kind: kind) }
+    }
+
+    static func decodeFind(_ data: Data) throws -> TMDBFindResult {
+        struct EpisodeRef: Decodable { let show_id: Int? }
+        struct Found: Decodable {
+            let movie_results: [Item]?
+            let tv_results: [Item]?
+            let tv_episode_results: [EpisodeRef]?
+        }
+        let found = try JSONDecoder().decode(Found.self, from: data)
+        return TMDBFindResult(movies: (found.movie_results ?? []).compactMap { $0.result(kind: .movie) },
+                              series: (found.tv_results ?? []).compactMap { $0.result(kind: .tv) },
+                              episodeShowIDs: (found.tv_episode_results ?? []).compactMap(\.show_id))
     }
 
     static func decodeMulti(_ data: Data) throws -> [TMDBSearchResult] {

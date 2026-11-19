@@ -11,7 +11,7 @@ struct FilmListImporter {
     /// Automatic match by title and year; unclear entries go to review.
     func resolve(_ entry: FilmListEntry) async throws {
         let results = try await tmdb.search(entry.title, kind: .movie)
-        switch chooseFilm(query: entry.title, year: entry.year, results: results) {
+        switch chooseTitle(query: entry.title, year: entry.year, results: results) {
         case .match(let result):
             try await record(entry, tmdbID: result.id)
         case .review(let candidates):
