@@ -24,6 +24,29 @@ struct MatchingHelpersTests {
         #expect(normalizeTitle("  Das, was du zurücklässt – Teil 1 ") == "das was du zurucklasst teil 1")
     }
 
+    @Test func stripsTrailingNumberOnly() {
+        #expect(normalizeTitle("Film (12)  ") == "film")
+        #expect(normalizeTitle("Film(3)") == "film")
+        #expect(normalizeTitle("(7)") == "")
+        #expect(normalizeTitle("Film (2a)") == "film 2a")
+        #expect(normalizeTitle("Film (7) Teil") == "film 7 teil")
+        #expect(normalizeTitle("Film ()") == "film")
+    }
+
+    /// Long whitespace runs must not make matching quadratic (security audit F05).
+    @Test func normalizeIsLinearOnWhitespaceRuns() {
+        let title = "a" + String(repeating: " ", count: 40_000) + "b"
+        let elapsed = ContinuousClock().measure { #expect(normalizeTitle(title) == "a b") }
+        #expect(elapsed < .seconds(1))
+    }
+
+    @Test func doubleEpisodeCheckIsLinearOnWhitespaceRuns() {
+        let pool = candidates([1: ["Pilot"]])
+        let title = "x" + String(repeating: " ", count: 20_000) + "y"
+        let elapsed = ContinuousClock().measure { #expect(matchEpisodes(title: title, season: 1, in: pool).isEmpty) }
+        #expect(elapsed < .seconds(1))
+    }
+
     @Test func autoMatchUniqueExact() {
         let hit = autoMatch(candidate: "The Mentalist", in: [result(1, "The Mentalist"), result(2, "Mentalist: Ein Neuanfang")])
         #expect(hit?.id == 1)

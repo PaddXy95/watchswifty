@@ -144,7 +144,11 @@ Alle unter `/api/v1`, alle mit Bearer-Token außer `version`, `auth/token`.
 - **Admin (nur Admins):** `GET/POST admin/users`, `PUT admin/users/{id}/password`, `PUT admin/users/{id}/admin`,
   `DELETE admin/users/{id}` – [Entscheidung des Entwurfs] nie auf das eigene Konto (`422 selfAction`), damit ein
   gestohlenes Admin-Gerät das eigene Passwort nicht ohne das alte ändern und den Besitzer aussperren kann;
-  das eigene Passwort nur über `PUT me/password`. `GET admin/system`, `PUT admin/system/update-check`, `POST admin/system/check-now`.
+  das eigene Passwort nur über `PUT me/password`. *Änderung 2026-11-14 (Security-Audit F10):* Admin-Rechte vergeben
+  (`POST admin/users` mit `isAdmin`, `PUT admin/users/{id}/admin`) sowie Passwort oder Verknüpfungslink für einen
+  anderen Admin brauchen `currentPassword` des handelnden Admins (`403 confirmationRequired`, Konten ohne Passwort
+  `403 confirmInBrowser` → im Browser) – sonst umgeht ein gestohlenes Gerät die Regel über einen zweiten Admin. Im
+  Web gilt eine Bestätigung (Passwort oder SSO) 5 Minuten. `GET admin/system`, `PUT admin/system/update-check`, `POST admin/system/check-now`.
 
 ## Dokumentation unter `/api`
 - `GET /api` → Doku-Seite (Swagger UI, Dateien im Repo unter `Public/api-docs/`, kein CDN) mit „Authorize“ für

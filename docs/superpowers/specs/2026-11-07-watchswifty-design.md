@@ -414,7 +414,9 @@ Ersetzt die betreffenden Aussagen in §3, §5, §6, §7, §9 und §10.
   kann ihn setzen/entfernen; er erscheint nirgends im Klartext, auch nicht für Admins, und wird nie
   geloggt. Die SQLite-Datei ist entsprechend zu schützen (README). **[Vorschlag]**
 - **Ohne Token:** Suche zeigt einen Hinweis mit Link zur Konto-Seite; bereits zwischengespeicherte
-  Titel, Weiterschauen, Verlauf und Bibliothek funktionieren weiter. **[Vorschlag]**
+  Titel, Weiterschauen, Verlauf und Bibliothek funktionieren weiter. **[Vorschlag]** *Änderung 2026-11-14
+  (Security-Audit F14):* zwischengespeicherte Titel nur, wenn der Benutzer sie selbst nutzt (`usesTitle`), sonst
+  dieselbe Antwort wie für nicht gespeicherte Titel – der Cache verrät sonst, was andere Benutzer verfolgen.
 - **Import:** Der Zuordnungslauf nutzt pro Benutzer dessen Token. Fehlt er oder lehnt TMDB ihn ab,
   bleiben nur die Zeilen dieses Benutzers ausstehend, und seine Import-Seite zeigt die Meldung;
   andere Benutzer werden weiter verarbeitet. **[Vorschlag]**

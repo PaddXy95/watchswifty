@@ -10,6 +10,8 @@ struct AdminUsersController {
         let admin = protected.grouped(RequireAdminMiddleware()).grouped("admin", "users")
         admin.get(use: list)
         admin.post(use: create)
+        admin.post("confirm", use: confirm)
+        admin.post("confirm-sso", use: confirmSSO)
         admin.post(":userID", "password", use: resetPassword)
         admin.post(":userID", "invite", use: resendInvite)
         admin.post(":userID", "sso-link", use: createSSOLink)
@@ -26,7 +28,8 @@ struct AdminUsersController {
         let created: (user: User, inviteMailError: String?)
         do {
             created = try await req.userAdmin.create(username: input.username, password: input.password, email: input.email,
-                                                     isAdmin: input.isAdmin ?? false, inviter: try req.currentUser)
+                                                     isAdmin: input.isAdmin ?? false, inviter: try req.currentUser,
+                                                     confirmation: Self.confirmation(req))
         } catch let error as APIError {
             return try await page(req, status: error.status, error: error.message).encodeResponse(for: req)
         }
@@ -55,7 +58,7 @@ struct AdminUsersController {
         let result: SSOLinkResult
         let id = try targetID(req)
         do {
-            result = try await req.userAdmin.createSSOLink(id: id, inviter: try req.currentUser)
+            result = try await req.userAdmin.createSSOLink(id: id, inviter: try req.currentUser, confirmation: Self.confirmation(req))
         } catch let error as APIError where error.status != .notFound {
             return try await page(req, status: error.status, error: error.message)
         }
@@ -76,7 +79,8 @@ struct AdminUsersController {
         guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(PasswordInput.self)
         do {
-            try await req.userAdmin.resetPassword(id: try targetID(req), password: input.password, actingUserID: try req.userID)
+            try await req.userAdmin.resetPassword(id: try targetID(req), password: input.password, actingUserID: try req.userID,
+                                                  confirmation: Self.confirmation(req))
         } catch let error as APIError where error.status != .notFound {
             return try await page(req, status: error.status, error: error.message).encodeResponse(for: req)
         }
@@ -86,11 +90,46 @@ struct AdminUsersController {
     func setAdmin(req: Request) async throws -> Response {
         let makeAdmin = try req.content.decode(AdminInput.self).isAdmin ?? false
         do {
-            try await req.userAdmin.setAdmin(id: try targetID(req), isAdmin: makeAdmin, actingUserID: try req.userID)
+            try await req.userAdmin.setAdmin(id: try targetID(req), isAdmin: makeAdmin, actingUserID: try req.userID,
+                                             confirmation: Self.confirmation(req))
         } catch let error as APIError where error.status != .notFound {
             return try await page(req, status: error.status, error: error.message).encodeResponse(for: req)
         }
         return req.redirect(to: "/admin/users", redirectType: .normal)
+    }
+
+    // MARK: Confirmation (security audit F10)
+
+    /// Confirmed with the password here, or through the provider, within the last five minutes.
+    static func confirmation(_ req: Request) -> AdminConfirmation {
+        let now = Date.now
+        return .recent(OIDCController.isFresh(verifiedAt: req.session.data[AdminConfirmation.sessionKey], now: now)
+            || OIDCController.isFresh(verifiedAt: req.session.data[OIDCController.verifiedAtKey], now: now))
+    }
+
+    /// Accounts that sign in through the provider confirm there instead of with a password.
+    private static func confirmsWithSSO(_ req: Request) throws -> Bool {
+        let login = req.application.loginSettings.current
+        return try req.currentUser.isSSOAccount(login.oidc, passwordLogin: login.passwordLogin)
+    }
+
+    func confirm(req: Request) async throws -> Response {
+        let user = try req.currentUser
+        guard try !Self.confirmsWithSSO(req), user.hasPassword else { throw Abort(.notFound) }
+        let input = try req.content.decode(PasswordInput.self)
+        guard try await req.password.async.verify(input.password, created: user.passwordHash) else {
+            return try await page(req, status: .forbidden, error: AccountValidation.wrongCurrentPasswordMessage).encodeResponse(for: req)
+        }
+        req.session.data[AdminConfirmation.sessionKey] = String(Date.now.timeIntervalSince1970)
+        return req.redirect(to: "/admin/users", redirectType: .normal)
+    }
+
+    /// „Über … bestätigen“: a fresh sign-in at the provider, which returns to this page.
+    func confirmSSO(req: Request) async throws -> Response {
+        guard try Self.confirmsWithSSO(req) else { throw Abort(.notFound) }
+        req.session.data[OIDCController.intentKey] = OIDCIntent.reauth.rawValue
+        req.session.data[OIDCController.returnToKey] = "/admin/users"
+        return req.redirect(to: "/auth/oidc/start", redirectType: .normal)
     }
 
     func delete(req: Request) async throws -> HTMLResponse {
@@ -114,9 +153,13 @@ struct AdminUsersController {
         let config = req.application.loginSettings.current
         var readiness: OIDCReadiness?
         if let oidc = config.oidc { readiness = try await OIDCLoginService.readiness(db: req.db, oidc: oidc) }
+        var confirm: AdminConfirmBox?
+        if case .recent(false) = Self.confirmation(req) {
+            confirm = try Self.confirmsWithSSO(req) ? .sso(config.oidc?.displayName ?? "SSO") : .password
+        }
         return HTMLResponse(status: status, AdminUsersPage(nav: try req.nav(.admin), users: users, mailConfigured: mailConfigured,
                                                            currentUserID: try req.userID, error: error, notice: notice,
                                                            ssoName: config.oidc?.displayName, ssoLink: ssoLink, readiness: readiness,
-                                                           passwordLogin: config.passwordLogin))
+                                                           passwordLogin: config.passwordLogin, confirm: confirm))
     }
 }

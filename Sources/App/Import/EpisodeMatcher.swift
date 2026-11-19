@@ -24,9 +24,12 @@ func matchEpisodes(title: String, season: Int?, in candidates: [EpisodeCandidate
     let exact = pool.filter { normalizeTitle($0.name) == wanted }
     if exact.count == 1 { return [exact[0].id] }
 
-    // 3. Merged double episode "… – Teil 1 und 2".
-    if let match = title.firstMatch(of: /^(.*?)[\s–:-]*Teil 1 und 2$/) {
-        let base = normalizeTitle(String(match.1))
+    // 3. Merged double episode "… – Teil 1 und 2" (a suffix check, not a regex: that backtracked quadratically over
+    //    long whitespace runs, security audit F05).
+    if title.hasSuffix(doubleEpisodeSuffix) {
+        var stem = title.dropLast(doubleEpisodeSuffix.count)
+        while let last = stem.last, last.isWhitespace || "–:-".contains(last) { stem = stem.dropLast() }
+        let base = normalizeTitle(String(stem))
         let parts = pool.filter { !base.isEmpty && normalizeTitle($0.name).hasPrefix(base) }
         if parts.count == 2 { return parts.sorted { $0.number < $1.number }.map(\.id) }
     }
@@ -40,6 +43,8 @@ func matchEpisodes(title: String, season: Int?, in candidates: [EpisodeCandidate
     if scored.count > 1, scored[1].score >= best.score - 0.10 { return [] }
     return [best.candidate.id]
 }
+
+private let doubleEpisodeSuffix = "Teil 1 und 2"
 
 /// Digit runs in a (normalized) title, in order.
 func numberTokens(_ s: String) -> [String] {

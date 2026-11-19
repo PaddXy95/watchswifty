@@ -15,14 +15,28 @@ func seriesDueForRefresh(on db: any Database) async throws -> [Title] {
         .filter { !["Ended", "Canceled"].contains($0.tmdbStatus ?? "") }
 }
 
-/// Token of a user who has the series visible in their library or follows it (nil if nobody with a token does) –
-/// the same users that make it due in `seriesDueForRefresh`.
-func refreshToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
+/// Tokens of the users who have the series visible in their library or follow it (the same users that make it due
+/// in `seriesDueForRefresh`), ordered by username.
+func refreshTokens(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> [String] {
     let owners = try await UserTitle.query(on: db).filter(\.$title.$id == titleID)
         .group(.or) { $0.filter(\.$hidden == false).filter(\.$followed == true) }.all().map(\.$user.id)
-    guard !owners.isEmpty else { return nil }
-    return try await User.query(on: db).filter(\.$id ~~ owners).filter(\.$tmdbToken != nil).all()
-        .lazy.compactMap { cipher.open($0.tmdbToken) }.first
+    guard !owners.isEmpty else { return [] }
+    return try await User.query(on: db).filter(\.$id ~~ owners).filter(\.$tmdbToken != nil).sort(\.$username).all()
+        .compactMap { cipher.open($0.tmdbToken) }
+}
+
+/// Runs `body` with each token in turn until TMDB accepts one: a user's revoked token must not block a title they
+/// share with others (security audit F13). Other errors (TMDB down …) end the attempt; false when there is no token.
+func withAcceptedToken(_ tokens: [String], _ body: (String) async throws -> Void) async throws -> Bool {
+    for (index, token) in tokens.enumerated() {
+        do {
+            try await body(token)
+            return true
+        } catch TMDBError.unauthorized where index < tokens.count - 1 {
+            continue
+        }
+    }
+    return false
 }
 
 /// Watched titles cached before runtimes or genres were stored (`runtime` or `genres` nil), sorted by TMDB id.
@@ -34,12 +48,12 @@ func titlesMissingDetails(on db: any Database) async throws -> [Title] {
     return missing.filter { $0.id.map(watched.contains) ?? false }
 }
 
-/// Token of any user who watched the title (nil if none of them stored one).
-func backfillToken(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> String? {
+/// Tokens of the users who watched the title, ordered by username.
+func backfillTokens(for titleID: UUID, on db: any Database, cipher: TokenCipher) async throws -> [String] {
     let watchers = try await Watch.query(on: db).filter(\.$title.$id == titleID).unique().all(\.$user.$id)
-    guard !watchers.isEmpty else { return nil }
+    guard !watchers.isEmpty else { return [] }
     return try await User.query(on: db).filter(\.$id ~~ watchers).filter(\.$tmdbToken != nil).sort(\.$username).all()
-        .lazy.compactMap { cipher.open($0.tmdbToken) }.first
+        .compactMap { cipher.open($0.tmdbToken) }
 }
 
 /// Loads runtimes and genres for watched titles that lack them (one refresh each); returns how many were refreshed.
@@ -53,9 +67,10 @@ func backfillDetails(db: any Database, provider: TMDBProvider, cipher: TokenCiph
     for title in titles {
         if Task.isCancelled { break }
         do {
-            guard let token = try await backfillToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
-            try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
-            refreshed += 1
+            let tokens = try await backfillTokens(for: title.requireID(), on: db, cipher: cipher)
+            if try await withAcceptedToken(tokens, { try await CatalogService(db: db, tmdb: provider.make($0)).refresh(title) }) {
+                refreshed += 1
+            }
         } catch {
             logger.warning("Laufzeit/Genres für \(title.name) nicht geladen: \(error)")
         }
@@ -82,6 +97,9 @@ func runDailyPass(_ application: Application, now: Date = .now) async {
     if let expired = try? await OIDCLinkTokenService(db: db).deleteExpired(), expired > 0 {
         logger.info("\(expired) abgelaufene Verknüpfungslinks gelöscht")
     }
+    if let idle = try? await WebSession.deleteIdle(on: db, now: now), idle > 0 {
+        logger.info("\(idle) unbenutzte Web-Sitzungen beendet")
+    }
     let maintenance = await maintainCatalog(db: db, provider: provider, cipher: cipher, logger: logger)
     if !maintenance.isEmpty {
         logger.info("TMDB-Cache-Pflege: \(maintenance.refreshed) aktualisiert, \(maintenance.deleted) gelöscht, \(maintenance.cleared) geleert, \(maintenance.candidatesCleared) Vorschlagslisten verworfen")
@@ -92,8 +110,9 @@ func runDailyPass(_ application: Application, now: Date = .now) async {
         for title in due {
             if Task.isCancelled { break }
             do {
-                guard let token = try await refreshToken(for: title.requireID(), on: db, cipher: cipher) else { continue }
-                try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+                let tokens = try await refreshTokens(for: title.requireID(), on: db, cipher: cipher)
+                guard try await withAcceptedToken(tokens, { try await CatalogService(db: db, tmdb: provider.make($0)).refresh(title) })
+                else { continue }
                 requeued += try await requeueUnmatchedRows(titleID: title.requireID(), on: db)
             } catch {
                 logger.warning("TMDB-Abgleich für \(title.name) fehlgeschlagen: \(error)")

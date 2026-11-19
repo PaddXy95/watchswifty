@@ -54,6 +54,19 @@ func titleUsers(on db: any Database) async throws -> [UUID: Set<UUID>] {
     return users
 }
 
+/// Whether one user uses the title, by the same tables as `titleUsers`: request paths without the user's own TMDB
+/// token only serve cached titles the user uses, because which titles are cached reflects other users' tracking
+/// (security audit F14).
+func usesTitle(userID: UUID, title: Title, on db: any Database) async throws -> Bool {
+    let titleID = try title.requireID()
+    if try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
+    if try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
+    if try await SeasonNote.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
+    if try await NetflixMapping.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
+    return try await ImportEntry.query(on: db).filter(\.$user.$id == userID).filter(\.$kind == title.kind)
+        .filter(\.$tmdbID == title.tmdbID).first() != nil
+}
+
 /// One maintenance pass (part of the daily TMDB pass).
 func maintainCatalog(db: any Database, provider: TMDBProvider, cipher: TokenCipher, logger: Logger, now: Date = .now,
                      refreshLimit: Int = CatalogMaintenance.refreshesPerPass) async -> MaintenanceResult {
@@ -79,12 +92,16 @@ func maintainCatalog(db: any Database, provider: TMDBProvider, cipher: TokenCiph
                     result.deleted += 1
                     continue
                 }
-                // Only the token of someone who uses the title, never a stranger's.
-                if let token = owners.sorted(by: { $0.uuidString < $1.uuidString }).lazy.compactMap({ tokens[$0] }).first {
+                // Only the tokens of those who use the title, never a stranger's; the next one when TMDB rejects one.
+                let ownerTokens = owners.sorted(by: { $0.uuidString < $1.uuidString }).compactMap { tokens[$0] }
+                if !ownerTokens.isEmpty {
                     guard result.refreshed < refreshLimit else { continue }
                     do {
-                        try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title, now: now)
-                        result.refreshed += 1
+                        if try await withAcceptedToken(ownerTokens, {
+                            try await CatalogService(db: db, tmdb: provider.make($0)).refresh(title, now: now)
+                        }) {
+                            result.refreshed += 1
+                        }
                     } catch {
                         logger.warning("TMDB-Cache: \(title.name) nicht aktualisiert: \(error)")
                     }

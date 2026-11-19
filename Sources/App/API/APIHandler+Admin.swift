@@ -15,7 +15,8 @@ extension APIHandler {
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
         let service = try APIContext.request().userAdmin
         let created = try await service.create(username: body.username, password: body.password, email: body.email,
-                                               isAdmin: body.isAdmin ?? false, inviter: admin)
+                                               isAdmin: body.isAdmin ?? false, inviter: admin,
+                                               confirmation: .password(body.currentPassword))
         let summary = Self.userSummary(try await service.row(for: created.user))
         return .created(.init(body: .json(.init(value1: summary, value2: .init(inviteMailError: created.inviteMailError)))))
     }
@@ -32,7 +33,8 @@ extension APIHandler {
         let admin = try APIContext.requireAdmin()
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
-        try await APIContext.request().userAdmin.resetPassword(id: id, password: body.password, actingUserID: admin.requireID())
+        try await APIContext.request().userAdmin.resetPassword(id: id, password: body.password, actingUserID: admin.requireID(),
+                                                               confirmation: .password(body.currentPassword))
         return .noContent(.init())
     }
 
@@ -41,7 +43,8 @@ extension APIHandler {
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
         let service = try APIContext.request().userAdmin
-        let user = try await service.setAdmin(id: id, isAdmin: body.isAdmin, actingUserID: admin.requireID())
+        let user = try await service.setAdmin(id: id, isAdmin: body.isAdmin, actingUserID: admin.requireID(),
+                                              confirmation: .password(body.currentPassword))
         return .ok(.init(body: .json(Self.userSummary(try await service.row(for: user)))))
     }
 
@@ -65,7 +68,9 @@ extension APIHandler {
     func createSSOLink(_ input: Operations.createSSOLink.Input) async throws -> Operations.createSSOLink.Output {
         let admin = try APIContext.requireAdmin()
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
-        let result = try await APIContext.request().userAdmin.createSSOLink(id: id, inviter: admin)
+        var currentPassword: String?
+        if case let .json(body)? = input.body { currentPassword = body.currentPassword }
+        let result = try await APIContext.request().userAdmin.createSSOLink(id: id, inviter: admin, confirmation: .password(currentPassword))
         return .ok(.init(body: .json(.init(mailed: result.mailed, emailHint: result.emailHint, url: result.url,
                                            mailError: result.mailError))))
     }

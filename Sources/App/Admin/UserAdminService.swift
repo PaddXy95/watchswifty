@@ -27,7 +27,8 @@ struct SSOLinkResult: Equatable, Sendable {
 }
 
 /// User administration shared by the „Benutzer“ page and `/v1/admin/users`. Admins never act on their own account
-/// here (password via Konto), so a stolen admin device cannot lock the owner out.
+/// here (password via Konto), so a stolen admin device cannot lock the owner out; granting admin rights and taking
+/// over another admin's sign-in need an `AdminConfirmation`, so it cannot do so through a peer admin either.
 struct UserAdminService {
     static let neitherMessage = "Bitte ein Startpasswort oder eine E-Mail-Adresse für die Einladung angeben."
     static let inviteNeedsMailMessage = "Einladungen gehen erst, wenn der Mail-Versand unter System eingerichtet ist."
@@ -60,11 +61,12 @@ struct UserAdminService {
     }
 
     /// „Verknüpfungslink“ for another, not yet linked account: mailed when possible, else returned to show once.
-    func createSSOLink(id: UUID, inviter: User) async throws -> SSOLinkResult {
+    func createSSOLink(id: UUID, inviter: User, confirmation: AdminConfirmation) async throws -> SSOLinkResult {
         guard let oidc else { throw APIError.notFound }
         guard id != inviter.id else { throw APIError.selfAction }
         let user = try await target(id)
         guard !user.isLinked(oidc) else { throw APIError.validation("Das Konto ist schon mit \(oidc.displayName) verknüpft.") }
+        if user.isAdmin { try await requireConfirmation(by: inviter, confirmation) }
         let now = Date.now
         let token = try await OIDCLinkTokenService(db: db).issue(userID: try user.requireID(), lifetime: OIDCLinkTokenService.adminLifetime,
                                                                  now: now)
@@ -84,7 +86,8 @@ struct UserAdminService {
     /// With a password: a normal account (an address is only stored). Without one but with an address: an account
     /// without password plus an invitation mail. A failed mail keeps the account and returns the reason.
     func create(username rawUsername: String, password rawPassword: String?, email rawEmail: String?, isAdmin: Bool,
-                inviter: User) async throws -> (user: User, inviteMailError: String?) {
+                inviter: User, confirmation: AdminConfirmation) async throws -> (user: User, inviteMailError: String?) {
+        if isAdmin { try await requireConfirmation(by: inviter, confirmation) }
         let username = User.normalize(rawUsername)
         if let error = AccountValidation.usernameError(username) { throw APIError.validation(error) }
         let password = rawPassword.flatMap { $0.isEmpty ? nil : $0 }
@@ -145,10 +148,11 @@ struct UserAdminService {
     }
 
     /// Also ends an open invitation or reset link.
-    func resetPassword(id: UUID, password: String, actingUserID: UUID) async throws {
+    func resetPassword(id: UUID, password: String, actingUserID: UUID, confirmation: AdminConfirmation) async throws {
         guard passwordLogin else { throw APIError.passwordLoginDisabled() }
         guard id != actingUserID else { throw APIError.selfAction }
         let user = try await target(id)
+        if user.isAdmin { try await requireConfirmation(by: try await target(actingUserID), confirmation) }
         if let error = AccountValidation.passwordError(password) { throw APIError.validation(error) }
         user.passwordHash = try await hasher.hash(password)
         try await user.save(on: db)
@@ -156,10 +160,11 @@ struct UserAdminService {
     }
 
     @discardableResult
-    func setAdmin(id: UUID, isAdmin: Bool, actingUserID: UUID) async throws -> User {
+    func setAdmin(id: UUID, isAdmin: Bool, actingUserID: UUID, confirmation: AdminConfirmation) async throws -> User {
         let user = try await target(id)
         if !isAdmin, user.isAdmin, try await adminCount() <= 1 { throw APIError.validation(AccountValidation.lastAdminMessage) }
         guard id != actingUserID else { throw APIError.selfAction }
+        if isAdmin, !user.isAdmin { try await requireConfirmation(by: try await target(actingUserID), confirmation) }
         user.isAdmin = isAdmin
         try await user.save(on: db)
         return user
