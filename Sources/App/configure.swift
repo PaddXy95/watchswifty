@@ -115,6 +115,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.lifecycle.use(LibraryRefreshLifecycle())
     if backgroundJobs {
         app.lifecycle.use(MatchingWorkerLifecycle())
+        app.lifecycle.use(ImportWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
         app.lifecycle.use(UpdateCheckLifecycle())
     }

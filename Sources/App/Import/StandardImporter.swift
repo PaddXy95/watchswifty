@@ -66,8 +66,6 @@ struct StandardImporter {
         let title = try await catalog.title(kind: kind, tmdbID: tmdbID)
         let titleID = try title.requireID()
         let userID = entry.$user.id
-        let watchService = WatchService(db: db, today: { [today] in today })
-        let userTitle = try await watchService.userTitle(userID: userID, titleID: titleID)
         let planned = entry.watchList
 
         var episodeIDs: [String: UUID] = [:]
@@ -91,51 +89,61 @@ struct StandardImporter {
             }
         }
 
-        var existing = try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).all()
-        var added = 0
-        var missing = 0
-        for watch in planned {
-            var episodeID: UUID?
-            if kind == .tv {
-                guard let season = watch.season, let number = watch.episode, let id = episodeIDs["\(season)#\(number)"] else {
-                    missing += 1
-                    continue
+        // All writes in one transaction, after checking that a new upload has not replaced the list meanwhile
+        // (TMDB calls above can take seconds).
+        let today = today
+        let entryID = try entry.requireID()
+        let episodeByKey = episodeIDs
+        try await db.transaction { db in
+            guard try await ImportEntry.find(entryID, on: db) != nil else { return }
+            let userTitle = try await WatchService(db: db, today: { today }).userTitle(userID: userID, titleID: titleID)
+            var existing = try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).all()
+            var added = 0
+            var missing = 0
+            for watch in planned {
+                var episodeID: UUID?
+                if kind == .tv {
+                    guard let season = watch.season, let number = watch.episode, let id = episodeByKey["\(season)#\(number)"] else {
+                        missing += 1
+                        continue
+                    }
+                    episodeID = id
                 }
-                episodeID = id
+                let day = watch.day.flatMap { CalendarDay.isValid($0) && $0 <= today ? $0 : nil }
+                let known = existing.contains { other in
+                    guard other.$episode.id == episodeID else { return false }
+                    guard let day else { return true }
+                    return other.watchedOn.map { abs(CalendarDay.daysBetween($0, day)) <= 1 } ?? false
+                }
+                if known { continue }
+                let new = Watch(userID: userID, titleID: titleID, episodeID: episodeID, watchedOn: day, service: watch.service,
+                                origin: .manual)
+                try await new.save(on: db)
+                existing.append(new)
+                added += 1
             }
-            let day = watch.day.flatMap { CalendarDay.isValid($0) && $0 <= today ? $0 : nil }
-            let known = existing.contains { other in
-                guard other.$episode.id == episodeID else { return false }
-                guard let day else { return true }
-                return other.watchedOn.map { abs(CalendarDay.daysBetween($0, day)) <= 1 } ?? false
-            }
-            if known { continue }
-            let new = Watch(userID: userID, titleID: titleID, episodeID: episodeID, watchedOn: day, service: watch.service, origin: .manual)
-            try await new.save(on: db)
-            existing.append(new)
-            added += 1
-        }
 
-        if added > 0 { userTitle.hidden = false }
-        if let rating = entry.rating { userTitle.rating = rating }
-        if let comment = entry.comment {
-            let current = userTitle.comment ?? ""
-            if current.isEmpty {
-                userTitle.comment = comment
-            } else if !current.contains(comment) {
-                let merged = current + "\n\n" + comment
-                if merged.count <= WatchService.maxCommentLength { userTitle.comment = merged }
+            if added > 0 { userTitle.hidden = false }
+            if let rating = entry.rating { userTitle.rating = rating }
+            if let comment = entry.comment {
+                let current = userTitle.comment ?? ""
+                if current.isEmpty {
+                    userTitle.comment = comment
+                } else if !current.contains(comment) {
+                    let merged = current + "\n\n" + comment
+                    if merged.count <= WatchService.maxCommentLength { userTitle.comment = merged }
+                }
             }
-        }
-        try await userTitle.save(on: db)
+            try await userTitle.save(on: db)
 
-        entry.status = ImportEntryStatus.imported.rawValue
-        entry.tmdbID = tmdbID
-        entry.missingEpisodes = missing
-        entry.addedWatches = added
-        entry.setCandidates([])
-        entry.error = nil
-        try await entry.save(on: db)
+            entry.status = ImportEntryStatus.imported.rawValue
+            entry.tmdbID = tmdbID
+            entry.missingEpisodes = missing
+            entry.addedWatches = added
+            entry.setCandidates([])
+            entry.error = nil
+            try await entry.save(on: db)
+        }
     }
 
     private func save(_ entry: ImportEntry, status: ImportEntryStatus, candidates: [TMDBSearchResult]) async throws {
@@ -227,6 +235,9 @@ actor ImportWorker {
                     } catch let error as TMDBError {
                         entry.error = error.description
                         try await entry.save(on: db)
+                        // Token, rate limit or TMDB down: the rest would fail too. Anything else concerns this entry
+                        // only, which must not keep the user's other entries waiting.
+                        guard Self.stopsPass(error) else { continue }
                         logger.warning("Standard-Import: TMDB-Fehler, Rest folgt beim nächsten Versuch: \(error)")
                         break
                     } catch {
@@ -241,6 +252,16 @@ actor ImportWorker {
     }
 }
 
+extension ImportWorker {
+    static func stopsPass(_ error: TMDBError) -> Bool {
+        switch error {
+        case .missingToken, .unauthorized, .rateLimited, .network: true
+        case .http(let code): code >= 500
+        case .notFound, .invalidResponse: false
+        }
+    }
+}
+
 extension Application {
     private struct ImportWorkerKey: StorageKey { typealias Value = ImportWorker }
 
@@ -250,5 +271,12 @@ extension Application {
             return worker
         }
         set { storage[ImportWorkerKey.self] = newValue }
+    }
+}
+
+/// Resumes entries left pending by a restart.
+struct ImportWorkerLifecycle: LifecycleHandler {
+    func didBootAsync(_ application: Application) async throws {
+        await application.importWorker.kick()
     }
 }

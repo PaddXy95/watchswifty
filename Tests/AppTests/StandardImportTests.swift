@@ -285,6 +285,68 @@ struct StandardImportTests {
         }
     }
 
+    @Test func perEntryTMDBErrorDoesNotBlockOthers() async throws {
+        let tmdb = Self.fake()
+        tmdb.fail("search:movie:Kaputt", with: .invalidResponse)
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            _ = try await entries(app, user, [Self.draft(.movie, "Kaputt"), Self.draft(.movie, "Dune", year: 2021, tmdb: 438631)])
+            _ = try await app.importWorker.processAll()
+            let list = try await ImportEntryService(db: app.db).entries(userID: user.requireID())
+            #expect(list[0].entryStatus == .pending)
+            #expect(list[0].error == TMDBError.invalidResponse.description)
+            #expect(list[1].entryStatus == .imported)
+        }
+    }
+
+    @Test func globalTMDBErrorStopsTheUsersPass() async throws {
+        let tmdb = Self.fake()
+        tmdb.fail("search:movie:Kaputt", with: .unauthorized)
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            _ = try await entries(app, user, [Self.draft(.movie, "Kaputt"), Self.draft(.movie, "Dune", year: 2021, tmdb: 438631)])
+            _ = try await app.importWorker.processAll()
+            let list = try await ImportEntryService(db: app.db).entries(userID: user.requireID())
+            #expect(list[0].error == TMDBError.unauthorized.description)
+            #expect(list[1].entryStatus == .pending)
+            #expect(!tmdb.calls.contains("movie:438631"))
+        }
+    }
+
+    @Test func bootResumesPendingEntries() async throws {
+        let tmdb = Self.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            _ = try await entries(app, user, [Self.draft(.movie, "Dune", year: 2021, tmdb: 438631)])
+            app.importWorker = ImportWorker(db: app.db, provider: TMDBProvider { _ in tmdb }, cipher: app.tokenCipher,
+                                            logger: app.logger, today: { Self.today }, enabled: true)
+            try await ImportWorkerLifecycle().didBootAsync(app)
+            var status = ImportEntryStatus.pending
+            for _ in 0..<100 where status == .pending {
+                try await Task.sleep(for: .milliseconds(20))
+                status = try await ImportEntryService(db: app.db).entries(userID: user.requireID())[0].entryStatus
+            }
+            #expect(status == .imported)
+        }
+    }
+
+    @Test func replaceDuringRecordWritesNothing() async throws {
+        let tmdb = Self.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let db = app.db
+            tmdb.onCall("series:95396") {
+                try await ImportEntryService(db: db).replace(userID: userID, drafts: [])
+            }
+            let entry = try await entries(app, user, [Self.draft(.tv, "Severance", watches: [Self.watch(season: 1, episode: 1)], rating: 9)])[0]
+            try await importer(app, tmdb).record(entry, tmdbID: 95396)
+            #expect(try await Watch.query(on: app.db).count() == 0)
+            #expect(try await UserTitle.query(on: app.db).count() == 0)
+            #expect(try await ImportEntry.query(on: app.db).count() == 0)
+        }
+    }
+
     @Test func uploadReplacesAndReports() async throws {
         try await withTestApp(tmdb: Self.fake()) { app in
             let user = try await createUser(app, "pat")

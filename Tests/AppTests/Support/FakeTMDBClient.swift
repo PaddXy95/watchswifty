@@ -11,6 +11,8 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         var moviesByID: [Int: TMDBMovie] = [:]
         var imdbIDs: [Int: String] = [:]
         var finds: [String: TMDBFindResult] = [:]
+        var callFailures: [String: TMDBError] = [:]
+        var callHooks: [String: @Sendable () async throws -> Void] = [:]
         var failure: TMDBError?
         var genericFailure = false
         var delay: Duration?
@@ -68,6 +70,16 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         return state.withLockedValue { $0.imdbIDs[id] }
     }
 
+    /// Makes only this call (as recorded in `calls`, e.g. "search:movie:X") fail.
+    func fail(_ call: String, with error: TMDBError) {
+        state.withLockedValue { $0.callFailures[call] = error }
+    }
+
+    /// Runs `hook` when this call is made, before it answers (to change the database mid-operation).
+    func onCall(_ call: String, _ hook: @escaping @Sendable () async throws -> Void) {
+        state.withLockedValue { $0.callHooks[call] = hook }
+    }
+
     func setFind(_ imdbID: String, _ result: TMDBFindResult) {
         state.withLockedValue { $0.finds[imdbID] = result }
     }
@@ -82,10 +94,11 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     }
 
     private func record(_ call: String) async throws {
-        let (failure, generic, delay) = state.withLockedValue { s -> (TMDBError?, Bool, Duration?) in
+        let (failure, generic, delay, hook) = state.withLockedValue { s -> (TMDBError?, Bool, Duration?, (@Sendable () async throws -> Void)?) in
             s.calls.append(call)
-            return (s.failure, s.genericFailure, s.delay)
+            return (s.failure ?? s.callFailures[call], s.genericFailure, s.delay, s.callHooks[call])
         }
+        if let hook { try await hook() }
         if let delay { try await Task.sleep(for: delay) }
         if generic { throw Boom() }
         if let failure { throw failure }
