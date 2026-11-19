@@ -85,6 +85,24 @@ struct CatalogMaintenanceTests {
         }
     }
 
+    @Test func importEntriesKeepTheirTitles() async throws {
+        let (_, provider, _) = Self.setup()
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let series = try await seedSeries(app, tmdbID: 9, seasons: [1: 2])
+            series.refreshedAt = start
+            try await series.save(on: app.db)
+            let entry = ImportEntry(userID: try user.requireID(), position: 0, draft: ImportDraft(
+                kind: .tv, title: "Serie", year: nil, tmdbHint: nil, imdbID: nil, watches: [], rating: nil, comment: nil))
+            entry.status = ImportEntryStatus.imported.rawValue
+            entry.tmdbID = 9
+            try await entry.save(on: app.db)
+            let result = await maintain(app, provider, at: start.addingTimeInterval(61 * Self.day))
+            #expect(result.deleted == 0)
+            #expect(try await Title.query(on: app.db).count() == 1)
+        }
+    }
+
     @Test func noOwnerTokenClearsOnlyAfterSixMonths() async throws {
         let (_, provider, tokens) = Self.setup()
         try await withTestApp { app in
@@ -129,17 +147,18 @@ struct CatalogMaintenanceTests {
             let mapping = NetflixMapping(userID: try user.requireID(), netflixName: "X", kind: .tv)
             mapping.candidateResults = [candidate]
             try await mapping.save(on: app.db)
-            try await FilmListService(db: app.db).replace(userID: user.requireID(), drafts: [
-                FilmListDraft(title: "Y", year: 2020, watches: [FilmWatch(day: nil, service: nil)], rating: nil, comment: nil),
+            try await ImportEntryService(db: app.db).replace(userID: user.requireID(), drafts: [
+                ImportDraft(kind: .movie, title: "Y", year: 2020, tmdbHint: nil, imdbID: nil,
+                            watches: [ImportWatch(season: nil, episode: nil, day: nil, service: nil)], rating: nil, comment: nil),
             ])
-            let entry = try #require(try await FilmListEntry.query(on: app.db).first())
+            let entry = try #require(try await ImportEntry.query(on: app.db).first())
             entry.setCandidates([candidate])
             try await entry.save(on: app.db)
 
             #expect(await maintain(app, provider, at: Date().addingTimeInterval(59 * Self.day)).candidatesCleared == 0)
             #expect(await maintain(app, provider, at: Date().addingTimeInterval(61 * Self.day)).candidatesCleared == 2)
             #expect(try await NetflixMapping.find(mapping.requireID(), on: app.db)?.candidates == nil)
-            #expect(try await FilmListEntry.find(entry.requireID(), on: app.db)?.candidates == nil)
+            #expect(try await ImportEntry.find(entry.requireID(), on: app.db)?.candidates == nil)
         }
     }
 }

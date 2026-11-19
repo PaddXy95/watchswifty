@@ -21,7 +21,7 @@ tags:
   - name: Library
   - name: Statistics
   - name: Netflix import
-  - name: Movie list
+  - name: Standard import
   - name: Admin
 paths:
   /v1/version:
@@ -1305,11 +1305,15 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-  /v1/imports/films:
+  /v1/imports/standard:
     post:
-      operationId: uploadFilmList
-      tags: [Movie list]
-      summary: Upload your own movie list (CSV with the header “Filmname”, at most 2 MB); replaces the previous list
+      operationId: uploadStandardImport
+      tags: [Standard import]
+      summary: Upload a CSV in the WatchSwifty standard format (columns `type` and `title` required, at most 5 MB); replaces the previous list
+      description: >-
+        One row per viewing (`movie`, `episode`) or per series (`series`, rating/comment only). Optional columns:
+        `year`, `tmdb_id`, `imdb_id`, `season`, `episode`, `watched_on`, `service`, `rating` (1–10), `comment`.
+        See docs/import.md.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1327,11 +1331,11 @@ paths:
                 contentType: "*/*"
       responses:
         "200":
-          description: Number of imported films (matching runs in the background)
+          description: Number of titles taken over and rows skipped (matching runs in the background)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmUploadResult"
+                $ref: "#/components/schemas/ImportUploadResult"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "413":
@@ -1343,9 +1347,9 @@ paths:
         "422":
           $ref: "#/components/responses/Unprocessable"
     get:
-      operationId: getFilmList
-      tags: [Movie list]
-      summary: Status of the movie list
+      operationId: getStandardImport
+      tags: [Standard import]
+      summary: Status of the standard import
       security: [{ bearerAuth: [] }]
       responses:
         "200":
@@ -1353,13 +1357,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmList"
+                $ref: "#/components/schemas/ImportList"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/imports/films/retry:
+  /v1/imports/standard/retry:
     post:
-      operationId: retryFilmList
-      tags: [Movie list]
+      operationId: retryStandardImport
+      tags: [Standard import]
       summary: Retry matching (after TMDB errors)
       security: [{ bearerAuth: [] }]
       responses:
@@ -1368,14 +1372,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmList"
+                $ref: "#/components/schemas/ImportList"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/imports/films/{id}/accept:
+  /v1/imports/standard/{id}/accept:
     post:
-      operationId: acceptFilm
-      tags: [Movie list]
-      summary: Assign a film to a TMDB result and create watches
+      operationId: acceptImportEntry
+      tags: [Standard import]
+      summary: Assign an entry to a TMDB result and create its watches
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1389,25 +1393,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FilmAccept"
+              $ref: "#/components/schemas/ImportAccept"
       responses:
         "200":
           description: Entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
-  /v1/imports/films/{id}/search:
+  /v1/imports/standard/{id}/search:
     post:
-      operationId: searchFilm
-      tags: [Movie list]
-      summary: Get suggestions with a different search term
+      operationId: searchImportEntry
+      tags: [Standard import]
+      summary: Get suggestions with a different search term (in the entry's kind)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1421,25 +1425,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FilmSearch"
+              $ref: "#/components/schemas/ImportSearch"
       responses:
         "200":
           description: Entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
-  /v1/imports/films/{id}/skip:
+  /v1/imports/standard/{id}/skip:
     post:
-      operationId: skipFilm
-      tags: [Movie list]
-      summary: Skip a film
+      operationId: skipImportEntry
+      tags: [Standard import]
+      summary: Skip an entry
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1454,7 +1458,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1481,7 +1485,7 @@ paths:
     post:
       operationId: createUser
       tags: [Admin]
-      summary: Create a user (admins only)
+      summary: Create a user (admins only; an admin account needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1499,7 +1503,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "409":
           description: Initial password although password login is switched off (`passwordLoginDisabled`) – only invitations are possible then
           content:
@@ -1549,7 +1553,7 @@ paths:
     put:
       operationId: resetUserPassword
       tags: [Admin]
-      summary: Set another user's password (not your own – use PUT /v1/me/password for that)
+      summary: Set another user's password (not your own – use PUT /v1/me/password for that; another admin's needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1570,7 +1574,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1595,6 +1599,13 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        description: Needed when the account is an admin's (security confirmation)
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminConfirmation"
       responses:
         "200":
           description: Created
@@ -1605,7 +1616,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           description: User unknown or OIDC not set up (`notFound`)
           content:
@@ -1622,7 +1633,7 @@ paths:
     put:
       operationId: setUserAdmin
       tags: [Admin]
-      summary: Set the admin right of another user
+      summary: Set the admin right of another user (granting it needs `currentPassword`)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1647,7 +1658,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          $ref: "#/components/responses/ForbiddenOrUnconfirmed"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -1998,6 +2009,13 @@ components:
             $ref: "#/components/schemas/Error"
     Forbidden:
       description: Admins only (`forbidden`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ForbiddenOrUnconfirmed:
+      description: Admins only (`forbidden`), or `currentPassword` is missing or wrong (`confirmationRequired`); an account
+        without a password confirms in the browser (`confirmInBrowser`)
       content:
         application/json:
           schema:
@@ -2710,38 +2728,52 @@ components:
         episodeId:
           type: string
           format: uuid
-    FilmUploadResult:
+    ImportUploadResult:
       type: object
-      required: [films]
+      required: [titles, skippedRows]
       properties:
-        films:
+        titles:
           type: integer
-    FilmEntry:
+          description: Titles (entries) taken over from the file.
+        skippedRows:
+          type: integer
+          description: Rows with an unknown type, without a title or (episodes) without season/episode.
+    ImportEntry:
       type: object
-      required: [id, title, watchCount, status, candidates]
+      required: [id, kind, title, watchCount, status, candidates, missingEpisodes, addedWatches]
       properties:
         id:
           type: string
           format: uuid
+        kind:
+          type: string
+          enum: [tv, movie]
         title:
           type: string
         year:
           type: integer
         watchCount:
           type: integer
+          description: Viewings in the file (movie or episode rows).
         rating:
           type: integer
         status:
-          $ref: "#/components/schemas/FilmStatus"
+          $ref: "#/components/schemas/ImportStatus"
         tmdbId:
           type: integer
         candidates:
           type: array
           items:
             $ref: "#/components/schemas/SearchResult"
+        missingEpisodes:
+          type: integer
+          description: Episodes of the file that TMDB does not list (not recorded).
+        addedWatches:
+          type: integer
+          description: Watches created by the last recording (known ones are not added again).
         error:
           type: string
-    FilmCounts:
+    ImportCounts:
       type: object
       required: [imported, review, notFound, skipped, pending]
       properties:
@@ -2755,26 +2787,26 @@ components:
           type: integer
         pending:
           type: integer
-    FilmList:
+    ImportList:
       type: object
       required: [counts, entries]
       properties:
         counts:
-          $ref: "#/components/schemas/FilmCounts"
+          $ref: "#/components/schemas/ImportCounts"
         error:
           type: string
           description: Matching error (e.g. no TMDB token); entries stay open.
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/FilmEntry"
-    FilmAccept:
+            $ref: "#/components/schemas/ImportEntry"
+    ImportAccept:
       type: object
       required: [tmdbId]
       properties:
         tmdbId:
           type: integer
-    FilmSearch:
+    ImportSearch:
       type: object
       required: [q]
       properties:
@@ -2910,6 +2942,10 @@ components:
           type: string
         isAdmin:
           type: boolean
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     AdminPassword:
       type: object
       required: [password]
@@ -2917,12 +2953,27 @@ components:
         password:
           type: string
           minLength: 8
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     AdminFlag:
       type: object
       required: [isAdmin]
       properties:
         isAdmin:
           type: boolean
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
+    AdminConfirmation:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          description: Your own current password. Needed to grant admin rights and to act on another admin's account
+            (security confirmation); accounts without a password do this in the browser (`confirmInBrowser`).
     UpdateCheck:
       type: object
       required: [enabled]
@@ -3025,9 +3076,9 @@ components:
       type: string
       description: Status of a Netflix mapping.
       enum: [pending, auto, confirmed, review, ignored]
-    FilmStatus:
+    ImportStatus:
       type: string
-      description: Status of a movie list entry.
+      description: Status of a standard import entry.
       enum: [pending, imported, review, not_found, skipped]
     NotifyChannel:
       type: string

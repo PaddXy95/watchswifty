@@ -1,0 +1,5 @@
+type,title,year,tmdb_id,imdb_id,season,episode,watched_on,service,rating,comment
+movie,Dune,2021,438631,,,,2024-03-02,netflix,8,Im Kino besser
+episode,Severance,2022,,tt11280740,1,3,2024-05-10,apple_tv,,
+episode,Severance,2022,,tt11280740,1,4,,apple_tv,,
+series,Severance,2022,,tt11280740,,,,,9,

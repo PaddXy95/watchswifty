@@ -6,7 +6,8 @@ import Vapor
 struct SearchHit {
     let result: TMDBSearchResult
     let inLibrary: Bool
-    /// Series only: watched / total regular episodes (nil when the series is not cached).
+    /// Series only: watched / total regular episodes (nil unless the series is in the user's library: which series
+    /// are cached reflects other users' tracking, security audit F14).
     let watchedEpisodes: Int?
     let totalEpisodes: Int?
     let movieWatched: Bool
@@ -48,9 +49,10 @@ struct SearchService {
             let entry = entries.first { $0.$title.id == id }
             let regular = Set(episodes.filter { $0.$title.id == id }.compactMap(\.id))
             let seen = Set(own.compactMap(\.$episode.id)).intersection(regular)
-            return SearchHit(result: result, inLibrary: !own.isEmpty || entry != nil,
-                             watchedEpisodes: result.kind == .tv ? seen.count : nil,
-                             totalEpisodes: result.kind == .tv ? regular.count : nil,
+            let inLibrary = !own.isEmpty || entry != nil
+            return SearchHit(result: result, inLibrary: inLibrary,
+                             watchedEpisodes: result.kind == .tv && inLibrary ? seen.count : nil,
+                             totalEpisodes: result.kind == .tv && inLibrary ? regular.count : nil,
                              movieWatched: result.kind == .movie && !own.isEmpty, rating: entry?.rating)
         }
     }

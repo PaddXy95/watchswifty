@@ -26,9 +26,14 @@ actor MatchingWorker {
     /// Last problem per user (missing/rejected token, TMDB down); cleared after a clean run for that user.
     private var errors: [UUID: String] = [:]
     private var failedThisRun: Set<UUID> = []
-    /// Titles whose cache was refreshed (or tried) during the current run, and those that failed.
-    private var refreshAttempted: Set<UUID> = []
-    private var refreshFailed: Set<UUID> = []
+    /// Titles whose cache was refreshed during the current run, and (owner, title) pairs whose refresh with that
+    /// owner's token failed: a failure only holds back that owner's rows (security audit F13).
+    private var refreshed: Set<UUID> = []
+    private var refreshFailed: Set<OwnerTitle> = []
+    private struct OwnerTitle: Hashable {
+        let owner: UUID
+        let title: UUID
+    }
     /// A cached title older than this is refreshed once when some of its rows do not match.
     static let staleCacheAge: TimeInterval = 3600
     private var rerunRequested = false
@@ -118,7 +123,7 @@ actor MatchingWorker {
         defer { processing = false }
         var result = MatchingRunResult()
         failedThisRun = []
-        refreshAttempted = []
+        refreshed = []
         refreshFailed = []
         var touchedUsers: Set<UUID> = []
         var changed = true
@@ -152,8 +157,8 @@ actor MatchingWorker {
         for (userID, userRows) in Dictionary(grouping: rows, by: { $0.$user.id }) {
             let seasonless = Set(userRows.compactMap { $0.parsedKind == "episode" && $0.seasonNumber == nil ? $0.showName : nil })
             var showCounts: [String: Int] = [:]
-            if !seasonless.isEmpty {
-                for row in try await NetflixRow.query(on: db).filter(\.$user.$id == userID).filter(\.$showName ~~ Array(seasonless)).all() {
+            for names in Array(seasonless).chunked() {
+                for row in try await NetflixRow.query(on: db).filter(\.$user.$id == userID).filter(\.$showName ~~ names).all() {
                     if let show = row.showName { showCounts[show, default: 0] += 1 }
                 }
             }
@@ -270,21 +275,28 @@ actor MatchingWorker {
     }
 
     private func ignoreRowsLocked() async throws {
-        let ignored = try await NetflixMapping.query(on: db).filter(\.$status == MappingStatus.ignored.rawValue).all().compactMap(\.id)
-        guard !ignored.isEmpty else { return }
-        try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id ~~ ignored)
-            .set(\.$status, to: RowStatus.ignored.rawValue).update()
+        let ignored = try await Self.pendingRows(on: db).filter(NetflixMapping.self, \.$status == MappingStatus.ignored.rawValue)
+            .unique().all(\.$mapping.$id).compactMap { $0 }
+        for chunk in ignored.chunked() {
+            try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id ~~ chunk)
+                .set(\.$status, to: RowStatus.ignored.rawValue).update()
+        }
+    }
+
+    /// Pending rows joined to their mapping: steps that look at mappings of a status across all users filter in
+    /// the database instead of binding every mapping ID (security audit F15).
+    private nonisolated static func pendingRows(on db: any Database) -> QueryBuilder<NetflixRow> {
+        NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
+            .join(NetflixMapping.self, on: \NetflixRow.$mapping.$id == \NetflixMapping.$id)
     }
 
     // MARK: Step 4 – episodes / movies
 
     private func matchRows() async throws -> (Int, Int) {
-        let resolvedIDs = try await NetflixMapping.query(on: db)
-            .filter(\.$status ~~ [MappingStatus.auto.rawValue, MappingStatus.confirmed.rawValue]).filter(\.$title.$id != nil)
-            .all().compactMap(\.id)
-        guard !resolvedIDs.isEmpty else { return (0, 0) }
-        let groups = Set(try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
-            .filter(\.$mapping.$id ~~ resolvedIDs).all().compactMap(\.$mapping.id))
+        let groups = Set(try await Self.pendingRows(on: db)
+            .filter(NetflixMapping.self, \.$status ~~ [MappingStatus.auto.rawValue, MappingStatus.confirmed.rawValue])
+            .filter(NetflixMapping.self, \.$title.$id != nil)
+            .unique().all(\.$mapping.$id).compactMap { $0 })
         var matched = 0, unmatched = 0
         for mappingID in groups {
             let (m, u) = try await locked { try await matchGroup(mappingID) }
@@ -298,8 +310,8 @@ actor MatchingWorker {
     /// decision the user made in the meantime is honoured.
     private func matchGroup(_ mappingID: UUID) async throws -> (Int, Int) {
         guard let mapping = try await NetflixMapping.find(mappingID, on: db),
-              [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id,
-              !refreshFailed.contains(titleID) else { return (0, 0) }
+              [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id else { return (0, 0) }
+        let ownerTitle = OwnerTitle(owner: mapping.$user.id, title: titleID)
         let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
             .filter(\.$mapping.$id == mappingID).all()
         guard !rows.isEmpty else { return (0, 0) }
@@ -314,19 +326,20 @@ actor MatchingWorker {
         }
 
         var matches = try await episodeMatches()
-        var keepPending = false
+        // Rows of an owner whose own refresh failed in this run wait for a retry; other owners are not affected.
+        var keepPending = refreshFailed.contains(ownerTitle)
         // Episodes missing only because the shared cache is old: refresh the title once with the
         // owner's token and try again. If TMDB fails, the unmatched rows stay pending for a retry.
-        if mapping.titleKind == .tv, matches.contains(where: \.isEmpty), !refreshAttempted.contains(titleID),
+        if mapping.titleKind == .tv, matches.contains(where: \.isEmpty), !refreshed.contains(titleID), !keepPending,
            let title = try await Title.find(titleID, on: db),
            (title.refreshedAt.map { Date().timeIntervalSince($0) > Self.staleCacheAge } ?? true),
            let token = cipher.open(try await User.find(mapping.$user.id, on: db)?.tmdbToken) {
-            refreshAttempted.insert(titleID)
             do {
                 try await CatalogService(db: db, tmdb: provider.make(token)).refresh(title)
+                refreshed.insert(titleID)
                 matches = try await episodeMatches()
             } catch {
-                refreshFailed.insert(titleID)
+                refreshFailed.insert(ownerTitle)
                 keepPending = true
                 fail(mapping.$user.id, error is TMDBError ? "TMDB nicht erreichbar: \(error)" : "Zuordnung fehlgeschlagen: \(error)")
             }
@@ -354,9 +367,7 @@ actor MatchingWorker {
     }
 
     private func awaitingReviewCount() async throws -> Int {
-        let review = try await NetflixMapping.query(on: db).filter(\.$status == MappingStatus.review.rawValue).all().compactMap(\.id)
-        guard !review.isEmpty else { return 0 }
-        return try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id ~~ review).count()
+        try await Self.pendingRows(on: db).filter(NetflixMapping.self, \.$status == MappingStatus.review.rawValue).count()
     }
 }
 

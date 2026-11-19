@@ -59,3 +59,17 @@ extension StreamingService {
         }
     }
 }
+
+extension StreamingService {
+    /// Maps a service name as people write it („Amazon Prime“, „WowTV“, „Gekauft“); unknown names → `.other`.
+    init?(label: String) {
+        let key = label.lowercased().filter { $0.isLetter }
+        guard !key.isEmpty else { return nil }
+        let table: [(String, StreamingService)] = [
+            ("netflix", .netflix), ("amazon", .primeVideo), ("prime", .primeVideo), ("disney", .disneyPlus),
+            ("apple", .appleTV), ("hbo", .hboMax), ("max", .hboMax), ("paramount", .paramountPlus), ("wow", .wow),
+            ("sky", .wow), ("kino", .cinema), ("cinema", .cinema), ("gekauft", .purchased), ("kauf", .purchased),
+        ]
+        self = table.first { key.hasPrefix($0.0) }?.1 ?? .other
+    }
+}

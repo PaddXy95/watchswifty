@@ -162,7 +162,7 @@ struct OIDCLinkTests {
         try await withTestApp(config: .testingOIDC, oidc: fake) { app in
             let user = try await createUser(app, "anna")
             let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
-            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            let result = try await confirmLinkToken(app, fake, token: token)
             #expect(result.location == "/account?sso=linked")
             #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "sub-1")
             #expect(try await OIDCLinkTokenService(db: app.db).check(token) == nil)
@@ -176,7 +176,7 @@ struct OIDCLinkTests {
         try await withTestApp(config: .testingOIDC, oidc: fake) { app in
             let user = try await createUser(app, "anna")
             let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
-            _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            _ = try await confirmLinkToken(app, fake, token: token)
             fake.identity = oidcIdentity("sub-2")
             let again = try await browserGet(app, "/auth/oidc/start?link=\(token)", headers: .sameOrigin)
             #expect(again.status == .badRequest)
@@ -204,7 +204,7 @@ struct OIDCLinkTests {
             try await linkOIDC(app, other)
             let user = try await createUser(app, "anna")
             let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
-            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            let result = try await confirmLinkToken(app, fake, token: token)
             #expect(result.status == .unprocessableEntity)
             #expect(result.body.contains("Dieses SSO-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft."))
             #expect(try await User.find(user.id, on: app.db)?.oidcSubject == nil)
@@ -371,7 +371,7 @@ struct OIDCLinkTests {
             let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
             try await linkOIDC(app, user, subject: "anna-sub")
             fake.identity = oidcIdentity("attacker")
-            let result = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            let result = try await confirmLinkToken(app, fake, token: token)
             #expect(result.status == .unprocessableEntity)
             #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "anna-sub")
         }
@@ -384,7 +384,7 @@ struct OIDCLinkTests {
             try await user.save(on: app.db)
             let invite = try await PasswordTokenService(db: app.db).issue(userID: user.requireID(), purpose: .invite)
             let link = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
-            _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(link)")
+            _ = try await confirmLinkToken(app, fake, token: link)
             #expect(try await PasswordTokenService(db: app.db).lookup(invite) == nil)
 
             let bert = User(username: "bert", passwordHash: User.noPasswordHash, isAdmin: false)
@@ -394,6 +394,66 @@ struct OIDCLinkTests {
             fake.identity = oidcIdentity("bert-sub")
             _ = try await oidcFlow(app, fake, start: "/auth/oidc/start?invite=\(invite2)")
             #expect(try await OIDCLinkTokenService(db: app.db).check(link2) == nil)
+        }
+    }
+
+    // MARK: - Security audit F06 / F17
+
+    /// A link flow cookie minted in one session must not link the account of another session (security audit F06).
+    @Test func linkFlowCookieFromOtherSessionIsRejected() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let mallory = try await createUser(app, "mallory")
+            let victim = try await createUser(app, "victim")
+            let malloryHeaders = try await login(app, "mallory")
+            let posted = try await browserPost(app, "/account/oidc/link", form: ["currentPassword": "password123"], headers: malloryHeaders)
+            let started = try await browserGet(app, "/auth/oidc/start", headers: posted.headers)
+            let state = try #require(fake.lastState)
+            let flowCookie = try #require(cookieValue(started.headers, OIDCFlowCookie.name))
+            fake.identity = oidcIdentity("mallory-sub")
+            let victimHeaders = try await login(app, "victim").settingCookie(OIDCFlowCookie.name, flowCookie)
+            let result = try await browserGet(app, "/auth/oidc/callback?code=test-code&state=\(state)", headers: victimHeaders)
+            #expect(result.status == .badRequest)
+            #expect(try await User.find(victim.id, on: app.db)?.oidcSubject == nil)
+            #expect(try await User.find(mallory.id, on: app.db)?.oidcSubject == nil)
+        }
+    }
+
+    /// A link token needs an explicit confirmation that names the target account (security audit F17).
+    @Test func linkTokenAsksForConfirmation() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let user = try await createUser(app, "anna")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: user.requireID(), lifetime: 3600)
+            let flow = try await oidcFlow(app, fake, start: "/auth/oidc/start?link=\(token)")
+            #expect(flow.location == "/auth/oidc/link")
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == nil)
+            let page = try await browserGet(app, "/auth/oidc/link", headers: flow.headers)
+            #expect(page.status == .ok)
+            #expect(page.body.contains("„anna“"))
+            #expect(page.body.contains("anna@example.org"))
+            #expect(page.body.contains("Verknüpfen"))
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == nil)
+            let confirmed = try await browserPost(app, "/auth/oidc/link", form: [:], headers: page.headers)
+            #expect(confirmed.location == "/account?sso=linked")
+            #expect(try await User.find(user.id, on: app.db)?.oidcSubject == "sub-1")
+        }
+    }
+
+    /// Opening someone else's link token while signed in to another account links nothing (security audit F17).
+    @Test func linkTokenRefusedWhileOtherAccountSignedIn() async throws {
+        let fake = FakeOIDCProvider()
+        try await withTestApp(config: .testingOIDC, oidc: fake) { app in
+            let mallory = try await createUser(app, "mallory")
+            try await createUser(app, "victim")
+            let token = try await OIDCLinkTokenService(db: app.db).issue(userID: mallory.requireID(), lifetime: 3600)
+            fake.identity = oidcIdentity("victim-sub")
+            let victim = try await login(app, "victim")
+            let result = try await confirmLinkToken(app, fake, token: token, headers: victim)
+            #expect(result.status == .forbidden)
+            #expect(result.body.contains("anderes Konto angemeldet"))
+            #expect(try await User.find(mallory.id, on: app.db)?.oidcSubject == nil)
+            #expect(try await OIDCLinkTokenService(db: app.db).check(token) != nil)
         }
     }
 }

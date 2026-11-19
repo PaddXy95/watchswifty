@@ -17,6 +17,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.backgroundTasks = BackgroundTasks()
     app.dailyRunTrigger = DailyRunTrigger()
     app.oidcIdentityLock = AsyncMutex()
+    app.forgotPasswordLock = AsyncMutex()
     app.oidcUsedStates = OIDCUsedStates()
     app.loginSettings = LoginSettingsStore()
     let httpClient = app.client
@@ -32,7 +33,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     AssetVersion.configure(publicDirectory: app.directory.publicDirectory, logger: app.logger)
     app.middleware.use(OriginCheckMiddleware(allowedOrigins: config.publicOrigins))
-    app.sessions.use(.fluent)
+    app.sessions.use { _ in HashedSessionDriver() }
     app.sessions.configuration = .init(cookieName: "watchswifty_session") { sessionID in
         .init(string: sessionID.string, expires: Date(timeIntervalSinceNow: 2_592_000), maxAge: 2_592_000,
               isSecure: false, isHTTPOnly: true, sameSite: .lax)
@@ -85,6 +86,9 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(CreateEpisodeNotice())
     app.migrations.add(AddTitleGenres())
     app.migrations.add(AddWatchUserIndex())
+    app.migrations.add(CreateWebSession())
+    app.migrations.add(CreateImportEntry())
+    app.migrations.add(DropFilmListEntries())
 
     try routes(app)
     try await app.autoMigrate()
@@ -107,12 +111,13 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)
     app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
                                         enabled: backgroundJobs, lock: app.importLock)
-    app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
-                                        today: config.today, enabled: backgroundJobs)
+    app.importWorker = ImportWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
+                                    today: config.today, enabled: backgroundJobs)
     app.libraryRefresh = LibraryRefreshWorker(db: app.db, provider: tmdbProvider, logger: app.logger, matching: app.matchingWorker)
     app.lifecycle.use(LibraryRefreshLifecycle())
     if backgroundJobs {
         app.lifecycle.use(MatchingWorkerLifecycle())
+        app.lifecycle.use(ImportWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
         app.lifecycle.use(UpdateCheckLifecycle())
     }

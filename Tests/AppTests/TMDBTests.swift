@@ -40,6 +40,26 @@ struct TMDBTests {
         #expect(results == [TMDBSearchResult(id: 603, kind: .movie, name: "Matrix", originalName: "The Matrix", year: 1999, posterPath: "/m.jpg")])
     }
 
+    @Test func decodesFind() throws {
+        let json = #"{"movie_results":[{"id":438631,"title":"Dune","original_title":"Dune","release_date":"2021-09-15","poster_path":"/d.jpg"}],"person_results":[],"tv_results":[{"id":95396,"name":"Severance","original_name":"Severance","first_air_date":"2022-02-17","poster_path":null}],"tv_episode_results":[{"id":1,"show_id":95396,"name":"Folge"}],"tv_season_results":[]}"#
+        let result = try LiveTMDBClient.decodeFind(Data(json.utf8))
+        #expect(result.movies == [TMDBSearchResult(id: 438631, kind: .movie, name: "Dune", originalName: "Dune", year: 2021, posterPath: "/d.jpg")])
+        #expect(result.series.map(\.kind) == [.tv])
+        #expect(result.series.first?.year == 2022)
+        #expect(result.episodeShowIDs == [95396])
+    }
+
+    @Test func findCallsFindEndpoint() async throws {
+        let http = ScriptedHTTPClient(eventLoop: MultiThreadedEventLoopGroup.singleton.next(), responses: [
+            (.ok, [:], #"{"movie_results":[],"tv_results":[],"tv_episode_results":[]}"#),
+        ])
+        let tmdb = LiveTMDBClient(client: http, token: "t", language: "de-DE", limiter: RateLimiter(minInterval: .zero))
+        #expect(try await tmdb.find(imdbID: "tt1520211") == TMDBFindResult())
+        let url = try #require(http.sent.withLockedValue { $0.first?.url.string })
+        #expect(url.contains("/find/tt1520211"))
+        #expect(url.contains("external_source=imdb_id"))
+    }
+
     @Test func multiSkipsPeople() throws {
         let json = #"{"results":[{"id":1,"media_type":"tv","name":"Serie","first_air_date":"2010-01-01"},{"id":2,"media_type":"person","name":"Jemand"},{"id":3,"media_type":"movie","title":"Film","release_date":"2011-05-05"}]}"#
         let results = try LiveTMDBClient.decodeMulti(Data(json.utf8))
