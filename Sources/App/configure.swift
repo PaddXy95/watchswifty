@@ -86,6 +86,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddTitleGenres())
     app.migrations.add(AddWatchUserIndex())
     app.migrations.add(CreateImportEntry())
+    app.migrations.add(DropFilmListEntries())
 
     try routes(app)
     try await app.autoMigrate()
@@ -108,8 +109,6 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)
     app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
                                         enabled: backgroundJobs, lock: app.importLock)
-    app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
-                                        today: config.today, enabled: backgroundJobs)
     app.importWorker = ImportWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
                                     today: config.today, enabled: backgroundJobs)
     app.libraryRefresh = LibraryRefreshWorker(db: app.db, provider: tmdbProvider, logger: app.logger, matching: app.matchingWorker)

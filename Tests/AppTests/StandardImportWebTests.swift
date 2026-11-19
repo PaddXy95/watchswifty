@@ -1,6 +1,7 @@
 @testable import App
 import Fluent
 import Foundation
+import SQLKit
 import Testing
 import VaporTesting
 
@@ -161,6 +162,29 @@ struct StandardImportWebTests {
             try await app.testing().test(.POST, "/import/standard/\(id)/skip", headers: headers) { res async in
                 #expect(res.status == .notFound)
             }
+        }
+    }
+}
+
+@Suite("FilmListRemoval")
+struct FilmListRemovalTests {
+    @Test func oldFilmRoutesAreGone() async throws {
+        try await withTestApp { app in
+            _ = try await createUser(app, "pat")
+            let headers = try await login(app, "pat")
+            try await app.testing().test(.GET, "/import/films", headers: headers) { res async in
+                #expect(res.status == .notFound)
+            }
+        }
+    }
+
+    @Test func filmListTableIsDropped() async throws {
+        try await withTestApp { app in
+            let sql = try #require(app.db as? any SQLDatabase)
+            struct Name: Decodable { let name: String }
+            let tables = try await sql.raw("SELECT name FROM sqlite_master WHERE type = 'table'").all(decoding: Name.self).map(\.name)
+            #expect(!tables.contains("film_list_entries"))
+            #expect(tables.contains("import_entries"))
         }
     }
 }

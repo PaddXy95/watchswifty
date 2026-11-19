@@ -21,8 +21,8 @@ struct MaintenanceResult: Equatable, Sendable {
     var isEmpty: Bool { self == MaintenanceResult() }
 }
 
-/// Users of each title: watches, library entries (rating/hidden/follow/comment), season comments, Netflix mappings,
-/// film list entries and matched standard import entries.
+/// Users of each title: watches, library entries (rating/hidden/follow/comment), season comments, Netflix mappings and
+/// matched standard import entries.
 func titleUsers(on db: any Database) async throws -> [UUID: Set<UUID>] {
     var users: [UUID: Set<UUID>] = [:]
     for watch in try await Watch.query(on: db).field(\.$user.$id).field(\.$title.$id).unique().all() {
@@ -36,15 +36,6 @@ func titleUsers(on db: any Database) async throws -> [UUID: Set<UUID>] {
     }
     for mapping in try await NetflixMapping.query(on: db).filter(\.$title.$id != nil).all() {
         if let titleID = mapping.$title.id { users[titleID, default: []].insert(mapping.$user.id) }
-    }
-    let listed = try await FilmListEntry.query(on: db).filter(\.$tmdbID != nil).all()
-    if !listed.isEmpty {
-        let movies = try await Title.query(on: db).filter(\.$kind == TitleKind.movie.rawValue)
-            .filter(\.$tmdbID ~~ Array(Set(listed.compactMap(\.tmdbID)))).all()
-        let movieByTMDB = Dictionary(movies.compactMap { movie in movie.id.map { (movie.tmdbID, $0) } }, uniquingKeysWith: { a, _ in a })
-        for entry in listed {
-            if let titleID = entry.tmdbID.flatMap({ movieByTMDB[$0] }) { users[titleID, default: []].insert(entry.$user.id) }
-        }
     }
     let imported = try await ImportEntry.query(on: db).filter(\.$tmdbID != nil).all()
     for kind in TitleKind.allCases {
@@ -107,12 +98,6 @@ func maintainCatalog(db: any Database, provider: TMDBProvider, cipher: TokenCiph
             mapping.candidates = nil
             mapping.candidatesAt = nil
             try await mapping.save(on: db)
-            result.candidatesCleared += 1
-        }
-        for entry in try await FilmListEntry.query(on: db).filter(\.$candidates != nil).all()
-        where (entry.createdAt ?? .distantPast) < cutoff {
-            entry.candidates = nil
-            try await entry.save(on: db)
             result.candidatesCleared += 1
         }
         for entry in try await ImportEntry.query(on: db).filter(\.$candidates != nil).all()
