@@ -34,8 +34,8 @@ struct ImportPage: HTML {
                 }
                 state.progress
                 p(.class("muted")) {
-                    "Eigene Filmliste aus Numbers oder Excel? "
-                    a(.href("/import/films")) { "Filmliste importieren" }
+                    "Verlauf aus einem anderen Tracker? "
+                    a(.href("/import/standard")) { "Aus anderen Trackern importieren" }
                 }
             }
             section {

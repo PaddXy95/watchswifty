@@ -187,9 +187,6 @@ struct FilmListImportTests {
         try await withTestApp(tmdb: tmdb) { app in
             let user = try await createUser(app, "pat")
             let headers = try await login(app, "pat")
-            try await app.testing().test(.GET, "/import", headers: headers) { res async in
-                #expect(res.body.string.contains(#"href="/import/films""#))
-            }
             try await app.testing().test(.POST, "/import/films", headers: headers, beforeRequest: { req in
                 try req.content.encode(UploadForm(file: File(data: ByteBuffer(string: filmListSample), filename: "Filme.csv")), as: .formData)
             }, afterResponse: { res async in
