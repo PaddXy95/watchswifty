@@ -101,20 +101,6 @@ func filmRating(detail: String, stars: String) -> Int? {
     return min(10, max(1, Int(raw.rounded())))
 }
 
-extension StreamingService {
-    /// Maps a service name as people write it („Amazon Prime“, „WowTV“, „Gekauft“); unknown names → `.other`.
-    init?(label: String) {
-        let key = label.lowercased().filter { $0.isLetter }
-        guard !key.isEmpty else { return nil }
-        let table: [(String, StreamingService)] = [
-            ("netflix", .netflix), ("amazon", .primeVideo), ("prime", .primeVideo), ("disney", .disneyPlus),
-            ("apple", .appleTV), ("hbo", .hboMax), ("max", .hboMax), ("paramount", .paramountPlus), ("wow", .wow),
-            ("sky", .wow), ("kino", .cinema), ("cinema", .cinema), ("gekauft", .purchased), ("kauf", .purchased),
-        ]
-        self = table.first { key.hasPrefix($0.0) }?.1 ?? .other
-    }
-}
-
 /// Merges repeated films (same normalized title and year) in list order; one viewing per row.
 func groupFilmList(_ rows: [FilmListRow]) -> [FilmListDraft] {
     var order: [String] = []
