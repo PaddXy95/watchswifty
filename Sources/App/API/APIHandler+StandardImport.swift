@@ -34,7 +34,8 @@ extension APIHandler {
     func acceptImportEntry(_ input: Operations.acceptImportEntry.Input) async throws -> Operations.acceptImportEntry.Output {
         let (request, entry) = try await importEntry(input.path.id)
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
-        try await StandardImporter(db: request.db, tmdb: request.tmdb, today: request.watches.today()).record(entry, tmdbID: body.tmdbId)
+        try await StandardImporter(db: request.db, tmdb: request.tmdb, today: request.watches.today(),
+                             tokenlessUser: request.catalog.tokenlessUser).record(entry, tmdbID: body.tmdbId)
         return .ok(.init(body: .json(Self.importEntry(entry))))
     }
 
@@ -43,7 +44,8 @@ extension APIHandler {
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
         let query = body.q.trimmingCharacters(in: .whitespaces)
         if query.count >= 2 {
-            try await StandardImporter(db: request.db, tmdb: request.tmdb, today: request.watches.today()).search(entry, query: query)
+            try await StandardImporter(db: request.db, tmdb: request.tmdb, today: request.watches.today(),
+                             tokenlessUser: request.catalog.tokenlessUser).search(entry, query: query)
         }
         return .ok(.init(body: .json(Self.importEntry(entry))))
     }

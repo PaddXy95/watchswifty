@@ -188,3 +188,50 @@ struct FilmListRemovalTests {
         }
     }
 }
+
+/// Accepting an import entry must not open other users' cached titles without a TMDB token (security audit F14).
+@Suite("StandardImportCacheIsolation")
+struct StandardImportCacheIsolationTests {
+    /// bob rates cached movie 4343; eve (no TMDB token) has one import entry.
+    func seed(_ app: Application) async throws -> (User, UUID) {
+        let bob = try await createUser(app, "bob")
+        let eve = try await createUser(app, "eve", tmdbToken: nil)
+        let movie = try await seedMovie(app, tmdbID: 4343)
+        try await WatchService(db: app.db).setRating(userID: bob.requireID(), titleID: movie.requireID(), rating: 8)
+        _ = try await ImportEntryService(db: app.db).upload(userID: eve.requireID(), text: "type,title\nmovie,X\n")
+        let entry = try #require(try await ImportEntryService(db: app.db).entries(userID: eve.requireID()).first)
+        return (eve, try entry.requireID())
+    }
+
+    func evesTraces(_ app: Application, _ eve: User) async throws -> Int {
+        try await Watch.query(on: app.db).filter(\.$user.$id == eve.requireID()).count()
+            + UserTitle.query(on: app.db).filter(\.$user.$id == eve.requireID()).count()
+    }
+
+    @Test func tokenlessWebAcceptDoesNotOpenForeignCachedTitles() async throws {
+        try await withTestApp { app in
+            let (eve, id) = try await seed(app)
+            let session = try await login(app, "eve")
+            try await app.testing().test(.POST, "/import/standard/\(id)/accept", headers: session, beforeRequest: { req in
+                try req.content.encode(["tmdbID": 4343], as: .urlEncodedForm)
+            }, afterResponse: { res async in
+                #expect(res.status != .ok)
+            })
+            #expect(try await evesTraces(app, eve) == 0)
+            #expect(try await ImportEntry.find(id, on: app.db)?.entryStatus == .pending)
+        }
+    }
+
+    @Test func tokenlessAPIAcceptDoesNotOpenForeignCachedTitles() async throws {
+        try await withTestApp { app in
+            let (eve, id) = try await seed(app)
+            let token = try await apiToken(app, eve)
+            try await app.testing().test(.POST, "/api/v1/imports/standard/\(id)/accept", headers: .bearer(token), beforeRequest: { req in
+                try req.content.encode(ImportAcceptBody(tmdbId: 4343), as: .json)
+            }, afterResponse: { res async in
+                #expect(res.status != .ok)
+            })
+            #expect(try await evesTraces(app, eve) == 0)
+        }
+    }
+}

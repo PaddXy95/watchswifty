@@ -85,7 +85,7 @@ struct StandardImportController {
     }
 
     private func importer(_ req: Request) -> StandardImporter {
-        StandardImporter(db: req.db, tmdb: req.tmdb, today: req.application.appConfig.today())
+        StandardImporter(db: req.db, tmdb: req.tmdb, today: req.application.appConfig.today(), tokenlessUser: req.catalog.tokenlessUser)
     }
 
     private func ownEntry(_ req: Request) async throws -> ImportEntry {

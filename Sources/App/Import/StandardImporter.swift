@@ -8,6 +8,9 @@ struct StandardImporter {
     let db: any Database
     let tmdb: any TMDBClient
     let today: String
+    /// The requesting user when they have no TMDB token: cached titles they do not use stay closed, as everywhere
+    /// (security audit F14). nil for the worker, which always runs with the user's token.
+    var tokenlessUser: UUID? = nil
 
     /// IDs first (with a plausibility check), then title and year; unclear entries go to review.
     func resolve(_ entry: ImportEntry) async throws {
@@ -60,7 +63,7 @@ struct StandardImporter {
     /// viewing of it for an undated row) are not added again; episodes the catalog lacks are counted as missing, after
     /// one refresh of a series that was cached before.
     func record(_ entry: ImportEntry, tmdbID: Int) async throws {
-        let catalog = CatalogService(db: db, tmdb: tmdb)
+        let catalog = CatalogService(db: db, tmdb: tmdb, tokenlessUser: tokenlessUser)
         let kind = entry.titleKind
         let wasCached = try await cachedTitle(kind: kind, tmdbID: tmdbID) != nil
         let title = try await catalog.title(kind: kind, tmdbID: tmdbID)
