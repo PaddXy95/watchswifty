@@ -45,7 +45,7 @@ import WatchSwiftyClient
                                                         "paramount_plus", "wow", "cinema", "purchased", "other"])
         #expect(WatchOriginValue.known.map(\.rawValue) == ["manual", "import"])
         #expect(MappingStatusValue.known.map(\.rawValue) == ["pending", "auto", "confirmed", "review", "ignored"])
-        #expect(FilmStatusValue.known.map(\.rawValue) == ["pending", "imported", "review", "not_found", "skipped"])
+        #expect(ImportStatusValue.known.map(\.rawValue) == ["pending", "imported", "review", "not_found", "skipped"])
         #expect(DeviceKindValue.known.map(\.rawValue) == ["device", "manual"])
         #expect(ServiceValue.primeVideo.isKnown)
         #expect(GenreValue.known.map(\.rawValue) == ["action", "adventure", "animation", "comedy", "crime", "documentary", "drama",

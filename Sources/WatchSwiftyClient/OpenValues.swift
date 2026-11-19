@@ -62,8 +62,8 @@ public struct MappingStatusValue: OpenStringValue {
     public static let known: [Self] = [.pending, .auto, .confirmed, .review, .ignored]
 }
 
-/// Schema `FilmStatus`: state of a film list entry.
-public struct FilmStatusValue: OpenStringValue {
+/// Schema `ImportStatus`: state of a standard import entry.
+public struct ImportStatusValue: OpenStringValue {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 

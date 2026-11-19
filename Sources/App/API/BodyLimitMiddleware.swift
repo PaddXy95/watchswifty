@@ -5,7 +5,7 @@ import OpenAPIRuntime
 /// handler (and its token check) runs. This caps every body: 1 MB for JSON, more for the two uploads.
 struct BodyLimitMiddleware: ServerMiddleware {
     static let defaultLimit = 1024 * 1024
-    static let limits = ["uploadNetflix": 11 * 1024 * 1024, "uploadFilmList": 3 * 1024 * 1024]
+    static let limits = ["uploadNetflix": 11 * 1024 * 1024, "uploadStandardImport": 6 * 1024 * 1024]
 
     func intercept(
         _ request: HTTPRequest, body: HTTPBody?, metadata: ServerRequestMetadata, operationID: String,
