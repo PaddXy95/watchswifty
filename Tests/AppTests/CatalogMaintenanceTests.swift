@@ -85,6 +85,24 @@ struct CatalogMaintenanceTests {
         }
     }
 
+    @Test func importEntriesKeepTheirTitles() async throws {
+        let (_, provider, _) = Self.setup()
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let series = try await seedSeries(app, tmdbID: 9, seasons: [1: 2])
+            series.refreshedAt = start
+            try await series.save(on: app.db)
+            let entry = ImportEntry(userID: try user.requireID(), position: 0, draft: ImportDraft(
+                kind: .tv, title: "Serie", year: nil, tmdbHint: nil, imdbID: nil, watches: [], rating: nil, comment: nil))
+            entry.status = ImportEntryStatus.imported.rawValue
+            entry.tmdbID = 9
+            try await entry.save(on: app.db)
+            let result = await maintain(app, provider, at: start.addingTimeInterval(61 * Self.day))
+            #expect(result.deleted == 0)
+            #expect(try await Title.query(on: app.db).count() == 1)
+        }
+    }
+
     @Test func noOwnerTokenClearsOnlyAfterSixMonths() async throws {
         let (_, provider, tokens) = Self.setup()
         try await withTestApp { app in
