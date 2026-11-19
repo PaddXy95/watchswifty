@@ -64,7 +64,7 @@ reverse proxy in front, see [Installation](docs/installation.md#reverse-proxy-ht
 - [Single sign-on](docs/sso.md): OIDC setup, moving an existing installation, emergency access
 - [Mail](docs/email.md): SMTP setup, SwiftyRelay
 - [Notifications](docs/notifications.md): new episodes by mail or KNot webhook, daily run time
-- [Import](docs/import.md): Netflix viewing history and your own film list
+- [Import](docs/import.md): Netflix viewing history and other trackers (standard CSV)
 - [App API](docs/app-api.md): connecting apps, tokens, Swift client
 - [Releases](docs/releases.md): versions, image tags, testing a beta
 - [Development](docs/development.md): build, tests, project layout
