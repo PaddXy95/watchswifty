@@ -14,6 +14,7 @@ struct StandardImportPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Aus anderen Trackern importieren", nav: nav) {
+            SectionTabs.account(.importing)
             h1 { "Aus anderen Trackern importieren" }
             p(.class("muted")) { a(.href("/import")) { "← Zurück zum Netflix-Import" } }
             section {

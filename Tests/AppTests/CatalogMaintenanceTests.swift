@@ -85,6 +85,38 @@ struct CatalogMaintenanceTests {
         }
     }
 
+    @Test func watchLaterKeepsTitleCached() async throws {
+        let (_, provider, _) = Self.setup()
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await movie(app, 603, refreshedAt: start)
+            try await WatchLaterEntry(userID: user.requireID(), titleID: title.requireID(), addedAt: start, addedOn: "2026-11-07")
+                .save(on: app.db)
+            #expect(try await titleUsers(on: app.db)[title.requireID()] == [try user.requireID()])
+            #expect(try await usesTitle(userID: user.requireID(), title: title, on: app.db))
+            #expect(await maintain(app, provider, at: start.addingTimeInterval(61 * Self.day)).deleted == 0)
+        }
+    }
+
+    @Test func availabilityRowsDoNotKeepTitle() async throws {
+        let (_, provider, _) = Self.setup()
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let title = try await movie(app, 603, refreshedAt: start)
+            let titleID = try title.requireID()
+            try await TitleAvailability(titleID: titleID, fetchedAt: start, regions: ["DE"], tmdbLink: nil).save(on: app.db)
+            try await TitleProvider(titleID: titleID, region: "DE", offer: TMDBOffer(providerID: 8, name: "Netflix", logoPath: nil,
+                                                                                     displayPriority: 1, kind: .flatrate)).save(on: app.db)
+            try await AvailabilityNotice(userID: user.requireID(), titleID: titleID, providerID: 8, noticedAt: start, state: .sent)
+                .save(on: app.db)
+            #expect(try await titleUsers(on: app.db)[titleID] == nil)
+            #expect(await maintain(app, provider, at: start.addingTimeInterval(61 * Self.day)).deleted == 1)
+            #expect(try await TitleAvailability.query(on: app.db).count() == 0)
+            #expect(try await TitleProvider.query(on: app.db).count() == 0)
+            #expect(try await AvailabilityNotice.query(on: app.db).count() == 0)
+        }
+    }
+
     @Test func importEntriesKeepTheirTitles() async throws {
         let (_, provider, _) = Self.setup()
         try await withTestApp { app in

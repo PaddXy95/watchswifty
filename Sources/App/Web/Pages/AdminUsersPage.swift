@@ -20,13 +20,14 @@ struct AdminUsersPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
+            SectionTabs.admin(.users)
             h1 { "Benutzer" }
             Messages(error: error, notice: notice)
             if let ssoName, let readiness {
                 p(.class("muted")) {
                     "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
                     if passwordLogin {
-                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."
+                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter Admin → System abschalten."
                     }
                 }
             }
@@ -69,7 +70,7 @@ struct AdminUsersPage: HTML {
             } else if mailConfigured {
                 p(.class("muted")) { "Mit E-Mail-Adresse und ohne Startpasswort bekommt die Person eine Einladung und legt ihr Passwort selbst fest." }
             } else {
-                p(.class("muted")) { "Einladungen per Mail gehen erst, wenn der Mail-Versand unter System eingerichtet ist." }
+                p(.class("muted")) { "Einladungen per Mail gehen erst, wenn der Mail-Versand unter Admin → System eingerichtet ist." }
             }
             form(.method(.post), .action("/admin/users")) {
                 label {

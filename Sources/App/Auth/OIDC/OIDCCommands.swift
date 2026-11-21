@@ -68,5 +68,5 @@ struct MoveOIDCIssuerCommand: AsyncCommand {
 }
 
 enum OIDCCommandText {
-    static let notConfigured = "OIDC ist nicht eingerichtet – unter System → Anmeldung über OIDC (SSO) einrichten."
+    static let notConfigured = "OIDC ist nicht eingerichtet – unter Admin → System → Anmeldung über OIDC (SSO) einrichten."
 }

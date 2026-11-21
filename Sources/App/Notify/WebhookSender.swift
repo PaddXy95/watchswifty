@@ -28,7 +28,7 @@ struct WebhookError: Error, Equatable, Sendable {
         case 413: "Die Nachricht ist für KNot zu groß (413)."
         case 429: "Zu viele Nachrichten an dieses KNot-Ziel (429) – später erneut versuchen."
         case 502: "KNot konnte die Mail nicht zustellen (502) – Log von KNot prüfen."
-        case 300..<400: "Der Webhook leitet weiter (\(code)) – bitte die Adresse unter System prüfen."
+        case 300..<400: "Der Webhook leitet weiter (\(code)) – bitte die Adresse unter Admin → System prüfen."
         default: "Der Webhook hat mit Status \(code) geantwortet."
         }
         return WebhookError(message: message)

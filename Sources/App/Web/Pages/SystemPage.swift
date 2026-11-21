@@ -49,6 +49,7 @@ struct SystemPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "System", nav: nav) {
+            SectionTabs.admin(.system)
             h1 { "System" }
             Messages(error: error, notice: notice)
             FoldableBlock(id: SystemBlock.updates.id, title: "Version & Updates", open: openBlock == .updates) {

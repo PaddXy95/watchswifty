@@ -6,6 +6,7 @@ struct HistoryPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Verlauf", nav: nav) {
+            SectionTabs.library(.history)
             h1 { "Verlauf" }
             if rows.rows.isEmpty {
                 p(.class("muted")) { "Noch keine Einträge." }

@@ -138,7 +138,7 @@ struct UpdateCheckTests {
             try await app.testing().test(.GET, "/admin/system", headers: admin) { res async in
                 #expect(res.status == .ok)
                 let body = res.body.string
-                #expect(body.contains(#"<a href="/admin/system" class="active" aria-current="page">System</a>"#))
+                #expect(body.contains(#"<a href="/admin/system" class="active" aria-current="page">Admin</a>"#))
                 #expect(body.contains("api.github.com"))
                 #expect(body.contains("Jetzt prüfen"))
                 #expect(body.contains("Noch nicht geprüft."))

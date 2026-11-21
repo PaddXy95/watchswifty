@@ -28,7 +28,7 @@ WatchSwifty runs as a single Docker container with one SQLite file in a volume. 
 5. Paste your own TMDB token under **Konto** (account), see [TMDB](tmdb.md).
 
 `ADMIN_USERNAME` and `ADMIN_PASSWORD` are only used on the very first start, while there is no user yet; after that
-they are ignored. The admin creates further accounts under **Benutzer** (users), see [Accounts](accounts.md).
+they are ignored. The admin creates further accounts under **Admin → Benutzer** (users), see [Accounts](accounts.md).
 
 Show the logs or stop the container:
 

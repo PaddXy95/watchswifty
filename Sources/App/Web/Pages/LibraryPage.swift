@@ -31,6 +31,7 @@ struct LibraryPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Bibliothek", nav: navContext) {
+            SectionTabs.library(.titles)
             h1 { "Bibliothek" }
             nav(.class("filter-bar"), .custom(name: "aria-label", value: "Filter")) {
                 for (key, label) in filters {

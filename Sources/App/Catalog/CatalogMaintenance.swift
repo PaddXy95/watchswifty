@@ -21,14 +21,17 @@ struct MaintenanceResult: Equatable, Sendable {
     var isEmpty: Bool { self == MaintenanceResult() }
 }
 
-/// Users of each title: watches, library entries (rating/hidden/follow/comment), season comments, Netflix mappings and
-/// matched standard import entries.
+/// Users of each title: watches, library entries (rating/hidden/follow/comment), season comments, Netflix mappings,
+/// matched standard import entries and „Später ansehen“ entries. Availability data and notices deliberately do not count.
 func titleUsers(on db: any Database) async throws -> [UUID: Set<UUID>] {
     var users: [UUID: Set<UUID>] = [:]
     for watch in try await Watch.query(on: db).field(\.$user.$id).field(\.$title.$id).unique().all() {
         users[watch.$title.id, default: []].insert(watch.$user.id)
     }
     for entry in try await UserTitle.query(on: db).field(\.$user.$id).field(\.$title.$id).unique().all() {
+        users[entry.$title.id, default: []].insert(entry.$user.id)
+    }
+    for entry in try await WatchLaterEntry.query(on: db).field(\.$user.$id).field(\.$title.$id).unique().all() {
         users[entry.$title.id, default: []].insert(entry.$user.id)
     }
     for note in try await SeasonNote.query(on: db).field(\.$user.$id).field(\.$title.$id).unique().all() {
@@ -61,6 +64,7 @@ func usesTitle(userID: UUID, title: Title, on db: any Database) async throws -> 
     let titleID = try title.requireID()
     if try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
     if try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
+    if try await WatchLaterEntry.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
     if try await SeasonNote.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
     if try await NetflixMapping.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first() != nil { return true }
     return try await ImportEntry.query(on: db).filter(\.$user.$id == userID).filter(\.$kind == title.kind)

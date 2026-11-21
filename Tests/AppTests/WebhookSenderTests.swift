@@ -97,7 +97,7 @@ struct WebhookSenderTests {
         #expect(WebhookError.status(413).message == "Die Nachricht ist für KNot zu groß (413).")
         #expect(WebhookError.status(400).message == "KNot hat die Nachricht abgelehnt (400).")
         #expect(WebhookError.status(502).message == "KNot konnte die Mail nicht zustellen (502) – Log von KNot prüfen.")
-        #expect(WebhookError.status(307).message == "Der Webhook leitet weiter (307) – bitte die Adresse unter System prüfen.")
+        #expect(WebhookError.status(307).message == "Der Webhook leitet weiter (307) – bitte die Adresse unter Admin → System prüfen.")
         #expect(WebhookError.status(418).message == "Der Webhook hat mit Status 418 geantwortet.")
         #expect(WebhookError.timeout.message == "Der Webhook hat nicht rechtzeitig geantwortet.")
         #expect(WebhookError.notConfigured.message == "Der Webhook ist nicht eingerichtet.")

@@ -11,7 +11,7 @@ extension APIHandler {
         let hits = try await SearchService(db: request.db, tmdb: request.tmdb).search(userID: user.requireID(), query: input.query.q)
         return .ok(.init(body: .json(hits.map { hit in
             .init(kind: hit.result.kind == .tv ? .tv : .movie, tmdbId: hit.result.id, name: hit.result.name, year: hit.result.year,
-                  posterPath: hit.result.posterPath, inLibrary: hit.inLibrary, watchedEpisodes: hit.watchedEpisodes,
+                  posterPath: hit.result.posterPath, inLibrary: hit.inLibrary, watchLater: hit.watchLater, watchedEpisodes: hit.watchedEpisodes,
                   totalEpisodes: hit.totalEpisodes, rating: hit.rating)
         })))
     }

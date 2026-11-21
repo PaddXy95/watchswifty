@@ -8,6 +8,8 @@ struct MoviePage: HTML {
     let rating: Int?
     let comment: String?
     let today: String
+    var watchLater = false
+    var availability: AvailabilityView? = nil
 
     var body: some HTML {
         PageLayout(title: title.name, nav: nav) {
@@ -28,9 +30,13 @@ struct MoviePage: HTML {
                     }
                     ExternalLinks(title: title)
                     RatingControl(kind: .movie, tmdbID: title.tmdbID, rating: rating)
+                    div(.class("title-actions")) {
+                        WatchLaterToggle(kind: .movie, tmdbID: title.tmdbID, onList: watchLater)
+                    }
                     CommentBox(id: "movie-comment", action: "/movie/\(title.tmdbID)/comment", caption: "Kommentar zum Film", comment: comment)
                 }
             }
+            if let availability { AvailabilityBlock(view: availability) }
             MovieWatchesSection(tmdbID: title.tmdbID, watches: watches, today: today)
         }
     }

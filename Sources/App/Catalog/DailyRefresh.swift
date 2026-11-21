@@ -78,7 +78,8 @@ func backfillDetails(db: any Database, provider: TMDBProvider, cipher: TokenCiph
     return refreshed
 }
 
-/// One daily pass: runtimes, expired tokens, TMDB cache upkeep, refresh of due series, then notifications; recorded
+/// One daily pass: runtimes, expired tokens, TMDB cache upkeep, refresh of due series, availability of „Später ansehen“
+/// titles, then notifications; recorded
 /// as the last run only when it completed.
 func runDailyPass(_ application: Application, now: Date = .now) async {
     let db = application.db
@@ -122,6 +123,10 @@ func runDailyPass(_ application: Application, now: Date = .now) async {
         if requeued > 0 { await worker.kick() }
     } catch {
         logger.error("TMDB-Abgleich fehlgeschlagen: \(error)")
+    }
+    let available = await refreshWatchLaterAvailability(db: db, provider: provider, cipher: cipher, logger: logger, now: now)
+    if available != AvailabilityPassResult() {
+        logger.info("Verfügbarkeit: \(available.refreshed) Titel abgefragt, \(available.failed) fehlgeschlagen, \(available.expired) veraltet gelöscht")
     }
     let notified = await runNotifications(db: db, notifications: application.notifications, today: application.appConfig.today(),
                                           logger: logger)

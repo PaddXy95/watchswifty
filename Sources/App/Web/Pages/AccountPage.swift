@@ -4,7 +4,7 @@ import Foundation
 
 /// The foldable blocks of the Konto page.
 enum AccountBlock: String, Sendable {
-    case tmdb, followed, notifications, devices, sso, email, password
+    case tmdb, followed, streaming, notifications, devices, sso, email, password
 
     var id: String { "block-\(rawValue)" }
 }
@@ -30,6 +30,7 @@ struct AccountPage: HTML {
     /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
     var tokenNeedsReauth = false
     var notifications: AccountNotifications? = nil
+    var streaming: AccountStreaming? = nil
     /// Block of the last action (or `?open=`); the token block is also open while no usable token is stored.
     var openBlock: AccountBlock? = nil
     /// Reload of all titles from TMDB (shown while a token is stored).
@@ -41,6 +42,7 @@ struct AccountPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
+            SectionTabs.account(.settings)
             h1 { "Konto" }
             p(.class("muted")) { "Angemeldet als \(nav.username)" }
             Messages(error: error, notice: notice)
@@ -91,6 +93,12 @@ struct AccountPage: HTML {
                             }
                         }
                     }
+                }
+            }
+
+            if let streaming {
+                FoldableBlock(id: AccountBlock.streaming.id, title: "Streamingdienste", open: isOpen(.streaming)) {
+                    AccountStreamingSection(state: streaming)
                 }
             }
 
@@ -267,6 +275,8 @@ struct AccountNotifications: Sendable {
     var webhookConfigured: Bool
     var keyState: WebhookKeyState
     var dailyRunTime: String
+    /// „Später ansehen“ title available at one of the user's services.
+    var titleAvailable = false
 }
 
 struct AccountNotificationsSection: HTML, Sendable {
@@ -293,6 +303,10 @@ struct AccountNotificationsSection: HTML, Sendable {
             label(.class("checkbox")) {
                 input(.type(.checkbox), .name("today")).attributes(.checked, when: state.today)
                 " am Tag der Ausstrahlung"
+            }
+            label(.class("checkbox")) {
+                input(.type(.checkbox), .name("available")).attributes(.checked, when: state.titleAvailable)
+                " Wenn ein Titel aus „Später ansehen“ bei einem meiner Dienste verfügbar wird"
             }
             p(.class("muted")) {
                 "Geprüft wird täglich um \(state.dailyRunTime) Uhr; alles Neue kommt in einer Nachricht. "

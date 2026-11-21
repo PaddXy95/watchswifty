@@ -8,7 +8,7 @@ Without mail everything else works as before.
 
 ## Setting up
 
-As an admin, under **System → E-Mail** enter the SMTP server's details, save and click „Testmail senden“ (send test
+As an admin, under **Admin → System → E-Mail** enter the SMTP server's details, save and click „Testmail senden“ (send test
 mail). Everything is stored encrypted (key `TOKEN_KEY`, like the TMDB tokens); the password is never shown again. When
 server, port, encryption or user change, the password must be entered again. No environment variables are needed.
 

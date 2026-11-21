@@ -85,6 +85,29 @@ struct TMDBTests {
         #expect(movie == TMDBMovie(id: 603, name: "Matrix", originalName: "The Matrix", year: 1999, posterPath: "/m.jpg"))
     }
 
+    @Test func decodeWatchProvidersGroupsByRegionAndKind() throws {
+        let json = #"{"id":1,"results":{"DE":{"link":"https://www.themoviedb.org/movie/1/watch?locale=DE","flatrate":[{"provider_id":8,"provider_name":"Netflix","logo_path":"/n.jpg","display_priority":1}],"buy":[{"provider_id":2,"provider_name":"Apple TV","logo_path":"/a.jpg","display_priority":4}],"cinema":[{"provider_id":9,"provider_name":"X","display_priority":1}]},"US":{"ads":[{"provider_id":300,"provider_name":"Pluto TV","logo_path":null}]}}}"#
+        let providers = try LiveTMDBClient.decodeWatchProviders(Data(json.utf8))
+        #expect(providers.offers["DE"] == [
+            TMDBOffer(providerID: 8, name: "Netflix", logoPath: "/n.jpg", displayPriority: 1, kind: .flatrate),
+            TMDBOffer(providerID: 2, name: "Apple TV", logoPath: "/a.jpg", displayPriority: 4, kind: .buy),
+        ])
+        #expect(providers.offers["US"] == [TMDBOffer(providerID: 300, name: "Pluto TV", logoPath: nil, displayPriority: Int.max, kind: .ads)])
+        #expect(providers.links["DE"] == "https://www.themoviedb.org/movie/1/watch?locale=DE")
+    }
+
+    @Test func decodeProviderList() throws {
+        let json = #"{"results":[{"provider_id":8,"provider_name":"Netflix","logo_path":"/n.jpg","display_priority":3}]}"#
+        #expect(try LiveTMDBClient.decodeProviderList(Data(json.utf8))
+                == [TMDBProviderInfo(providerID: 8, name: "Netflix", logoPath: "/n.jpg", displayPriority: 3)])
+    }
+
+    @Test func decodeRegions() throws {
+        let json = #"{"results":[{"iso_3166_1":"DE","english_name":"Germany","native_name":"Deutschland"},{"iso_3166_1":"AT","english_name":"Austria"}]}"#
+        #expect(try LiveTMDBClient.decodeRegions(Data(json.utf8))
+                == [TMDBRegion(code: "DE", name: "Deutschland"), TMDBRegion(code: "AT", name: "Austria")])
+    }
+
     @Test func urlCarriesLanguageAndEncodesQuery() {
         let uri = LiveTMDBClient.url(path: "search/tv", query: ["query": "Pokémon", "include_adult": "false"], language: "de-DE")
         #expect(uri.string.hasPrefix("https://api.themoviedb.org/3/search/tv?"))
@@ -175,5 +198,11 @@ struct TMDBEpisodeOverviewTests {
     @Test func decodesEpisodeOverview() throws {
         let episodes = try LiveTMDBClient.decodeSeason(Data(#"{"episodes":[{"id":1,"episode_number":1,"season_number":1,"name":"Pilot","air_date":"2008-09-23","overview":"Jane hilft dem CBI."},{"id":2,"episode_number":2,"season_number":1,"name":"Zwei","overview":""}]}"#.utf8))
         #expect(episodes.map(\.overview) == ["Jane hilft dem CBI.", nil])
+    }
+
+    @Test func watchProvidersWithoutResultsIsInvalid() {
+        #expect(throws: TMDBError.invalidResponse) {
+            try LiveTMDBClient.decoding { try LiveTMDBClient.decodeWatchProviders(Data(#"{"id":1}"#.utf8)) }
+        }
     }
 }

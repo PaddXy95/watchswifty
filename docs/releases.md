@@ -87,7 +87,7 @@ docker run --rm -v watchswifty-data:/from:ro -v watchswifty-beta-data:/to ubuntu
 
 Start both again afterwards. The copy includes the mail settings, so the beta then sends real mails to the users (for
 example about a newly connected device). If you don't want that, delete the mail settings in the beta under
-**System**.
+**Admin → System**.
 
 Browsers do not separate cookies by port: if both instances run under the same host name, signing in to the beta
 signs you out of the normal instance. Reach the beta under a different name instead (its own subdomain, or the IP

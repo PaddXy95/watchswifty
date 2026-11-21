@@ -26,7 +26,7 @@ Provider notes:
 
 ## Setting up WatchSwifty
 
-As an admin, under **System → Anmeldung über OIDC (SSO)** (sign-in via OIDC) enter the display name (for example
+As an admin, under **Admin → System → Anmeldung über OIDC (SSO)** (sign-in via OIDC) enter the display name (for example
 "Pocket ID"), issuer, client ID, client secret and the **address of WatchSwifty**, then save. The page shows the
 callback URL to copy (address + `/auth/oidc/callback`), checks the connection right away and has a
 „Verbindung testen“ (test connection) button. Everything is stored encrypted (key `TOKEN_KEY`) and takes effect
@@ -44,21 +44,21 @@ SSO have no password; their e-mail address comes from the provider.
 
 ## Moving an existing installation to SSO
 
-1. Set up OIDC under **System** as above and **keep password login on** (no restart needed).
+1. Set up OIDC under **Admin → System** as above and **keep password login on** (no restart needed).
 2. Everyone signs in as usual and clicks „Mit SSO verknüpfen“ (link with SSO) under **Konto** (account). People who
    forgot their password use „Passwort vergessen?“ (forgot password) or a **„Verknüpfungslink“** (linking link) from
    the admin (users page, by mail or to pass on, valid for 7 days). After the sign-in at the provider, the page „SSO
    verknüpfen“ (link with SSO) shows both accounts; they are linked only after „Verknüpfen“ (link). If another
    account is signed in in that browser, sign out first. Open invitations can be accepted through SSO directly.
-3. Check on the **Benutzer** (users) page: „x von y Konten verknüpft · Admin verknüpft: ja“ (x of y accounts linked,
+3. Check on the **Admin → Benutzer** (users) page: „x von y Konten verknüpft · Admin verknüpft: ja“ (x of y accounts linked,
    admin linked).
-4. Under **System**, click „Passwort-Login abschalten“ (turn off password login); this only works once your own account
+4. Under **Admin → System**, click „Passwort-Login abschalten“ (turn off password login); this only works once your own account
    is linked. After that only the SSO button remains; „Passwort vergessen“, initial passwords and „Passwort setzen“
    (set password) are gone, and new accounts come from invitations or the first SSO sign-in.
 5. Connected apps keep working (tokens last up to 90 days). The next time an app connects, and for a token created by
    hand, it goes through the provider once; a user blocked there gets no new token. An existing web session stays
    signed in as long as it is used (every use extends it by 30 days); to lock someone out at once, delete the account
-   under **Benutzer**.
+   under **Admin → Benutzer**.
 
 Note: if an admin later sets a password for an account created through SSO, it keeps the address taken from the
 provider, and „Passwort vergessen“ would send mail there.
@@ -76,7 +76,7 @@ docker exec -it watchswifty /app/docker-entrypoint.sh link-oidc <username>
 ```
 
 If only the provider's address changes (new domain, renamed slug), this command rewrites all account links. Enter the new
-issuer under **System** first; `<new>` must be exactly the issuer of the new discovery document:
+issuer under **Admin → System** first; `<new>` must be exactly the issuer of the new discovery document:
 
 ```bash
 docker exec -it watchswifty /app/docker-entrypoint.sh oidc-move-issuer <old> <new>
@@ -86,6 +86,6 @@ On a **real change** of provider, the user IDs change: link the accounts again w
 moving to SSO) or send linking links. A user ID that happens to match at the new provider does not open an old account.
 
 **Back without OIDC:** turn on password login and click „Anmelde-Einstellungen löschen“ (delete sign-in settings)
-under **System**. Accounts with a password sign in normally; accounts created through SSO count as invitations again:
+under **Admin → System**. Accounts with a password sign in normally; accounts created through SSO count as invitations again:
 use „Einladung erneut senden“ (resend invitation) or „Passwort setzen“ on the users page (or `reset-password`). If you
 turn OIDC on again later with the same issuer, the old links apply again.

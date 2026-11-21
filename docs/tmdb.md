@@ -35,4 +35,18 @@ all your series and movies at once (for example after an update that brings new 
 laden“ under **Konto → TMDB-Token** (account → TMDB token). It runs in the background with your token and shows its
 progress there; with a large library it takes a few minutes.
 
+## Streaming availability
+
+Where a title streams comes from TMDB's watch provider data, which TMDB gets from
+[JustWatch](https://www.justwatch.com). WatchSwifty names JustWatch as the source wherever it shows or sends this
+data, as TMDB requires.
+
+- Titles on a **Später ansehen** (watch later) list are checked once a day in the daily run, one request per title
+  no matter how many users list it, with the token of a user who lists it. There is no monthly limit, only TMDB's
+  shared rate limit.
+- On a series or movie page the block **Verfügbarkeit** (availability) loads after the page when its data is missing
+  or older than 7 days, with your own token.
+- Only the countries users have chosen are stored. Availability data that has not been fetched for 30 days is
+  deleted, and it never keeps a title in the cache.
+
 The language of the TMDB data is set with `TMDB_LANGUAGE` (default `de-DE`), see [Configuration](configuration.md).

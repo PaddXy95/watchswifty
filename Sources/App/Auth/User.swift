@@ -24,6 +24,13 @@ final class User: Model, @unchecked Sendable {
     @OptionalField(key: "notify_today") var notifyToday: Bool?
     /// When „neu angekündigt“ was last switched on: only episodes first seen later count.
     @OptionalField(key: "notify_announced_since") var notifyAnnouncedSince: Date?
+    /// Country for streaming availability (ISO 3166-1, e.g. „DE“); nil = `DE`.
+    @OptionalField(key: "watch_region") var watchRegion: String?
+    /// Notify when a title on „Später ansehen“ becomes available at one of the user's services; nil = off.
+    @OptionalField(key: "notify_available") var notifyAvailable: Bool?
+
+    /// The user's country for streaming availability.
+    var region: String { watchRegion ?? "DE" }
     /// The user's KNot API key, sealed with the server key (never rendered or logged).
     @OptionalField(key: "webhook_key") var webhookKey: String?
     @Timestamp(key: "created_at", on: .create) var createdAt: Date?

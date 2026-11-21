@@ -55,7 +55,7 @@ struct RenderingTests {
 
     @Test func adminSeesUserNav() {
         let html = PageLayout(title: "X", nav: .init(username: "pat", isAdmin: true, active: .admin)) { p { "x" } }.render()
-        #expect(html.contains("Benutzer"))
+        #expect(html.contains(#"href="/admin/system""#) && html.contains(">Admin<"))
     }
 
     @Test func loginLayoutHasNoNav() {
@@ -143,7 +143,7 @@ struct RenderingTests {
         #expect(html.contains(#"id="nav-toggle""#))
         #expect(html.contains(#"for="nav-toggle""#))
         #expect(html.contains(#"aria-label="Menü""#))
-        #expect(html.contains("Benutzer"))
+        #expect(html.contains(">Admin<"))
         #expect(html.contains("Abmelden"))
     }
 

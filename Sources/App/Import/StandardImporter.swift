@@ -103,6 +103,7 @@ struct StandardImporter {
             var existing = try await Watch.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).all()
             var added = 0
             var missing = 0
+            var latest: String?
             for watch in planned {
                 var episodeID: UUID?
                 if kind == .tv {
@@ -124,6 +125,12 @@ struct StandardImporter {
                 try await new.save(on: db)
                 existing.append(new)
                 added += 1
+                latest = max(latest ?? "", day ?? "")
+            }
+            // Imported history only ends a „Später ansehen“ entry when dated on or after the day of adding.
+            if added > 0 {
+                try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID,
+                                                                     day: latest.flatMap { $0.isEmpty ? nil : $0 }, origin: .import)
             }
 
             if added > 0 { userTitle.hidden = false }

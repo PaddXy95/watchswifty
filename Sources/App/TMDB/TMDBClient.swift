@@ -60,6 +60,41 @@ struct TMDBFindResult: Sendable, Equatable {
     var episodeShowIDs: [Int] = []
 }
 
+/// How a title is offered at a streaming service (TMDB „watch providers“, data by JustWatch).
+enum OfferKind: String, Codable, Sendable, CaseIterable {
+    case flatrate, free, ads, rent, buy
+}
+
+/// One offer of a title in one country.
+struct TMDBOffer: Sendable, Equatable {
+    let providerID: Int
+    let name: String
+    let logoPath: String?
+    /// TMDB's order of services (smaller first); `Int.max` when TMDB has none.
+    let displayPriority: Int
+    let kind: OfferKind
+}
+
+/// Offers of a title (`GET /{movie|tv}/{id}/watch/providers`), keyed by country code.
+struct TMDBWatchProviders: Sendable, Equatable {
+    var links: [String: String] = [:]
+    var offers: [String: [TMDBOffer]] = [:]
+}
+
+/// A streaming service of a country (`GET /watch/providers/{movie|tv}?watch_region=`).
+struct TMDBProviderInfo: Sendable, Equatable {
+    let providerID: Int
+    let name: String
+    let logoPath: String?
+    let displayPriority: Int
+}
+
+/// A country with watch provider data (`GET /watch/providers/regions`).
+struct TMDBRegion: Sendable, Equatable {
+    let code: String
+    let name: String
+}
+
 enum TMDBError: Error, Equatable, CustomStringConvertible {
     case missingToken, unauthorized, notFound, rateLimited, invalidResponse
     case http(UInt)
@@ -90,6 +125,12 @@ protocol TMDBClient: Sendable {
     func seriesIMDbID(id: Int) async throws -> String?
     /// Titles with this IMDb id (`GET /find/{id}?external_source=imdb_id`).
     func find(imdbID: String) async throws -> TMDBFindResult
+    /// Offers of a title in all countries (`GET /{movie|tv}/{id}/watch/providers`).
+    func watchProviders(kind: TitleKind, id: Int) async throws -> TMDBWatchProviders
+    /// Streaming services of a country (`GET /watch/providers/{movie|tv}?watch_region=`).
+    func providers(kind: TitleKind, region: String) async throws -> [TMDBProviderInfo]
+    /// Countries with watch provider data (`GET /watch/providers/regions`).
+    func providerRegions() async throws -> [TMDBRegion]
 }
 
 /// Builds a TMDB client for one user's token.
@@ -111,4 +152,7 @@ struct MissingTokenTMDBClient: TMDBClient {
     func movie(id: Int) async throws -> TMDBMovie { throw TMDBError.missingToken }
     func seriesIMDbID(id: Int) async throws -> String? { throw TMDBError.missingToken }
     func find(imdbID: String) async throws -> TMDBFindResult { throw TMDBError.missingToken }
+    func watchProviders(kind: TitleKind, id: Int) async throws -> TMDBWatchProviders { throw TMDBError.missingToken }
+    func providers(kind: TitleKind, region: String) async throws -> [TMDBProviderInfo] { throw TMDBError.missingToken }
+    func providerRegions() async throws -> [TMDBRegion] { throw TMDBError.missingToken }
 }
