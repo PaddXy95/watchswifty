@@ -44,4 +44,5 @@ request (`403 confirmationRequired` otherwise). Admins without a password do thi
 
 The Swift package also offers the library `WatchSwiftyClient`, generated from the same OpenAPI description as the
 server. Values that may grow with new versions (streaming services, genres, offer kinds, import and matching states, device kind) are open
-there, so older apps keep understanding newer servers.
+there, so older apps keep understanding newer servers. Which changes `/api/v1` may get and which it never gets:
+[Compatibility](releases.md#app-api).
