@@ -5,6 +5,7 @@ struct SearchResultModel {
     let result: TMDBSearchResult
     let status: String?
     let rating: Int?
+    var watchLater = false
 }
 
 struct SearchPage: HTML {
@@ -46,20 +47,39 @@ struct SearchResults: HTML {
         div(.id("results"), .class("card-list"), .hx.boost(true)) {
             if !hasToken { TokenHint() }
             for item in results {
-                a(.class("card search-result"), .href("/\(item.result.kind.rawValue)/\(item.result.id)"),
-                  .custom(name: "hx-indicator", value: "closest .search-result, #page-loader")) {
-                    Poster(path: item.result.posterPath, alt: item.result.name)
-                    div {
-                        strong { item.result.name }
-                        if let year = item.result.year { span(.class("muted")) { " (\(year))" } }
+                div(.class("card search-result")) {
+                    a(.class("search-link"), .href("/\(item.result.kind.rawValue)/\(item.result.id)"),
+                      .custom(name: "hx-indicator", value: "closest .search-result, #page-loader")) {
+                        Poster(path: item.result.posterPath, alt: item.result.name)
                         div {
-                            span(.class("badge")) { item.result.kind == .tv ? "Serie" : "Film" }
-                            if let status = item.status { " "; span(.class("badge")) { status } }
-                            if let rating = item.rating { " "; span(.class("rating")) { "★ \(rating)" } }
+                            strong { item.result.name }
+                            if let year = item.result.year { span(.class("muted")) { " (\(year))" } }
+                            div {
+                                span(.class("badge")) { item.result.kind == .tv ? "Serie" : "Film" }
+                                if let status = item.status { " "; span(.class("badge")) { status } }
+                                if let rating = item.rating { " "; span(.class("rating")) { "★ \(rating)" } }
+                            }
                         }
                     }
+                    SearchWatchLaterButton(kind: item.result.kind, tmdbID: item.result.id, onList: item.watchLater)
                 }
             }
+        }
+    }
+}
+
+/// „+ Später“ on a search result; adds the title to „Später ansehen“ (a second click does nothing more).
+struct SearchWatchLaterButton: HTML {
+    let kind: TitleKind
+    let tmdbID: Int
+    let onList: Bool
+
+    var body: some HTML {
+        if onList {
+            span(.class("watch-later-add done"), .custom(name: "title", value: "Steht auf „Später ansehen“")) { "✓ Später" }
+        } else {
+            button(.class("watch-later-add"), .hx.post("/watch-later"), .hx.vals(#"{"kind":"\#(kind.rawValue)","tmdbID":"\#(tmdbID)"}"#),
+                   .hx.swap(.outerHTML), .custom(name: "aria-label", value: "Zu „Später ansehen“ hinzufügen")) { "+ Später" }
         }
     }
 }

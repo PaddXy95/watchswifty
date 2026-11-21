@@ -428,3 +428,14 @@ code.new-token { user-select: all; word-break: break-all; padding: 0 var(--space
 .rent-buy summary { cursor: pointer; color: var(--ink-2); }
 .rent-buy .providers { margin-top: var(--space-2); }
 .availability .attribution { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--ink-3); }
+.search-result { align-items: center; }
+.search-result .search-link { display: flex; gap: var(--space-4); flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+.watch-later-add { flex-shrink: 0; font-size: var(--text-sm); }
+.watch-later-add.done { color: var(--ok); }
+.watch-later-item { align-items: center; }
+.watch-later-item .poster-link { line-height: 0; flex-shrink: 0; }
+.watch-later-item .card-body strong a { text-decoration: none; }
+.watch-later-item .providers { margin-top: var(--space-1); }
+.new-since { font-size: var(--text-sm); color: var(--ok); }
+h2 .count { font-size: var(--text-sm); font-weight: 400; }
+.attribution { font-size: var(--text-sm); }

@@ -23,4 +23,5 @@ func routes(_ app: Application) throws {
     AccountController().register(on: protected)
     SearchController().register(on: protected)
     TitleController().register(on: protected)
+    WatchLaterController().register(on: protected)
 }

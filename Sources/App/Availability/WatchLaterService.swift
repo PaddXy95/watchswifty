@@ -8,12 +8,15 @@ struct WatchLaterItem: Sendable {
     let addedAt: Date
     /// Offers in the user's country; nil when not fetched for it yet.
     let groups: AvailabilityGroups?
+    /// Offers at the user's services (subscription, free, ads).
+    let available: [Offer]
     /// Earliest appearance of a new offer at the user's services within the last 7 days („neu seit“).
     let newSince: Date?
 }
 
 /// The „Später ansehen“ page (spec §3.2).
 struct WatchLaterPage: Sendable {
+    let region: String
     let atMyServices: [WatchLaterItem]
     let others: [WatchLaterItem]
     let hasServices: Bool
@@ -102,14 +105,15 @@ struct WatchLaterService {
             guard let title = titles[entry.$title.id], filter == "all" || title.kind == filter else { continue }
             let snapshot = snapshots[entry.$title.id]
             let groups = snapshot.map { AvailabilityGroups(snapshot: $0, services: services) }
-            let atServices = !(groups?.atServices(services).isEmpty ?? true)
-            let item = WatchLaterItem(title: title, addedAt: entry.addedAt, groups: groups,
+            let available = groups?.atServices(services) ?? []
+            let atServices = !available.isEmpty
+            let item = WatchLaterItem(title: title, addedAt: entry.addedAt, groups: groups, available: available,
                                       newSince: atServices ? fresh[entry.$title.id] : nil)
             if atServices { mine.append(item) } else { others.append(item) }
         }
         let shown = Set((mine + others).compactMap(\.title.id))
         let oldest = snapshots.filter { shown.contains($0.key) }.map(\.value.fetchedAt).min()
-        return WatchLaterPage(atMyServices: mine, others: others, hasServices: !services.isEmpty, oldestFetch: oldest)
+        return WatchLaterPage(region: user.region, atMyServices: mine, others: others, hasServices: !services.isEmpty, oldestFetch: oldest)
     }
 }
 

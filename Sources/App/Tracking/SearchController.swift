@@ -27,6 +27,6 @@ struct SearchController {
 
     private func search(_ req: Request, _ rawQuery: String) async throws -> [SearchResultModel] {
         try await SearchService(db: req.db, tmdb: req.tmdb).search(userID: try req.userID, query: rawQuery)
-            .map { SearchResultModel(result: $0.result, status: $0.status, rating: $0.rating) }
+            .map { SearchResultModel(result: $0.result, status: $0.status, rating: $0.rating, watchLater: $0.watchLater) }
     }
 }

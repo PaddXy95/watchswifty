@@ -12,6 +12,8 @@ struct SearchHit {
     let totalEpisodes: Int?
     let movieWatched: Bool
     let rating: Int?
+    /// On the user's „Später ansehen“ list.
+    var watchLater = false
 
     /// Web badge: „3/10 gesehen“, „gesehen“.
     var status: String? {
@@ -41,7 +43,17 @@ struct SearchService {
         let episodes = titleIDs.isEmpty ? [] : try await Episode.query(on: db)
             .filter(\.$title.$id ~~ titleIDs).filter(\.$season >= 1).all()
 
+        let laterTV = try await WatchLaterService(db: db).containsTMDB(userID: userID, kind: .tv,
+                                                                       tmdbIDs: results.filter { $0.kind == .tv }.map(\.id))
+        let laterMovies = try await WatchLaterService(db: db).containsTMDB(userID: userID, kind: .movie,
+                                                                           tmdbIDs: results.filter { $0.kind == .movie }.map(\.id))
         return results.map { result in
+            var hit = hit(for: result)
+            hit.watchLater = (result.kind == .tv ? laterTV : laterMovies).contains(result.id)
+            return hit
+        }
+
+        func hit(for result: TMDBSearchResult) -> SearchHit {
             guard let title = cached.first(where: { $0.tmdbID == result.id && $0.titleKind == result.kind }), let id = title.id else {
                 return SearchHit(result: result, inLibrary: false, watchedEpisodes: nil, totalEpisodes: nil, movieWatched: false, rating: nil)
             }
