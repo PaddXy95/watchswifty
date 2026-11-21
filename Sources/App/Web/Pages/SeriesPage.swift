@@ -11,6 +11,8 @@ struct SeriesPage: HTML {
     var followed = false
     let today: String
     let defaultService: StreamingService?
+    var watchLater = false
+    var availability: AvailabilityView? = nil
 
     var body: some HTML {
         PageLayout(title: title.name, nav: nav) {
@@ -30,12 +32,14 @@ struct SeriesPage: HTML {
                     ExternalLinks(title: title)
                     RatingControl(kind: .tv, tmdbID: title.tmdbID, rating: rating)
                     div(.class("title-actions")) {
+                        WatchLaterToggle(kind: .tv, tmdbID: title.tmdbID, onList: watchLater)
                         FollowToggle(tmdbID: title.tmdbID, followed: followed)
                         HiddenToggle(tmdbID: title.tmdbID, hidden: hidden)
                     }
                     CommentBox(id: "series-comment", action: "/tv/\(title.tmdbID)/comment", caption: "Kommentar zur Serie", comment: comment)
                 }
             }
+            if let availability { AvailabilityBlock(view: availability) }
             if seasons.isEmpty {
                 p(.class("muted")) { "Für diese Serie sind keine Folgen bekannt." }
             } else {

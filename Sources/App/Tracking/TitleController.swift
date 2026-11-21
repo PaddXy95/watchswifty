@@ -7,6 +7,7 @@ struct TitleController {
     struct HiddenInput: Content { var hidden: Bool; var context: String? }
     struct CommentInput: Content { var comment: String? }
     struct FollowInput: Content { var followed: Bool; var context: String? }
+    struct WatchLaterInput: Content { var watchLater: Bool }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("tv", ":tmdbID", use: seriesPage)
@@ -21,7 +22,11 @@ struct TitleController {
         protected.post("tv", ":tmdbID", "rating") { try await setRating(req: $0, kind: .tv) }
         protected.post("tv", ":tmdbID", "comment") { try await setComment(req: $0, kind: .tv) }
         protected.post("tv", ":tmdbID", "seasons", ":season", "comment", use: setSeasonComment)
+        protected.post("tv", ":tmdbID", "watch-later") { try await setWatchLater(req: $0, kind: .tv) }
+        protected.get("tv", ":tmdbID", "availability") { try await availability(req: $0, kind: .tv) }
         protected.get("movie", ":tmdbID", use: moviePage)
+        protected.post("movie", ":tmdbID", "watch-later") { try await setWatchLater(req: $0, kind: .movie) }
+        protected.get("movie", ":tmdbID", "availability") { try await availability(req: $0, kind: .movie) }
         protected.post("movie", ":tmdbID", "watch", use: markMovie)
         protected.delete("movie", ":tmdbID", "watches", ":watchID", use: deleteMovieWatch)
         protected.post("movie", ":tmdbID", "rating") { try await setRating(req: $0, kind: .movie) }
@@ -37,9 +42,11 @@ struct TitleController {
             let userID = try req.userID
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
             let seasons = try await seasonModels(req, title: title, userID: userID, open: nil)
+            let onList = try await req.watchLater.contains(userID: userID, titleID: title.requireID())
             return HTMLResponse(SeriesPage(nav: try req.nav(.search), title: title, seasons: seasons, rating: entry?.rating,
                                            comment: entry?.comment, hidden: entry?.hidden ?? false, followed: entry?.isFollowed ?? false, today: req.watches.today(),
-                                           defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID())))
+                                           defaultService: try await req.watches.lastService(userID: userID, titleID: title.requireID()),
+                                           watchLater: onList, availability: try await availabilityView(req, title: title, onList: onList)))
         }
     }
 
@@ -131,9 +138,11 @@ struct TitleController {
             await refreshForDetails(req, title)
             let userID = try req.userID
             let entry = try await findEntry(req, userID: userID, titleID: title.requireID())
+            let onList = try await req.watchLater.contains(userID: userID, titleID: title.requireID())
             return HTMLResponse(MoviePage(nav: try req.nav(.search), title: title,
                                           watches: try await movieWatches(req, userID: userID, titleID: title.requireID()),
-                                          rating: entry?.rating, comment: entry?.comment, today: req.watches.today()))
+                                          rating: entry?.rating, comment: entry?.comment, today: req.watches.today(),
+                                          watchLater: onList, availability: try await availabilityView(req, title: title, onList: onList)))
         }
     }
 
@@ -226,6 +235,57 @@ struct TitleController {
 
     private func refreshForDetails(_ req: Request, _ title: Title) async {
         await req.seriesDetails.refreshForDetails(title)
+    }
+
+    // MARK: Später ansehen / Verfügbarkeit
+
+    func setWatchLater(req: Request, kind: TitleKind) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, kind)
+            let input = try req.content.decode(WatchLaterInput.self)
+            let userID = try req.userID
+            if input.watchLater {
+                try await req.watchLater.add(userID: userID, title: title, tmdb: req.tmdb, today: req.watches.today(), logger: req.logger)
+            } else {
+                try await req.watchLater.remove(userID: userID, titleID: title.requireID())
+            }
+            return HTMLResponse(WatchLaterToggle(kind: kind, tmdbID: title.tmdbID, onList: input.watchLater))
+        }
+    }
+
+    /// The block, fetched first when the stored state is missing or older than 7 days (htmx after the page load).
+    func availability(req: Request, kind: TitleKind) async throws -> Response {
+        try await handle(req) {
+            let title = try await resolve(req, kind)
+            let user = try req.currentUser
+            let titleID = try title.requireID()
+            var fetchError: String?
+            if req.tmdbToken != nil, try await req.availability.needsRefresh(titleID: titleID, region: user.region) {
+                do {
+                    try await req.availability.refresh(title, tmdb: req.tmdb)
+                    try await AvailabilityNoticeService(db: req.db).reconcile(titleID: titleID)
+                } catch let error as TMDBError {
+                    fetchError = "Abfrage bei TMDB fehlgeschlagen: \(error)"
+                }
+            }
+            let onList = try await req.watchLater.contains(userID: try req.userID, titleID: titleID)
+            var view = try await availabilityView(req, title: title, onList: onList)
+            view.loading = false
+            view.fetchError = fetchError
+            return HTMLResponse(AvailabilityBlock(view: view))
+        }
+    }
+
+    private func availabilityView(_ req: Request, title: Title, onList: Bool) async throws -> AvailabilityView {
+        let user = try req.currentUser
+        let titleID = try title.requireID()
+        let hasToken = req.tmdbToken != nil
+        let services = try await AvailabilityNoticeService(db: req.db).serviceIDs(userID: try req.userID)
+        let stale = try await req.availability.needsRefresh(titleID: titleID, region: user.region)
+        return AvailabilityView(kind: title.titleKind, tmdbID: title.tmdbID, titleName: title.name, region: user.region,
+                                snapshot: try await req.availability.snapshot(titleID: titleID, region: user.region),
+                                services: services, onList: onList, hasToken: hasToken,
+                                loading: hasToken && stale)
     }
 
     private func handle(_ req: Request, _ body: () async throws -> HTMLResponse) async throws -> Response {
