@@ -19,7 +19,9 @@ docker rm -f watchswifty
 ```
 
 Then run the `docker run` command from [Installation](installation.md#docker-run) again; the volume is kept. Database
-changes of new versions are applied automatically on start. A backup before updating does no harm.
+changes of new versions are applied automatically on start, also when versions in between are skipped. They cannot
+be undone, so take a [backup](#backup-and-restore) before updating if you may want to go back. What stays compatible
+across versions: [Compatibility](releases.md#compatibility).
 
 ## Update check
 

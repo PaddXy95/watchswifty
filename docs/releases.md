@@ -4,6 +4,57 @@ WatchSwifty follows [SemVer](https://semver.org); changes are listed in the [CHA
 version is shown on the left of the footer (after signing in) and at `http://<server>:8080/version`. To be told about new versions, see
 [Update check](operations.md#update-check).
 
+## Compatibility
+
+From 1.0.0 on, the interfaces below are stable. A change that breaks one of them only comes with a new major version
+(2.0.0) and is listed in its CHANGELOG section under `### Breaking changes` with what to do. Minor versions (1.1.0)
+add features and stay compatible, patch versions (1.0.1) fix bugs.
+
+### Data and updates
+
+- An update from any earlier release, 0.1.0 included, needs no manual steps: database changes run automatically on
+  start, and versions in between can be skipped. `UpgradeTests` check this with databases written by old releases.
+- There is no downgrade. Database changes cannot be undone; to go back, restore the backup taken before the update
+  (see [Backup and restore](operations.md#backup-and-restore)).
+- Encrypted values stay readable as long as the same key is used (`TOKEN_KEY`, `TOKEN_KEY_FILE` or `/data/token.key`).
+
+### Installation and operation
+
+Stable:
+
+- the [environment variables](configuration.md#environment-variables): names, meaning and defaults
+- the volume `/data` with `watchswifty.sqlite` and `token.key`, port `8080`
+- the image `ghcr.io/paddxy95/watchswifty` and its [tags](#image-tags)
+- the commands `reset-password`, `link-oidc` and `oidc-move-issuer` with their arguments
+- `/healthz` and `/version`
+
+A renamed environment variable or command keeps working under its old name, with a warning in the log, until the next
+major version.
+
+Not stable: the web UI (pages, addresses, texts), log messages, the database schema itself (read or change it only
+through WatchSwifty) and `beta` images.
+
+### App API
+
+The App API under `/api/v1` keeps working for existing apps. Within v1 these changes are allowed:
+
+- new endpoints, new optional parameters and request fields
+- new fields in responses
+- new values in the growing lists: streaming services (`Service`), genres (`Genre`), offer kinds (`OfferKind`),
+  watch origins (`WatchOrigin`), import and matching states (`ImportStatus`, `MappingStatus`), device kinds
+  (`DeviceKind`) and notification channels (`NotifyChannel`)
+- new error codes
+- a shorter or longer lifetime of device tokens
+
+Apps therefore ignore unknown fields, show unknown list values in a neutral way (`WatchSwiftyClient` does this, see
+[Swift client](app-api.md#swift-client)), show the `message` of an unknown error code and, on `401`, connect again.
+
+Breaking, and only possible with a new major version: removing or renaming an endpoint or field, making a request
+field required, changing the type or meaning of a field, removing a value from a list, adding a value to any other list
+(for example `tv`/`movie`), and changes to signing in (Authorization Code with PKCE, the `redirect_uri`
+`dev.patmei.watchswifty:/auth`, bearer tokens `ws_…`). Such changes come as `/api/v2`; `/api/v1` keeps working next to
+it for at least six months.
+
 ## Image tags
 
 | Tag | Content |

@@ -165,7 +165,11 @@ Spec `2026-11-11-notifications-design.md`.
   release.
 - `VERSION` holds the intended version; `scripts/next-version.sh` releases it if the tag doesn't exist yet, else
   bumps the patch. Release notes come from the matching `## [X.Y.Z] – date` section of `CHANGELOG.md` (English,
-  sections `### Added`, `### Changed`, `### Fixed`, `### Security`, `### Performance`) via `scripts/release-notes.sh`.
+  sections `### Breaking changes`, `### Added`, `### Changed`, `### Fixed`, `### Security`, `### Performance`) via
+  `scripts/release-notes.sh`.
+- `docs/releases.md#compatibility` lists the stable interfaces (data upgrades, env vars, volume, commands,
+  `/api/v1`). A change that breaks one of them needs a major version, a `### Breaking changes` CHANGELOG entry and,
+  for the API, `/api/v2`. New response enum values are only allowed for the open types in `OpenValues.swift`.
 - A release commit bumps `VERSION`, adds the CHANGELOG section and updates the README and `docs/` where user-facing
   behavior changed.
 
