@@ -65,11 +65,11 @@ struct AppConfig: Sendable {
         config.passwordLoginForced = value("PASSWORD_LOGIN")?.lowercased() == "true"
         if let raw = value("PASSWORD_LOGIN"), !config.passwordLoginForced {
             config.environmentHints.append(
-                "PASSWORD_LOGIN=\(raw) wird ignoriert – nur PASSWORD_LOGIN=true wirkt (Notschalter); den Passwort-Login unter System abschalten.")
+                "PASSWORD_LOGIN=\(raw) wird ignoriert – nur PASSWORD_LOGIN=true wirkt (Notschalter); den Passwort-Login unter Admin → System abschalten.")
         }
         for name in ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_CLIENT_SECRET_FILE", "OIDC_REDIRECT_URL", "OIDC_NAME"]
         where value(name) != nil {
-            config.environmentHints.append("\(name) wird ignoriert – SSO wird unter System → Anmeldung über OIDC (SSO) eingerichtet.")
+            config.environmentHints.append("\(name) wird ignoriert – SSO wird unter Admin → System → Anmeldung über OIDC (SSO) eingerichtet.")
         }
         return config
     }

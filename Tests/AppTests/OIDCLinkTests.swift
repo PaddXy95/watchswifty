@@ -320,7 +320,7 @@ struct OIDCLinkTests {
     @Test func linkCommandWithoutOIDCFails() async throws {
         try await withTestApp { app in
             try await createUser(app, "anna")
-            await #expect(throws: CommandFailure("OIDC ist nicht eingerichtet – unter System → Anmeldung über OIDC (SSO) einrichten.")) {
+            await #expect(throws: CommandFailure("OIDC ist nicht eingerichtet – unter Admin → System → Anmeldung über OIDC (SSO) einrichten.")) {
                 _ = try await runLinkCommand(app, ["anna"])
             }
         }

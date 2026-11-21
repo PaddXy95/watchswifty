@@ -42,6 +42,7 @@ struct AccountPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
+            SectionTabs.account(.settings)
             h1 { "Konto" }
             p(.class("muted")) { "Angemeldet als \(nav.username)" }
             Messages(error: error, notice: notice)

@@ -39,7 +39,7 @@ TMDB (see [TMDB](tmdb.md#streaming-availability)).
 ## Daily run
 
 Once a day WatchSwifty refreshes running series and the availability of titles on watch later lists from TMDB and then sends notifications. The admin sets the time
-under **System → Benachrichtigungen** (default 07:00). It uses the server's time zone, so set `TZ` in the container,
+under **Admin → System → Benachrichtigungen** (default 07:00). It uses the server's time zone, so set `TZ` in the container,
 for example `TZ=Europe/Berlin` (see [Configuration](configuration.md)); the page shows the zone in use and the next run.
 After a restart the run is repeated at once only when the last one is more than 24 hours old.
 
@@ -58,7 +58,7 @@ Password resets, invitations and SSO links are always sent by mail, never throug
 into a mail to the recipient configured for that key.
 
 1. In KNot, add one target per person with their mail address and a key from `java -jar knot.jar key`.
-2. As admin, enter the hook address (for example `https://knot.example.lan/hook`) under **System →
+2. As admin, enter the hook address (for example `https://knot.example.lan/hook`) under **Admin → System →
    Benachrichtigungen**. Addresses with user info, `?…` or `#…` are rejected; the key belongs in the header.
 3. Give each person their key. They enter it under **Konto → Benachrichtigungen** (no password needed) and can send a
    **Testnachricht** (test message).

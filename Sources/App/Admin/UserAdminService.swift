@@ -31,7 +31,7 @@ struct SSOLinkResult: Equatable, Sendable {
 /// over another admin's sign-in need an `AdminConfirmation`, so it cannot do so through a peer admin either.
 struct UserAdminService {
     static let neitherMessage = "Bitte ein Startpasswort oder eine E-Mail-Adresse für die Einladung angeben."
-    static let inviteNeedsMailMessage = "Einladungen gehen erst, wenn der Mail-Versand unter System eingerichtet ist."
+    static let inviteNeedsMailMessage = "Einladungen gehen erst, wenn der Mail-Versand unter Admin → System eingerichtet ist."
     static let hasPasswordMessage = "Das Konto hat schon ein Passwort."
     static let noAddressMessage = "Für dieses Konto ist keine lesbare E-Mail-Adresse hinterlegt."
 

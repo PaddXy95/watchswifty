@@ -19,6 +19,7 @@ struct ImportPage: HTML {
 
     var body: some HTML {
         PageLayout(title: "Import", nav: navContext) {
+            SectionTabs.account(.importing)
             h1 { "Import" }
             section(.class("import-upload")) {
                 h2 { "Upload" }

@@ -151,9 +151,9 @@ struct WatchLaterPageTests {
             let (_, headers) = try await pat(app)
             let body = try await get(app, "/watch-later", headers)
             #expect(body.contains(#"href="/watch-later""#))
-            let library = try #require(body.range(of: ">Bibliothek<")), later = try #require(body.range(of: #"href="/watch-later""#)),
-                stats = try #require(body.range(of: ">Statistik<"))
-            #expect(library.lowerBound < later.lowerBound && later.lowerBound < stats.lowerBound)
+            let start = try #require(body.range(of: ">Weiterschauen<")), later = try #require(body.range(of: #"href="/watch-later""#)),
+                library = try #require(body.range(of: ">Bibliothek<"))
+            #expect(start.lowerBound < later.lowerBound && later.lowerBound < library.lowerBound)
         }
     }
 

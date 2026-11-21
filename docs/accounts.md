@@ -2,11 +2,11 @@
 
 WatchSwifty has several users with separate data. The first admin is created from `ADMIN_USERNAME` and
 `ADMIN_PASSWORD` on the very first start (see [Installation](installation.md)). After that the admin creates accounts
-under **Benutzer** (users) or, with [mail](email.md) set up, invites people by mail: they choose their password
+under **Admin → Benutzer** (users) or, with [mail](email.md) set up, invites people by mail: they choose their password
 themselves, the link is valid for 7 days. With [single sign-on](sso.md), accounts can also be created on the first
 sign-in through the provider.
 
-Admins never act on their own account under **Benutzer**; their own password changes under **Konto**. Granting admin
+Admins never act on their own account under **Admin → Benutzer**; their own password changes under **Konto**. Granting admin
 rights (a new admin account or „Zum Admin machen“ (make admin)) and setting the password of, or a linking link for,
 another admin first need a confirmation that it is really them: the page asks for the admin's password, or for a
 sign-in through the provider for accounts without a password, and the confirmation lasts 5 minutes. In the
@@ -38,7 +38,7 @@ arrives at one of your services (see [Notifications](notifications.md)).
 
 If [mail](email.md) is set up and the user has an address under **Konto**, no admin is needed: choose
 „Passwort vergessen?“ (forgot password) on the sign-in page, enter the username and open the link from the mail (valid
-for one hour). An admin can also reset other users' passwords under **Benutzer**.
+for one hour). An admin can also reset other users' passwords under **Admin → Benutzer**.
 
 Without mail, or when nobody can sign in any more (including the only admin), set the password on the server:
 

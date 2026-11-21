@@ -3,6 +3,16 @@ import ElementaryHTMX2
 
 enum NavItem: Sendable, Equatable {
     case continueWatching, history, library, watchLater, stats, search, importing, account, admin, system
+
+    /// The menu entry a page belongs to: Verlauf is a tab of Bibliothek, Import of Konto, System and Benutzer of Admin.
+    var menuEntry: NavItem {
+        switch self {
+        case .history: .library
+        case .importing: .account
+        case .system: .admin
+        default: self
+        }
+    }
 }
 
 struct NavContext: Sendable {
@@ -65,17 +75,14 @@ struct SiteNav: HTML {
     private var items: [(NavItem, String, String)] {
         var items: [(NavItem, String, String)] = [
             (.continueWatching, "Weiterschauen", "/"),
-            (.history, "Verlauf", "/history"),
-            (.library, "Bibliothek", "/library"),
             (.watchLater, "Später ansehen", "/watch-later"),
+            (.library, "Bibliothek", "/library"),
             (.stats, "Statistik", "/stats"),
             (.search, "Suche", "/search"),
-            (.importing, "Import", "/import"),
             (.account, "Konto", "/account"),
         ]
         if context.isAdmin {
-            items.append((.admin, "Benutzer", "/admin/users"))
-            items.append((.system, "System", "/admin/system"))
+            items.append((.admin, "Admin", "/admin/system"))
         }
         return items
     }
@@ -93,7 +100,7 @@ struct SiteNav: HTML {
             nav(.class("site-nav"), .hx.boost(true)) {
                 for (item, label, href) in items {
                     a(.href(href)) { label }
-                        .attributes(.class("active"), .custom(name: "aria-current", value: "page"), when: item == context.active)
+                        .attributes(.class("active"), .custom(name: "aria-current", value: "page"), when: item == context.active.menuEntry)
                 }
             }
             form(.class("logout"), .method(.post), .action("/logout")) {
