@@ -15,6 +15,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.mailSender = mailSender ?? LiveMailSender()
     app.webhookSender = webhookSender ?? LiveWebhookSender(userAgent: "WatchSwifty/\(config.appVersion.version)")
     app.backgroundTasks = BackgroundTasks()
+    app.providerCatalog = ProviderCatalog()
     app.dailyRunTrigger = DailyRunTrigger()
     app.oidcIdentityLock = AsyncMutex()
     app.forgotPasswordLock = AsyncMutex()

@@ -406,3 +406,11 @@ details.service-more > .service-bars { margin-top: var(--space-2); }
 .device-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 .device-list .inline-form { margin: 0 0 0 auto; }
 code.new-token { user-select: all; word-break: break-all; padding: 0 var(--space-1); background: var(--paper-3); border-radius: 4px; }
+
+/* Streaming services and availability (spec 2026-11-21-watch-later-availability-design.md) */
+.provider-logo { width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
+.provider-logo-empty { display: inline-grid; place-items: center; background: var(--paper-3); color: var(--ink-2); font-size: 0.7rem; font-weight: 700; }
+.provider-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; max-width: 48rem; }
+.provider-choice { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.provider-choice:has(input:checked) { border-color: var(--ok); }
+.streaming-form select { font: inherit; color: var(--ink); background: var(--paper-3); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-1) var(--space-2); }

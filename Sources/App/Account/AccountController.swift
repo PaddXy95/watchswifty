@@ -9,6 +9,7 @@ struct AccountController {
     struct LinkInput: Content { var currentPassword: String? }
     struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var available: String?; var channel: String? }
     struct WebhookKeyInput: Content { var key: String }
+    struct StreamingInput: Content { var region: String; var providers: [Int]? }
 
     func register(on protected: any RoutesBuilder) {
         protected.get("account", use: show)
@@ -23,9 +24,60 @@ struct AccountController {
         protected.post("account", "oidc", "link", use: startLink)
         protected.post("account", "oidc", "reauth", use: startReauth)
         protected.post("account", "notifications", use: saveNotifications)
+        protected.post("account", "streaming", use: saveStreaming)
+        protected.get("account", "streaming", "providers", use: streamingProviders)
         protected.post("account", "notifications", "webhook-key", use: saveWebhookKey)
         protected.post("account", "notifications", "webhook-key", "remove", use: removeWebhookKey)
         protected.post("account", "notifications", "test", use: testNotification)
+    }
+
+    // MARK: - Streamingdienste
+
+    func saveStreaming(req: Request) async throws -> HTMLResponse {
+        let input = try req.content.decode(StreamingInput.self)
+        let user = try req.currentUser
+        let changedRegion: Bool
+        do {
+            changedRegion = try await req.streamingSettings.save(user: user, region: input.region, providerIDs: input.providers ?? [])
+        } catch let error as APIError {
+            return try await page(req, open: .streaming, status: error.status, error: error.message)
+        }
+        if changedRegion, let token = req.tmdbToken {
+            let app = req.application, userID = try user.requireID(), region = user.region
+            app.backgroundTasks.run {
+                await StreamingSettingsService(db: app.db).fetchMissing(userID: userID, region: region, tmdb: app.tmdbProvider.make(token),
+                                                                        logger: app.logger)
+            }
+        }
+        return try await page(req, open: .streaming, notice: "Streamingdienste gespeichert.")
+    }
+
+    /// The checkboxes for another country (htmx, when the country changes).
+    func streamingProviders(req: Request) async throws -> HTMLResponse {
+        let region = ((try? req.query.get(String.self, at: "region")) ?? "").uppercased()
+        guard region.count == 2, region.unicodeScalars.allSatisfy({ ("A"..."Z").contains($0) }) else { throw Abort(.badRequest) }
+        let user = try req.currentUser
+        let providers = try await req.application.providerCatalog.providers(region: region, tmdb: req.tmdb)
+        let selected = try await req.streamingSettings.settings(user: user).providerIDs
+        return HTMLResponse(StreamingProviderChoices(providers: providers, selected: selected))
+    }
+
+    private func streamingState(_ req: Request, user: User) async throws -> AccountStreaming {
+        let settings = try await req.streamingSettings.settings(user: user)
+        var state = AccountStreaming(region: settings.region, regions: [], providers: [], selected: settings.providerIDs,
+                                     hasToken: req.tmdbToken != nil)
+        guard state.hasToken else { return state }
+        do {
+            let catalog = req.application.providerCatalog
+            state.regions = try await catalog.regions(tmdb: req.tmdb)
+            if !state.regions.contains(where: { $0.code == settings.region }) {
+                state.regions.insert(TMDBRegion(code: settings.region, name: settings.region), at: 0)
+            }
+            state.providers = try await catalog.providers(region: settings.region, tmdb: req.tmdb)
+        } catch let error as TMDBError {
+            state.loadError = "Die Streamingdienste konnten nicht von TMDB geladen werden: \(error)"
+        }
+        return state
     }
 
     // MARK: - Benachrichtigungen
@@ -226,14 +278,15 @@ struct AccountController {
             announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
             available: available, active: available.contains(user.preferredChannel) ? user.preferredChannel : available.first,
             preferred: user.preferredChannel, webhookConfigured: notifySettings.webhookURL != nil,
-            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime)
+            keyState: user.webhookKeyState(req.application.tokenCipher), dailyRunTime: notifySettings.dailyRunTime,
+            titleAvailable: user.notifyAvailable == true)
         return HTMLResponse(status: status, AccountPage(nav: try req.nav(.account), tokenSuffix: suffix, error: error, notice: notice,
                                                         followed: followed, tokenUnreadable: unreadable, devices: devices,
                                                         newToken: newToken, email: user.emailState(req.application.tokenCipher),
                                                         mailConfigured: mailConfigured, sso: sso,
                                                         passwordChange: user.hasPassword && config.passwordLogin,
                                                         tokenNeedsReauth: try tokenNeedsReauth(req), notifications: notifications,
-                                                        openBlock: open,
+                                                        streaming: try await streamingState(req, user: user), openBlock: open,
                                                         libraryRefresh: await req.application.libraryRefresh.state(userID: try req.userID)))
     }
 }
