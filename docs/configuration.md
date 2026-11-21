@@ -1,7 +1,7 @@
 # Configuration
 
 WatchSwifty is configured through environment variables (with Compose: the `.env` file next to
-`docker-compose.yml`, template `.env.example`). Mail and single sign-on are set up in the web UI under **System**, not
+`docker-compose.yml`, template `.env.example`). Mail and single sign-on are set up in the web UI under **Admin → System**, not
 here, see [Mail](email.md) and [Single sign-on](sso.md).
 
 ## Environment variables
@@ -34,4 +34,4 @@ The key comes from:
 
 Keep the key separate from the data. If it is lost or changes, the stored secrets can no longer be read: every user
 enters their TMDB token and e-mail address under **Konto** (account) again, and the admin sets up mail and single
-sign-on again under **System**. All other data stays. Tokens from older versions are encrypted automatically on start.
+sign-on again under **Admin → System**. All other data stays. Tokens from older versions are encrypted automatically on start.

@@ -204,4 +204,21 @@ struct AccountNotificationsTests {
             #expect(stored.notifyAnnounced == true)
         }
     }
+
+    @Test func switchingAvailableOnRebaselines() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let movie = try await seedMovie(app, tmdbID: 603)
+            try await WatchLaterEntry(userID: user.requireID(), titleID: movie.requireID(), addedAt: .now, addedOn: "2026-11-07",
+                                      baselined: true).save(on: app.db)
+            let prefs = NotificationPrefsService(db: app.db, cipher: app.tokenCipher)
+            try await prefs.save(user: user, announced: false, soon: false, today: false, titleAvailable: true, channel: .mail, available: [])
+            #expect(user.notifyAvailable == true)
+            #expect(try await WatchLaterEntry.query(on: app.db).first()?.baselined == false)
+            try await WatchLaterEntry.query(on: app.db).set(\.$baselined, to: true).update()
+            try await prefs.save(user: user, announced: false, soon: false, today: false, titleAvailable: nil, channel: .mail, available: [])
+            #expect(user.notifyAvailable == true)                                                   // nil keeps the value
+            #expect(try await WatchLaterEntry.query(on: app.db).first()?.baselined == true)          // already on: no re-baseline
+        }
+    }
 }

@@ -19,9 +19,10 @@ tags:
   - name: Movies
   - name: History
   - name: Library
+  - name: Watch later
   - name: Statistics
   - name: Netflix import
-  - name: Movie list
+  - name: Standard import
   - name: Admin
 paths:
   /v1/version:
@@ -1014,6 +1015,188 @@ paths:
                 $ref: "#/components/schemas/Error"
         "503":
           $ref: "#/components/responses/NotifyFailed"
+  /v1/watch-later:
+    get:
+      operationId: getWatchLater
+      tags: [Watch later]
+      summary: The „Später ansehen“ (watch later) list, newest first, with availability in the user's country
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchLaterList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/tv/{tmdbID}/watch-later:
+    put:
+      operationId: setSeriesWatchLater
+      tags: [Watch later]
+      summary: Put a series on the watch later list or take it off
+      description: Adding fetches the availability right away; offers already there are never notified. The entry ends with the first new watch.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchLaterInput"
+      responses:
+        "204":
+          description: Saved
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/movies/{tmdbID}/watch-later:
+    put:
+      operationId: setMovieWatchLater
+      tags: [Watch later]
+      summary: Put a film on the watch later list or take it off
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WatchLaterInput"
+      responses:
+        "204":
+          description: Saved
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/tv/{tmdbID}/availability:
+    get:
+      operationId: getSeriesAvailability
+      tags: [Watch later]
+      summary: Where a series streams in the user's country (data by JustWatch via TMDB)
+      description: Fetched from TMDB first when nothing is stored or the stored state is older than 7 days. Apps must credit JustWatch where they show it.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "200":
+          description: Offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Availability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/movies/{tmdbID}/availability:
+    get:
+      operationId: getMovieAvailability
+      tags: [Watch later]
+      summary: Where a film streams in the user's country (data by JustWatch via TMDB)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TmdbID"
+      responses:
+        "200":
+          description: Offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Availability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/me/streaming-services:
+    get:
+      operationId: getStreamingServices
+      tags: [Account]
+      summary: The user's country and streaming services
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamingServices"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: setStreamingServices
+      tags: [Account]
+      summary: Set the user's country and streaming services
+      description: Titles already available at a newly chosen service are not notified. A new country fetches the list's availability in the background.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StreamingServices"
+      responses:
+        "200":
+          description: Saved settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamingServices"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/streaming-providers:
+    get:
+      operationId: getStreamingProviders
+      tags: [Account]
+      summary: Streaming services of a country (for the selection)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: region
+          in: query
+          required: true
+          description: ISO 3166-1 code, e.g. DE
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Services, by TMDB's priority
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StreamingProvider"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+  /v1/streaming-regions:
+    get:
+      operationId: getStreamingRegions
+      tags: [Account]
+      summary: Countries with streaming data (German names)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Countries, by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StreamingRegion"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/imports/netflix:
     post:
       operationId: uploadNetflix
@@ -1305,11 +1488,15 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-  /v1/imports/films:
+  /v1/imports/standard:
     post:
-      operationId: uploadFilmList
-      tags: [Movie list]
-      summary: Upload your own movie list (CSV with the header “Filmname”, at most 2 MB); replaces the previous list
+      operationId: uploadStandardImport
+      tags: [Standard import]
+      summary: Upload a CSV in the WatchSwifty standard format (columns `type` and `title` required, at most 5 MB); replaces the previous list
+      description: >-
+        One row per viewing (`movie`, `episode`) or per series (`series`, rating/comment only). Optional columns:
+        `year`, `tmdb_id`, `imdb_id`, `season`, `episode`, `watched_on`, `service`, `rating` (1–10), `comment`.
+        See docs/import.md.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -1327,11 +1514,11 @@ paths:
                 contentType: "*/*"
       responses:
         "200":
-          description: Number of imported films (matching runs in the background)
+          description: Number of titles taken over and rows skipped (matching runs in the background)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmUploadResult"
+                $ref: "#/components/schemas/ImportUploadResult"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "413":
@@ -1343,9 +1530,9 @@ paths:
         "422":
           $ref: "#/components/responses/Unprocessable"
     get:
-      operationId: getFilmList
-      tags: [Movie list]
-      summary: Status of the movie list
+      operationId: getStandardImport
+      tags: [Standard import]
+      summary: Status of the standard import
       security: [{ bearerAuth: [] }]
       responses:
         "200":
@@ -1353,13 +1540,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmList"
+                $ref: "#/components/schemas/ImportList"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/imports/films/retry:
+  /v1/imports/standard/retry:
     post:
-      operationId: retryFilmList
-      tags: [Movie list]
+      operationId: retryStandardImport
+      tags: [Standard import]
       summary: Retry matching (after TMDB errors)
       security: [{ bearerAuth: [] }]
       responses:
@@ -1368,14 +1555,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmList"
+                $ref: "#/components/schemas/ImportList"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/imports/films/{id}/accept:
+  /v1/imports/standard/{id}/accept:
     post:
-      operationId: acceptFilm
-      tags: [Movie list]
-      summary: Assign a film to a TMDB result and create watches
+      operationId: acceptImportEntry
+      tags: [Standard import]
+      summary: Assign an entry to a TMDB result and create its watches
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1389,25 +1576,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FilmAccept"
+              $ref: "#/components/schemas/ImportAccept"
       responses:
         "200":
           description: Entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
-  /v1/imports/films/{id}/search:
+  /v1/imports/standard/{id}/search:
     post:
-      operationId: searchFilm
-      tags: [Movie list]
-      summary: Get suggestions with a different search term
+      operationId: searchImportEntry
+      tags: [Standard import]
+      summary: Get suggestions with a different search term (in the entry's kind)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1421,25 +1608,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FilmSearch"
+              $ref: "#/components/schemas/ImportSearch"
       responses:
         "200":
           description: Entry
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Unprocessable"
-  /v1/imports/films/{id}/skip:
+  /v1/imports/standard/{id}/skip:
     post:
-      operationId: skipFilm
-      tags: [Movie list]
-      summary: Skip a film
+      operationId: skipImportEntry
+      tags: [Standard import]
+      summary: Skip an entry
       security: [{ bearerAuth: [] }]
       parameters:
         - name: id
@@ -1454,7 +1641,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FilmEntry"
+                $ref: "#/components/schemas/ImportEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -2184,6 +2371,9 @@ components:
           type: string
         inLibrary:
           type: boolean
+        watchLater:
+          type: boolean
+          description: On the user's watch later list
         watchedEpisodes:
           type: integer
         totalEpisodes:
@@ -2218,6 +2408,9 @@ components:
           type: integer
         comment:
           type: string
+        watchLater:
+          type: boolean
+          description: On the user's watch later list
         watches:
           type: array
           items:
@@ -2724,38 +2917,52 @@ components:
         episodeId:
           type: string
           format: uuid
-    FilmUploadResult:
+    ImportUploadResult:
       type: object
-      required: [films]
+      required: [titles, skippedRows]
       properties:
-        films:
+        titles:
           type: integer
-    FilmEntry:
+          description: Titles (entries) taken over from the file.
+        skippedRows:
+          type: integer
+          description: Rows with an unknown type, without a title or (episodes) without season/episode.
+    ImportEntry:
       type: object
-      required: [id, title, watchCount, status, candidates]
+      required: [id, kind, title, watchCount, status, candidates, missingEpisodes, addedWatches]
       properties:
         id:
           type: string
           format: uuid
+        kind:
+          type: string
+          enum: [tv, movie]
         title:
           type: string
         year:
           type: integer
         watchCount:
           type: integer
+          description: Viewings in the file (movie or episode rows).
         rating:
           type: integer
         status:
-          $ref: "#/components/schemas/FilmStatus"
+          $ref: "#/components/schemas/ImportStatus"
         tmdbId:
           type: integer
         candidates:
           type: array
           items:
             $ref: "#/components/schemas/SearchResult"
+        missingEpisodes:
+          type: integer
+          description: Episodes of the file that TMDB does not list (not recorded).
+        addedWatches:
+          type: integer
+          description: Watches created by the last recording (known ones are not added again).
         error:
           type: string
-    FilmCounts:
+    ImportCounts:
       type: object
       required: [imported, review, notFound, skipped, pending]
       properties:
@@ -2769,26 +2976,26 @@ components:
           type: integer
         pending:
           type: integer
-    FilmList:
+    ImportList:
       type: object
       required: [counts, entries]
       properties:
         counts:
-          $ref: "#/components/schemas/FilmCounts"
+          $ref: "#/components/schemas/ImportCounts"
         error:
           type: string
           description: Matching error (e.g. no TMDB token); entries stay open.
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/FilmEntry"
-    FilmAccept:
+            $ref: "#/components/schemas/ImportEntry"
+    ImportAccept:
       type: object
       required: [tmdbId]
       properties:
         tmdbId:
           type: integer
-    FilmSearch:
+    ImportSearch:
       type: object
       required: [q]
       properties:
@@ -3058,9 +3265,9 @@ components:
       type: string
       description: Status of a Netflix mapping.
       enum: [pending, auto, confirmed, review, ignored]
-    FilmStatus:
+    ImportStatus:
       type: string
-      description: Status of a movie list entry.
+      description: Status of a standard import entry.
       enum: [pending, imported, review, not_found, skipped]
     NotifyChannel:
       type: string
@@ -3070,6 +3277,9 @@ components:
       type: object
       required: [announced, soon, today, channel, availableChannels, webhookConfigured, hasWebhookKey, dailyRunTime]
       properties:
+        titleAvailable:
+          type: boolean
+          description: Notify when a title on the watch later list becomes available at one of the user's services (always sent; optional so apps also work with older servers).
         announced:
           type: boolean
           description: Notify as soon as a new episode of a followed series is known.
@@ -3100,6 +3310,9 @@ components:
       type: object
       required: [announced, soon, today, channel]
       properties:
+        titleAvailable:
+          type: boolean
+          description: Absent keeps the stored value.
         announced:
           type: boolean
         soon:
@@ -3177,6 +3390,112 @@ components:
       properties:
         hidden:
           type: boolean
+    WatchLaterInput:
+      type: object
+      required: [watchLater]
+      properties:
+        watchLater:
+          type: boolean
+    OfferKind:
+      type: string
+      description: How a title is offered (flatrate = included in a subscription)
+      enum: [flatrate, free, ads, rent, buy]
+    ProviderOffer:
+      type: object
+      required: [providerId, name, kind, mine]
+      properties:
+        providerId:
+          type: integer
+          description: TMDB watch provider id
+        name:
+          type: string
+        logoPath:
+          type: string
+          description: TMDB image path (https://image.tmdb.org/t/p/w92 + path)
+        kind:
+          $ref: "#/components/schemas/OfferKind"
+        mine:
+          type: boolean
+          description: One of the user's streaming services
+    Availability:
+      type: object
+      required: [region, offers]
+      description: Offers in the user's country. Data by JustWatch (credit required); no `fetchedAt` = not fetched yet.
+      properties:
+        region:
+          type: string
+        fetchedAt:
+          type: string
+          format: date-time
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderOffer"
+    WatchLaterItem:
+      type: object
+      required: [kind, tmdbId, name, addedAt]
+      properties:
+        kind:
+          type: string
+          enum: [tv, movie]
+        tmdbId:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        posterPath:
+          type: string
+        addedAt:
+          type: string
+          format: date-time
+        availability:
+          $ref: "#/components/schemas/Availability"
+        newSince:
+          type: string
+          format: date-time
+          description: A service of the user started offering it in the last 7 days
+    WatchLaterList:
+      type: object
+      required: [region, items]
+      properties:
+        region:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchLaterItem"
+    StreamingServices:
+      type: object
+      required: [region, providerIds]
+      properties:
+        region:
+          type: string
+          description: ISO 3166-1 code, e.g. DE
+        providerIds:
+          type: array
+          items:
+            type: integer
+    StreamingProvider:
+      type: object
+      required: [providerId, name]
+      properties:
+        providerId:
+          type: integer
+        name:
+          type: string
+        logoPath:
+          type: string
+        displayPriority:
+          type: integer
+    StreamingRegion:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
     FollowInput:
       type: object
       required: [followed]
@@ -3297,6 +3616,9 @@ components:
           type: boolean
         followed:
           type: boolean
+        watchLater:
+          type: boolean
+          description: On the user's watch later list
         lastService:
           $ref: "#/components/schemas/Service"
         next:

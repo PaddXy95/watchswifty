@@ -17,16 +17,22 @@ container, one SQLite file, data from TMDB. The web UI is in German; apps such a
 
 - **Continue watching:** one card per series with the next episode (series of the last 3 months)
 - **Netflix import:** upload your viewing history as CSV, titles are matched to TMDB automatically
+- **Import from other trackers** (Letterboxd, IMDb, Trakt, TV Time, Simkl, …) in a simple standard CSV format
 - **Tracking by hand:** search series and movies, mark episodes as watched (with date and streaming service), rate
   them 1–10, private comments on series, seasons and movies
 - **History and library** with synopsis, genres (library filter) and links to TMDB, IMDb, Rotten Tomatoes and SeriesGraph
+- **Später ansehen (watch later):** a list of titles to watch, filled from the search; a title leaves it once you
+  start watching
+- **Where it streams:** each series and movie shows its subscription, free, rent and buy offers in your country, with
+  your own streaming services first (data by [JustWatch](https://www.justwatch.com) via TMDB)
 - **Statistics:** movies, series, episodes and time watched, in total, per year and month, by rating, service and genre;
   longest and most watched series, movies and episodes
 - **Several users** with separate data; the admin creates accounts or invites people by mail
 - **Single sign-on (optional)** through your own OpenID Connect provider
 - **Mail (optional)** for invitations, password resets and new devices, for example through
   [SwiftyRelay](https://github.com/PaddXy95/SwiftyRelay)
-- **Notifications (optional)** about new episodes of followed series, by mail or through a
+- **Notifications (optional)** about new episodes of followed series and titles on your watch later list that
+  arrive at one of your streaming services, by mail or through a
   [KNot](https://github.com/nexus421/KNot) webhook, once a day at a time the admin chooses
 - **App API** (`/api/v1`, OpenAPI) with device tokens and a Swift client library
 - Secrets such as TMDB tokens and mail settings are encrypted at rest
@@ -64,7 +70,7 @@ reverse proxy in front, see [Installation](docs/installation.md#reverse-proxy-ht
 - [Single sign-on](docs/sso.md): OIDC setup, moving an existing installation, emergency access
 - [Mail](docs/email.md): SMTP setup, SwiftyRelay
 - [Notifications](docs/notifications.md): new episodes by mail or KNot webhook, daily run time
-- [Import](docs/import.md): Netflix viewing history and your own film list
+- [Import](docs/import.md): Netflix viewing history and other trackers (standard CSV)
 - [App API](docs/app-api.md): connecting apps, tokens, Swift client
 - [Releases](docs/releases.md): versions, image tags, testing a beta
 - [Development](docs/development.md): build, tests, project layout

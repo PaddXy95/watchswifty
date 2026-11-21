@@ -79,4 +79,40 @@ struct NotificationTextsTests {
         #expect(body.contains("„A B“"))
         #expect(body.contains("\nSerie mit Umbruch\n"))
     }
+
+    static let dune = AvailabilityDue(titleID: UUID(), tmdbID: 693134, kind: .movie, name: "Dune", year: 2024,
+                                      providers: ["Netflix"], noticeIDs: [])
+
+    @Test func digestWithAvailability() {
+        let message = NotificationTexts.digest(username: "pat", items: [], available: [Self.dune], today: Self.today,
+                                               baseURL: "https://w.lan")
+        #expect(message.subject == "WatchSwifty: 1 Titel jetzt verfügbar")
+        #expect(message.body == """
+            Hallo pat,
+
+            es gibt Neues zu deiner Liste „Später ansehen“:
+
+            Jetzt bei deinen Diensten:
+              „Dune“ (2024, Film) – Netflix
+              https://w.lan/movie/693134
+
+            Verfügbarkeit: JustWatch
+            Abschalten unter „Konto → Benachrichtigungen“.
+
+            Viele Grüße
+            WatchSwifty
+            """)
+    }
+
+    @Test func digestMixed() {
+        let series = AvailabilityDue(titleID: UUID(), tmdbID: 1, kind: .tv, name: "Andor", year: nil, providers: ["Disney+", "WOW"],
+                                     noticeIDs: [])
+        let message = NotificationTexts.digest(username: "pat", items: [item("A", 1, 1, airDate: Self.today, [.today])],
+                                               available: [Self.dune, series], today: Self.today, baseURL: nil)
+        #expect(message.subject == "WatchSwifty: 1 Folge heute, 2 Titel jetzt verfügbar")
+        #expect(message.body.contains("es gibt Neues zu deinen beobachteten Serien:"))
+        #expect(message.body.contains("Die Termine sind die von TMDB"))
+        #expect(message.body.contains("  „Andor“ (Serie) – Disney+, WOW"))
+        #expect(message.body.contains("Verfügbarkeit: JustWatch"))
+    }
 }

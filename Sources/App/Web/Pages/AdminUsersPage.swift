@@ -2,31 +2,44 @@ import Elementary
 import ElementaryHTMX2
 import Foundation
 
+/// „Benutzer“ (users) admin page at `/admin/users`: SSO link status, the identity confirmation box, a freshly created
+/// link, the table of all accounts and the form to create an account.
+///
+/// The hints and the create form depend on the setup: invitations need mail, the start password field is only shown
+/// while the password login is on.
 struct AdminUsersPage: HTML {
     let nav: NavContext
+    /// All accounts with their link and invitation state.
     let users: [AdminUserRow]
+    /// Mail is set up: an account created without start password gets an invitation.
     var mailConfigured = false
+    /// The signed-in admin; their row is marked „(du)“ (you) and cannot be deleted.
     let currentUserID: UUID
+    /// Error message of the last action.
     let error: String?
+    /// Success message of the last action.
     let notice: String?
     /// SSO display name when OIDC is configured.
     var ssoName: String? = nil
     /// A link just created for passing on (shown only in this response).
     var ssoLink: AdminSSOLink? = nil
+    /// How many accounts (and whether an admin) are linked to the provider; shown with `ssoName`.
     var readiness: OIDCReadiness? = nil
+    /// Password login is on: shows the password fields.
     var passwordLogin = true
     /// How to confirm before granting admin rights or acting on another admin; nil while a confirmation is fresh.
     var confirm: AdminConfirmBox? = nil
 
     var body: some HTML {
         PageLayout(title: "Benutzer", nav: nav) {
+            SectionTabs.admin(.users)
             h1 { "Benutzer" }
             Messages(error: error, notice: notice)
             if let ssoName, let readiness {
                 p(.class("muted")) {
                     "\(readiness.linked) von \(readiness.total) Konten mit \(ssoName) verknüpft · Admin verknüpft: \(readiness.adminLinked ? "ja" : "nein")"
                     if passwordLogin {
-                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter System abschalten."
+                        " – Erst wenn alle verknüpft sind (mindestens ein Admin), den Passwort-Login unter Admin → System abschalten."
                     }
                 }
             }
@@ -69,7 +82,7 @@ struct AdminUsersPage: HTML {
             } else if mailConfigured {
                 p(.class("muted")) { "Mit E-Mail-Adresse und ohne Startpasswort bekommt die Person eine Einladung und legt ihr Passwort selbst fest." }
             } else {
-                p(.class("muted")) { "Einladungen per Mail gehen erst, wenn der Mail-Versand unter System eingerichtet ist." }
+                p(.class("muted")) { "Einladungen per Mail gehen erst, wenn der Mail-Versand unter Admin → System eingerichtet ist." }
             }
             form(.method(.post), .action("/admin/users")) {
                 label {
@@ -105,18 +118,32 @@ enum AdminConfirmBox: Equatable, Sendable {
 
 /// A „Verknüpfungslink“ to show once on the users page.
 struct AdminSSOLink: Sendable {
+    /// Account the link is for.
     let username: String
+    /// The link to pass on.
     let url: String
 }
 
+/// Table row of one account on the users page: name, role with SSO and invitation badges, e-mail hint, creation date and
+/// the actions.
+///
+/// Actions: „Verknüpfungslink“ (link token, for other unlinked accounts while SSO is configured), resending the
+/// invitation (no password and not linked), setting a password (while the password login is on), toggling admin rights
+/// and deleting (not for oneself). Deleting asks for confirmation and swaps `main` with the reloaded page.
 struct UserRow: HTML {
+    /// The account with its link and invitation state.
     let row: AdminUserRow
+    /// The row is the signed-in admin's own account.
     let isSelf: Bool
+    /// SSO display name when OIDC is configured.
     var ssoName: String? = nil
+    /// Password login is on: shows the „Passwort setzen“ (set password) form.
     var passwordLogin = true
 
+    /// The account of the row.
     private var user: User { row.user }
 
+    /// Creation day for display, empty when unknown.
     private var created: String {
         user.createdAt.map { CalendarDay.display(CalendarDay.today(now: $0)) } ?? ""
     }

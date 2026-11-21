@@ -1,5 +1,6 @@
 import Foundation
 
+/// A cached TMDB episode as input to `matchEpisodes`.
 struct EpisodeCandidate: Sendable, Equatable {
     let id: UUID
     let season: Int
@@ -9,6 +10,15 @@ struct EpisodeCandidate: Sendable, Equatable {
 
 /// Matches a Netflix episode title to TMDB episodes. Returns [] when nothing matches or the
 /// match is ambiguous (better unmatched than wrong); two IDs for a merged double episode.
+///
+/// Without a season, specials (season 0) are not considered. Steps in order: "Folge N" by number, one exact
+/// normalized name, a merged double episode ("… Teil 1 und 2" → two episodes with that name prefix), then a fuzzy
+/// match that needs similarity ≥ 0.85, a lead of more than 0.10 over the runner-up and the same digit runs.
+/// - Parameters:
+///   - title: The episode title from Netflix.
+///   - season: The season from the Netflix title, if any.
+///   - candidates: The series' cached episodes.
+/// - Returns: The matched episode IDs (one, or two for a double episode), or [] when unmatched.
 func matchEpisodes(title: String, season: Int?, in candidates: [EpisodeCandidate]) -> [UUID] {
     let pool = season.map { s in candidates.filter { $0.season == s } } ?? candidates.filter { $0.season >= 1 }
     guard !pool.isEmpty else { return [] }
@@ -47,6 +57,9 @@ func matchEpisodes(title: String, season: Int?, in candidates: [EpisodeCandidate
 private let doubleEpisodeSuffix = "Teil 1 und 2"
 
 /// Digit runs in a (normalized) title, in order.
+///
+/// - Parameter s: A normalized title.
+/// - Returns: The digit runs, e.g. `["7"]` for "die 7 leben".
 func numberTokens(_ s: String) -> [String] {
     s.split(whereSeparator: { !$0.isNumber }).map(String.init)
 }

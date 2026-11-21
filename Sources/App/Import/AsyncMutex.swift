@@ -3,6 +3,7 @@ actor AsyncMutex {
     private var locked = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
+    /// Acquires the lock, suspending until earlier waiters have had their turn.
     func lock() async {
         if !locked {
             locked = true
@@ -12,6 +13,10 @@ actor AsyncMutex {
     }
 
     /// Runs `body` while holding the lock (released on success and on error).
+    ///
+    /// - Parameter body: The work to run under the lock.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: Whatever `body` throws.
     nonisolated func withLock<T>(_ body: () async throws -> T) async throws -> T {
         await lock()
         do {
@@ -24,6 +29,7 @@ actor AsyncMutex {
         }
     }
 
+    /// Releases the lock, handing it directly to the longest-waiting caller if there is one.
     func unlock() {
         if waiters.isEmpty {
             locked = false

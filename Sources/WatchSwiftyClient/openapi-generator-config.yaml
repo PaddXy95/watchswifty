@@ -9,7 +9,8 @@ typeOverrides:
     Service: ServiceValue
     WatchOrigin: WatchOriginValue
     MappingStatus: MappingStatusValue
-    FilmStatus: FilmStatusValue
+    ImportStatus: ImportStatusValue
     DeviceKind: DeviceKindValue
     NotifyChannel: NotifyChannelValue
     Genre: GenreValue
+    OfferKind: OfferKindValue

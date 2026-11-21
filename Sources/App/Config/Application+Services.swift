@@ -1,8 +1,10 @@
 import Vapor
 
 extension Application {
+    /// Storage key for `appConfig`.
     private struct AppConfigKey: StorageKey { typealias Value = AppConfig }
 
+    /// The configuration passed to `configure` (reading it earlier is a programming error and crashes).
     var appConfig: AppConfig {
         get {
             guard let config = storage[AppConfigKey.self] else { fatalError("AppConfig not configured") }
@@ -13,8 +15,10 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `tmdbProvider`.
     private struct TMDBProviderKey: StorageKey { typealias Value = TMDBProvider }
 
+    /// Factory for TMDB clients bound to a user's token (live or a test fake).
     var tmdbProvider: TMDBProvider {
         get {
             guard let provider = storage[TMDBProviderKey.self] else { fatalError("TMDB provider not configured") }
@@ -25,8 +29,10 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `tokenCipher`.
     private struct TokenCipherKey: StorageKey { typealias Value = TokenCipher }
 
+    /// AES-GCM cipher for secrets at rest (key from `TOKEN_KEY`, `TOKEN_KEY_FILE` or the generated `token.key`).
     var tokenCipher: TokenCipher {
         get {
             guard let cipher = storage[TokenCipherKey.self] else { fatalError("Token cipher not configured") }
@@ -50,6 +56,7 @@ extension Request {
 }
 
 extension Application {
+    /// Storage key for `importLock`.
     private struct ImportLockKey: StorageKey { typealias Value = AsyncMutex }
 
     /// Serializes import decisions (MappingService) with the matching worker's writes.
@@ -63,8 +70,10 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `matchingWorker`.
     private struct MatchingWorkerKey: StorageKey { typealias Value = MatchingWorker }
 
+    /// Background worker that matches imported Netflix names to TMDB titles.
     var matchingWorker: MatchingWorker {
         get {
             guard let worker = storage[MatchingWorkerKey.self] else { fatalError("MatchingWorker not configured") }
@@ -75,9 +84,12 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `mailSender`.
     private struct MailSenderKey: StorageKey { typealias Value = any MailSender }
+    /// Storage key for `backgroundTasks`.
     private struct BackgroundTasksKey: StorageKey { typealias Value = BackgroundTasks }
 
+    /// Transport for outgoing mail (live SMTP or a test fake).
     var mailSender: any MailSender {
         get {
             guard let sender = storage[MailSenderKey.self] else { fatalError("Mail sender not configured") }
@@ -86,6 +98,7 @@ extension Application {
         set { storage[MailSenderKey.self] = newValue }
     }
 
+    /// Runner for work that continues after the response has been sent.
     var backgroundTasks: BackgroundTasks {
         get {
             guard let tasks = storage[BackgroundTasksKey.self] else { fatalError("Background tasks not configured") }
@@ -96,6 +109,7 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `dummyPasswordHash`.
     private struct DummyPasswordHashKey: StorageKey { typealias Value = String }
 
     /// Bcrypt hash (same cost as real ones) the login checks for unknown users and accounts without a password.
@@ -109,8 +123,11 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `oidcIdentityLock`.
     private struct OIDCIdentityLockKey: StorageKey { typealias Value = AsyncMutex }
+    /// Storage key for `forgotPasswordLock`.
     private struct ForgotPasswordLockKey: StorageKey { typealias Value = AsyncMutex }
+    /// Storage key for `oidcUsedStates`.
     private struct OIDCUsedStatesKey: StorageKey { typealias Value = OIDCUsedStates }
 
     /// States of OIDC flows already completed (single-use flow cookies).
@@ -142,6 +159,7 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `dailyRunTrigger`.
     private struct DailyRunTriggerKey: StorageKey { typealias Value = DailyRunTrigger }
 
     /// Wakes the daily loop when the admin changes its time.
@@ -155,8 +173,10 @@ extension Application {
 }
 
 extension Application {
+    /// Storage key for `webhookSender`.
     private struct WebhookSenderKey: StorageKey { typealias Value = any WebhookSender }
 
+    /// Transport for KNot webhook notifications (live or a test fake).
     var webhookSender: any WebhookSender {
         get {
             guard let sender = storage[WebhookSenderKey.self] else { fatalError("Webhook sender not configured") }

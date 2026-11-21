@@ -79,7 +79,8 @@ docker build -t watchswifty .
   `APIError`/`APIErrorMiddleware`.
 - Feature folders: `Auth` (incl. `Auth/OIDC`: OIDC login, see below), `Account`, `Admin`, `Catalog` (local cache
   of TMDB titles/episodes), `Tracking` (watches, ratings, comments, continue watching, history, library, stats,
-  search), `Import` (Netflix CSV, film list, `MatchingWorker`), `Mail`, `Notify` (daily run schedule, new-episode
+  search), `Import` (Netflix CSV, film list, `MatchingWorker`), `Availability` („Später ansehen“ list, streaming services, TMDB
+  watch providers, availability notices), `Mail`, `Notify` (daily run schedule, new-episode
   notices, KNot webhook, per-user channel), `TMDB`, `Web`, `API`, `Config` (`AppConfig`, `CalendarDay`, storage
   accessors).
 
@@ -114,7 +115,8 @@ test seeds). `LiveOIDCProvider`
 them, unused titles are deleted, TMDB texts are cleared after 180 days without refresh. `titleUsers(on:)` lists every
 table that counts as "using" a title; **a new per-user table referencing titles must be added there** (and to
 `usesTitle`, which decides which cached titles a user without a TMDB token may open), or its titles get deleted.
-`episode_notices` (sent notifications) deliberately does not count: it must not keep titles cached.
+`watch_later` counts; `episode_notices`, `availability_notices`, `title_availability` and `title_providers`
+deliberately do not: they must not keep titles cached (availability data is deleted after 30 days without a fetch).
 
 ### Notifications
 `DailyRefreshLifecycle` runs `runDailyPass` at the admin's time (`app_settings.daily_run_time`, server time zone,

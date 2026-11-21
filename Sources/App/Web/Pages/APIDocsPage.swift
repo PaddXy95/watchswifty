@@ -5,6 +5,7 @@ struct APIDocsPage: HTMLDocument {
     var title: String { "WatchSwifty API" }
     var lang: String { "en" }
 
+    /// Viewport and the vendored Swagger UI stylesheet.
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
         link(.rel(.stylesheet), .href("/api-docs/swagger-ui.css"))

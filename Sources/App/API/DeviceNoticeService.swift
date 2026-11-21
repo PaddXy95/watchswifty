@@ -10,6 +10,12 @@ struct DeviceNoticeService {
     let notifications: NotificationService
     let logger: Logger
 
+    /// Sends the „Neues Gerät verbunden“ (new device connected) notice to the user's active channel; failures are
+    /// logged.
+    /// - Parameters:
+    ///   - userID: The account that got the device token.
+    ///   - deviceName: The device name the app sent.
+    ///   - now: The connection time shown in the notice.
     func handle(userID: UUID, deviceName: String, now: Date = .now) async {
         var who = userID.uuidString
         do {
@@ -28,12 +34,14 @@ struct DeviceNoticeService {
 }
 
 extension Request {
+    /// The device notice service on the application's database and channels (it runs after the response).
     var deviceNotice: DeviceNoticeService {
         DeviceNoticeService(db: application.db, notifications: application.notifications, logger: application.logger)
     }
 }
 
 extension Application {
+    /// The device notice service for code without a request.
     var deviceNotice: DeviceNoticeService {
         DeviceNoticeService(db: db, notifications: notifications, logger: logger)
     }

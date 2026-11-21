@@ -19,8 +19,14 @@ final class NetflixRow: Model, @unchecked Sendable {
     @OptionalParent(key: "mapping_id") var mapping: NetflixMapping?
     @OptionalParent(key: "watch_id") var watch: Watch?
 
+    /// Creates an empty model for Fluent.
     init() {}
 
+    /// Creates a pending row from a parsed CSV line, splitting its title into show, season and episode title (or a movie).
+    /// - Parameters:
+    ///   - userID: The owner.
+    ///   - importID: The upload the row came from.
+    ///   - row: The parsed CSV line.
     init(userID: UUID, importID: UUID, row: NetflixCSVRow) {
         self.$user.id = userID
         self.$netflixImport.id = importID
@@ -39,5 +45,6 @@ final class NetflixRow: Model, @unchecked Sendable {
         self.status = RowStatus.pending.rawValue
     }
 
+    /// The typed `status`; unknown values read as `pending`.
     var rowStatus: RowStatus { RowStatus(rawValue: status) ?? .pending }
 }

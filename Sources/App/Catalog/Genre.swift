@@ -8,6 +8,7 @@ enum Genre: String, CaseIterable, Sendable {
          mystery, romance, scienceFiction = "science_fiction", tvMovie = "tv_movie", thriller, war, western,
          kids, news, reality, soap, talk, politics
 
+    /// German display label of the genre.
     var label: String {
         switch self {
         case .action: "Action"
@@ -49,6 +50,8 @@ enum Genre: String, CaseIterable, Sendable {
     ]
 
     /// Our genres for TMDB ids, in order of first appearance, without duplicates; unknown ids are ignored.
+    /// - Parameter tmdbIDs: TMDB genre ids from either list (movie or TV).
+    /// - Returns: The matching genres.
     static func from(tmdbIDs: [Int]) -> [Genre] {
         var result: [Genre] = []
         for genre in tmdbIDs.flatMap({ byTMDBID[$0] ?? [] }) where !result.contains(genre) {
@@ -57,8 +60,12 @@ enum Genre: String, CaseIterable, Sendable {
         return result
     }
 
+    /// Locale used to sort genre labels (German collation for umlauts).
     private static let collation = Locale(identifier: "de_DE")
 
+    /// Sorts genres by their German label.
+    /// - Parameter genres: The genres to sort.
+    /// - Returns: The genres in label order.
     static func sortedByLabel(_ genres: some Sequence<Genre>) -> [Genre] {
         genres.sorted { $0.label.compare($1.label, locale: collation) == .orderedAscending }
     }
@@ -66,6 +73,8 @@ enum Genre: String, CaseIterable, Sendable {
 
 extension Genre {
     /// A stored `genres` column as a list: nil = not fetched yet, [] = TMDB has none. Unknown keys are skipped.
+    /// - Parameter stored: The comma-separated stored value.
+    /// - Returns: The parsed genres, or nil when `stored` is nil.
     static func list(_ stored: String?) -> [Genre]? {
         stored.map { $0.split(separator: ",").compactMap { Genre(rawValue: String($0)) } }
     }

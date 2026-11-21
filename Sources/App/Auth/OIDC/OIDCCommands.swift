@@ -4,13 +4,20 @@ import Vapor
 /// `App link-oidc <benutzer>`: emergency exit when an account cannot get in through the provider any more (changed
 /// `sub`, password login switched off too early). Removes the link and prints a one-time link valid for an hour.
 struct LinkOIDCCommand: AsyncCommand {
+    /// Command-line arguments: the username (`benutzer`).
     struct Signature: CommandSignature {
         @Argument(name: "benutzer", help: "Benutzername")
         var username: String
     }
 
+    /// German help text shown in the command list.
     var help: String { "Löst die OIDC-Verknüpfung eines Kontos und gibt einen Verknüpfungslink aus (1 Stunde gültig)." }
 
+    /// Unlinks the account and prints `<canonical origin>/auth/oidc/start?link=<token>`.
+    /// - Parameters:
+    ///   - context: The command context (application and console).
+    ///   - signature: The parsed arguments.
+    /// - Throws: `CommandFailure` when OIDC is not configured or the user does not exist; database errors otherwise.
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
         guard let oidc = app.loginSettings.current.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
@@ -29,6 +36,7 @@ struct LinkOIDCCommand: AsyncCommand {
 /// `App oidc-move-issuer <alt> <neu>`: the provider's address changed (new domain, renamed slug) but the `sub` values
 /// stayed the same – moves every link to the new issuer.
 struct MoveOIDCIssuerCommand: AsyncCommand {
+    /// Command-line arguments: the old issuer (`alt`) and the new one (`neu`).
     struct Signature: CommandSignature {
         @Argument(name: "alt", help: "Bisheriger Issuer")
         var from: String
@@ -36,8 +44,16 @@ struct MoveOIDCIssuerCommand: AsyncCommand {
         var to: String
     }
 
+    /// German help text shown in the command list.
     var help: String { "Schreibt die OIDC-Verknüpfungen aller Konten von einem Issuer auf einen neuen um." }
 
+    /// Warns when the discovery names a different issuer (or cannot be reached), then moves the links and prints how
+    /// many accounts changed.
+    /// - Parameters:
+    ///   - context: The command context (application and console).
+    ///   - signature: The parsed arguments.
+    /// - Throws: `CommandFailure` when OIDC is not configured or the move would create duplicate identities; database
+    ///   errors otherwise.
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
         guard let oidc = app.loginSettings.current.oidc else { throw CommandFailure(OIDCCommandText.notConfigured) }
@@ -67,6 +83,7 @@ struct MoveOIDCIssuerCommand: AsyncCommand {
     }
 }
 
+/// German texts shared by the OIDC commands.
 enum OIDCCommandText {
-    static let notConfigured = "OIDC ist nicht eingerichtet – unter System → Anmeldung über OIDC (SSO) einrichten."
+    static let notConfigured = "OIDC ist nicht eingerichtet – unter Admin → System → Anmeldung über OIDC (SSO) einrichten."
 }

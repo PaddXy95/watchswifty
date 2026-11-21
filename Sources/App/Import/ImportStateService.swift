@@ -7,10 +7,19 @@ struct ImportStateService {
     let db: any Database
     let worker: MatchingWorker
 
+    /// How many of the newest unmatched rows the page lists.
     static let unmatchedLimit = 50
+    /// Accepted values of the mapping list filter.
     static let mappingFilters = ["all", "auto", "confirmed", "ignored"]
 
+    /// The user's matching progress.
+    ///
     /// Counted in the database: the import page polls this every 2 s (security audit F16).
+    ///
+    /// - Parameter userID: The user whose rows are counted.
+    /// - Returns: Whether the worker runs, pending rows (without those waiting for review), rows waiting for review and the
+    ///   user's last matching error.
+    /// - Throws: A database error.
     func progress(userID: UUID) async throws -> ImportProgress {
         let pending = try await pendingRows(userID: userID).count()
         let waiting = try await pendingRows(userID: userID)
@@ -20,15 +29,30 @@ struct ImportStateService {
                               waitingForReview: waiting, lastError: await worker.lastError(for: userID))
     }
 
+    /// Query for the user's rows still waiting for matching.
+    /// - Parameter userID: The owner of the rows.
+    /// - Returns: A query builder filtered to the user's `pending` rows.
     private func pendingRows(userID: UUID) -> QueryBuilder<NetflixRow> {
         NetflixRow.query(on: db).filter(\.$user.$id == userID).filter(\.$status == RowStatus.pending.rawValue)
     }
 
+    /// Query for the user's rows whose name is mapped but no episode fit.
+    /// - Parameter userID: The owner of the rows.
+    /// - Returns: A query builder filtered to the user's `unmatched` rows.
     private func unmatchedRows(userID: UUID) -> QueryBuilder<NetflixRow> {
         NetflixRow.query(on: db).filter(\.$user.$id == userID).filter(\.$status == RowStatus.unmatched.rawValue)
     }
 
+    /// Everything the import page shows: progress, names to review with their pending rows, the newest unmatched rows
+    /// and the filtered mapping list.
+    ///
     /// `mappingFilter`: all (everything except review) | auto | confirmed | ignored; unknown → all.
+    ///
+    /// - Parameters:
+    ///   - userID: The user whose import state is loaded.
+    ///   - rawFilter: The requested mapping list filter.
+    /// - Returns: The import state for the page or the API.
+    /// - Throws: A database error.
     func state(userID: UUID, mappingFilter rawFilter: String) async throws -> ImportState {
         let filter = Self.mappingFilters.contains(rawFilter) ? rawFilter : "all"
         let mappings = try await NetflixMapping.query(on: db).filter(\.$user.$id == userID).with(\.$title)
@@ -73,5 +97,6 @@ extension NetflixCSVError {
 }
 
 extension Request {
+    /// Import state service for this request, backed by the app's `MatchingWorker`.
     var importState: ImportStateService { ImportStateService(db: db, worker: application.matchingWorker) }
 }

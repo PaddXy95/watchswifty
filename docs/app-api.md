@@ -29,8 +29,12 @@ address under **Konto**, or through the KNot webhook when they chose it.
 ## Scope
 
 Everything the web UI can do: continue watching and notices, search, series and movies (mark as watched, rate,
-comment, follow, hide; with their genres), history, library (filterable by `genre`, reload from TMDB), statistics (including genres and the longest and most watched titles), account and devices, Netflix import and film list, and for admins
+comment, follow, hide, watch later; with their genres and where they stream), history, library (filterable by `genre`, reload from TMDB), statistics (including genres and the longest and most watched titles), the watch later list, account (including
+streaming services and country) and devices, Netflix import and standard import (CSV from other trackers), and for admins
 user management and system settings. Details and "Try it out" at `/api`.
+
+Availability data (`/v1/{tv|movies}/{tmdbID}/availability`, `/v1/watch-later`) comes from JustWatch through TMDB;
+apps that show it must name JustWatch as the source.
 
 Granting admin rights (`POST /v1/admin/users` with `isAdmin`, `PUT /v1/admin/users/{id}/admin`) and setting the
 password of, or a linking link for, another admin need the acting admin's current password as `currentPassword` in the
@@ -39,5 +43,5 @@ request (`403 confirmationRequired` otherwise). Admins without a password do thi
 ## Swift client
 
 The Swift package also offers the library `WatchSwiftyClient`, generated from the same OpenAPI description as the
-server. Values that may grow with new versions (streaming services, genres, import and matching states, device kind) are open
+server. Values that may grow with new versions (streaming services, genres, offer kinds, import and matching states, device kind) are open
 there, so older apps keep understanding newer servers.

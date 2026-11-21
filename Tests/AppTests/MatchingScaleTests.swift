@@ -74,13 +74,13 @@ struct MatchingScaleTests {
         }
     }
 
-    @Test func titleUsersStaysBoundedForLongFilmLists() async throws {
+    @Test func titleUsersStaysBoundedForLongImportLists() async throws {
         try await withTestApp { app in
             let userID = try await createUser(app, "pat").requireID()
             let movie = try await seedMovie(app, tmdbID: 1, name: "Film")
             let entries = (1...Self.many).map { index in
-                let entry = FilmListEntry(userID: userID, position: index,
-                                          draft: FilmListDraft(title: "Film \(index)", year: nil, watches: [], rating: nil, comment: nil))
+                let entry = ImportEntry(userID: userID, position: index, draft: ImportDraft(
+                    kind: .movie, title: "Film \(index)", year: nil, tmdbHint: nil, imdbID: nil, watches: [], rating: nil, comment: nil))
                 entry.tmdbID = index
                 return entry
             }

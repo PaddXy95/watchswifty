@@ -22,8 +22,17 @@ final class Episode: Model, @unchecked Sendable {
     /// Time of the last refresh in which TMDB still returned this episode.
     @OptionalField(key: "last_seen_at") var lastSeenAt: Date?
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates an episode row for a series.
+    /// - Parameters:
+    ///   - titleID: The series' ID.
+    ///   - season: The season number.
+    ///   - number: The episode number within the season.
+    ///   - name: The episode's name.
+    ///   - airDate: The air date as `YYYY-MM-DD`, if known.
+    ///   - tmdbEpisodeID: TMDB's id of the episode.
     init(titleID: UUID, season: Int, number: Int, name: String, airDate: String?, tmdbEpisodeID: Int) {
         self.$title.id = titleID
         self.season = season
@@ -34,6 +43,8 @@ final class Episode: Model, @unchecked Sendable {
     }
 
     /// Still returned by the title's latest refresh (renumbered or dropped rows are not: refreshes never delete rows).
+    /// - Parameter titleRefreshedAt: The `refreshedAt` of the episode's title.
+    /// - Returns: `true` if the episode was returned by that refresh, or when either time is unknown.
     func isCurrent(titleRefreshedAt: Date?) -> Bool {
         guard let lastSeenAt, let titleRefreshedAt else { return true }
         return lastSeenAt >= titleRefreshedAt
@@ -44,12 +55,19 @@ final class Episode: Model, @unchecked Sendable {
 
     /// Lightweight episode list of several titles (no overview), read with a plain SQL projection: building ~13,000
     /// Fluent models made „Weiterschauen“ take about a second.
+    /// - Parameters:
+    ///   - titleIDs: The titles whose episodes are loaded.
+    ///   - minSeason: The lowest season number included.
+    ///   - db: The database; non-SQL databases fall back to Fluent models.
+    /// - Returns: Episode infos grouped by title ID; titles without episodes are absent.
+    /// - Throws: Database errors.
     static func infos(ofTitles titleIDs: [UUID], minSeason: Int = 0, on db: any Database) async throws -> [UUID: [EpisodeInfo]] {
         guard !titleIDs.isEmpty else { return [:] }
         guard let sql = db as? any SQLDatabase else {
             let episodes = try await Episode.query(on: db).filter(\.$title.$id ~~ titleIDs).filter(\.$season >= minSeason).all()
             return Dictionary(grouping: episodes, by: { $0.$title.id }).mapValues { $0.map(EpisodeInfo.init) }
         }
+        /// One row of the SQL projection, named after the `episodes` columns.
         struct Row: Decodable {
             let id: UUID
             let title_id: UUID

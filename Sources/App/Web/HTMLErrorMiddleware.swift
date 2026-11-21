@@ -4,6 +4,16 @@ import Vapor
 /// Turns every error into German HTML: a flash message (retargeted to `#flash`) for htmx
 /// requests, a small error page otherwise. Replaces Vapor's JSON ErrorMiddleware.
 struct HTMLErrorMiddleware: AsyncMiddleware {
+    /// Passes the request on and turns a thrown error into a response.
+    ///
+    /// App API requests (`/api/v1/…`) get the JSON `APIError` body instead of HTML. For web requests the error is mapped by
+    /// `describe(_:path:)`; 5xx errors are logged as errors, everything else at debug level. htmx requests get a flash
+    /// message retargeted to `#flash`, all others an `ErrorPage` with the error's status.
+    /// - Parameters:
+    ///   - request: The incoming request.
+    ///   - next: The rest of the responder chain.
+    /// - Returns: The response of `next`, or the error response.
+    /// - Throws: Only when encoding the error response fails.
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
         do {
             return try await next.respond(to: request)
@@ -28,6 +38,15 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
         }
     }
 
+    /// Maps an error to an HTTP status and a German message for the user.
+    ///
+    /// Known app errors (`APIError`, `TrackingError`, `TMDBError`) get their own messages; other `AbortError`s keep a custom
+    /// reason, a 403 about the origin check ("Herkunft") adds a hint about `PUBLIC_ORIGIN`, and anything unknown becomes
+    /// a 500 „Interner Fehler.“ (internal error).
+    /// - Parameters:
+    ///   - error: The thrown error.
+    ///   - path: The request path; a 413 under `/import` gets a hint about the expected Netflix file.
+    /// - Returns: The status and the message to show.
     static func describe(_ error: any Error, path: String) -> (HTTPStatus, String) {
         switch error {
         case let error as APIError:
@@ -72,8 +91,12 @@ struct HTMLErrorMiddleware: AsyncMiddleware {
     }
 }
 
+/// Small stand-alone error page (no navigation) with the status code, the German message and a link to the start page.
+///
+/// Rendered by `HTMLErrorMiddleware` for web requests that are not htmx requests.
 struct ErrorPage: HTML {
     let status: HTTPStatus
+    /// German message shown as an alert.
     let message: String
 
     var body: some HTML {

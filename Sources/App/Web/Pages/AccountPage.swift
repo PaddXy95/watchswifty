@@ -4,16 +4,27 @@ import Foundation
 
 /// The foldable blocks of the Konto page.
 enum AccountBlock: String, Sendable {
-    case tmdb, followed, notifications, devices, sso, email, password
+    case tmdb, followed, streaming, notifications, devices, sso, email, password
 
+    /// Element ID of the block's `FoldableBlock`, e.g. `block-tmdb`.
     var id: String { "block-\(rawValue)" }
 }
 
+/// „Konto“ (account) settings page at `/account`: foldable blocks for the TMDB token, followed series, streaming
+/// services, notifications, devices, SSO, e-mail address and password.
+///
+/// The block of the last action (or `?open=`) is shown open. Blocks for streaming, notifications and SSO only appear
+/// when their state is given; the e-mail block is read-only when the provider supplies the address. „Nicht mehr
+/// beobachten“ (unfollow) posts via htmx and removes the list item with the empty response.
 struct AccountPage: HTML {
     let nav: NavContext
+    /// End of the stored TMDB token for display; nil when no usable token is stored.
     let tokenSuffix: String?
+    /// Error message of the last action.
     let error: String?
+    /// Success message of the last action.
     let notice: String?
+    /// Series the user follows, with their next episode.
     var followed: [FollowedSeries] = []
     /// A token is stored but cannot be decrypted (server key changed).
     var tokenUnreadable = false
@@ -21,7 +32,9 @@ struct AccountPage: HTML {
     var devices: [APIToken] = []
     /// A token created just now (shown only once).
     var newToken: String? = nil
+    /// The stored e-mail address (none, unreadable, or the address).
     var email: EmailState = .none
+    /// Mail is set up; without it the e-mail block notes that „Passwort vergessen“ does not work yet.
     var mailConfigured = false
     /// OIDC section; nil without OIDC.
     var sso: AccountSSO? = nil
@@ -29,18 +42,25 @@ struct AccountPage: HTML {
     var passwordChange = true
     /// SSO account without a fresh provider confirmation: a manual token first needs „Über … bestätigen“.
     var tokenNeedsReauth = false
+    /// Notification settings; nil leaves the block out.
     var notifications: AccountNotifications? = nil
+    /// Streaming service selection; nil leaves the block out.
+    var streaming: AccountStreaming? = nil
     /// Block of the last action (or `?open=`); the token block is also open while no usable token is stored.
     var openBlock: AccountBlock? = nil
     /// Reload of all titles from TMDB (shown while a token is stored).
     var libraryRefresh: LibraryRefreshState? = nil
 
+    /// Whether a block is rendered open.
+    /// - Parameter block: The block.
+    /// - Returns: True for the block of the last action, and for the token block while no usable token is stored.
     private func isOpen(_ block: AccountBlock) -> Bool {
         openBlock == block || (block == .tmdb && tokenSuffix == nil)
     }
 
     var body: some HTML {
         PageLayout(title: "Konto", nav: nav) {
+            SectionTabs.account(.settings)
             h1 { "Konto" }
             p(.class("muted")) { "Angemeldet als \(nav.username)" }
             Messages(error: error, notice: notice)
@@ -91,6 +111,12 @@ struct AccountPage: HTML {
                             }
                         }
                     }
+                }
+            }
+
+            if let streaming {
+                FoldableBlock(id: AccountBlock.streaming.id, title: "Streamingdienste", open: isOpen(.streaming)) {
+                    AccountStreamingSection(state: streaming)
                 }
             }
 
@@ -217,8 +243,11 @@ struct AccountPage: HTML {
 
 /// What the Konto page shows about the OIDC link.
 struct AccountSSO: Sendable {
+    /// Display name of the provider.
     let name: String
+    /// The account is linked to the provider.
     let linked: Bool
+    /// The account's e-mail address comes from the provider and cannot be changed here.
     let emailFromProvider: Bool
     /// Linking asks for the current password (accounts that have one).
     var needsPassword = false
@@ -226,6 +255,7 @@ struct AccountSSO: Sendable {
 
 /// Step-by-step help for getting a TMDB token (open while none is stored).
 struct TokenHelp: HTML {
+    /// Renders the details open.
     var open = false
 
     var body: some HTML {
@@ -257,21 +287,38 @@ struct TokenHelp: HTML {
 
 /// What Konto → Benachrichtigungen shows.
 struct AccountNotifications: Sendable {
+    /// Notice as soon as a new episode becomes known.
     var announced: Bool
+    /// Notice when an episode airs within the next 1–3 days („3 Tage vor der Ausstrahlung“).
     var soon: Bool
+    /// Notice on the day an episode airs.
     var today: Bool
+    /// Channels that can currently deliver to the user (`availableChannels(for:)`).
     var available: [NotifyChannel]
+    /// Channel used for sending: the preferred one when available, else the first available; nil when none is.
     var active: NotifyChannel?
+    /// The user's stored channel choice.
     var preferred: NotifyChannel
     /// The admin set up a webhook address (only then the key field appears).
     var webhookConfigured: Bool
+    /// Whether a webhook key is stored and readable.
     var keyState: WebhookKeyState
+    /// Time of the daily pass (`HH:mm`).
     var dailyRunTime: String
+    /// „Später ansehen“ title available at one of the user's services.
+    var titleAvailable = false
 }
 
+/// Content of Konto → „Benachrichtigungen“ (notifications): the notice preferences with the channel choice, the KNot
+/// webhook key form (only when the admin set up a webhook address) and „Testnachricht senden“ (send test message) for
+/// the active channel.
 struct AccountNotificationsSection: HTML, Sendable {
+    /// Settings and channels to show.
     let state: AccountNotifications
 
+    /// German name of a channel.
+    /// - Parameter channel: The channel.
+    /// - Returns: „E-Mail“ or „Webhook (KNot)“.
     private func channelName(_ channel: NotifyChannel) -> String {
         switch channel {
         case .mail: "E-Mail"
@@ -293,6 +340,10 @@ struct AccountNotificationsSection: HTML, Sendable {
             label(.class("checkbox")) {
                 input(.type(.checkbox), .name("today")).attributes(.checked, when: state.today)
                 " am Tag der Ausstrahlung"
+            }
+            label(.class("checkbox")) {
+                input(.type(.checkbox), .name("available")).attributes(.checked, when: state.titleAvailable)
+                " Wenn ein Titel aus „Später ansehen“ bei einem meiner Dienste verfügbar wird"
             }
             p(.class("muted")) {
                 "Geprüft wird täglich um \(state.dailyRunTime) Uhr; alles Neue kommt in einer Nachricht. "

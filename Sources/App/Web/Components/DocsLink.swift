@@ -2,10 +2,12 @@ import Elementary
 
 /// Link to a page of the documentation in the repository (`docs/`), opened in a new tab.
 struct DocsLink: HTML {
+    /// Base URL of the `docs/` folder on GitHub (main branch).
     static let baseURL = "https://github.com/PaddXy95/watchswifty/blob/main/docs/"
 
     /// File name in `docs/`, optionally with an anchor, e.g. `operations.md#updating`.
     let page: String
+    /// Visible link text (German).
     let label: String
 
     var body: some HTML {

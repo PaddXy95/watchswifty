@@ -23,13 +23,20 @@ final class Title: Model, @unchecked Sendable {
     /// Genre keys, comma-separated (see `Genre`, `genreList`); "" = TMDB has none, nil = not fetched yet.
     @OptionalField(key: "genres") var genres: String?
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates a title row (data is filled by a refresh).
+    /// - Parameters:
+    ///   - tmdbID: The title's TMDB id.
+    ///   - kind: Series or movie.
+    ///   - name: The display name.
     init(tmdbID: Int, kind: TitleKind, name: String) {
         self.tmdbID = tmdbID
         self.kind = kind.rawValue
         self.name = name
     }
 
+    /// `kind` as ``TitleKind``; unknown values count as series.
     var titleKind: TitleKind { TitleKind(rawValue: kind) ?? .tv }
 }

@@ -2,6 +2,7 @@ import Fluent
 import Foundation
 import Vapor
 
+/// A „Neue Folgen“ (new episodes) note on the start page for one followed series.
 struct NewEpisodesNote: Sendable {
     let titleID: UUID
     let tmdbID: Int
@@ -14,6 +15,7 @@ struct NewEpisodesNote: Sendable {
     let newestAirDate: String
 }
 
+/// A „Demnächst“ (upcoming) note on the start page for one followed series.
 struct UpcomingNote: Sendable {
     let tmdbID: Int
     let name: String
@@ -23,6 +25,7 @@ struct UpcomingNote: Sendable {
     let count: Int
 }
 
+/// A followed series as listed on the account page.
 struct FollowedSeries: Sendable {
     let tmdbID: Int
     let name: String
@@ -35,6 +38,15 @@ struct FollowedSeries: Sendable {
 struct NewEpisodesService {
     let db: any Database
 
+    /// The „Neue Folgen“ notes of all series the user follows, the series with the most recently aired new episode first.
+    ///
+    /// An episode is new when it is a regular episode (season ≥ 1), aired on or before `today`, unwatched, and aired
+    /// after the latest of the follow day, the last „Erledigt“ (done) and the user's newest dated watch of the series.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - today: The current day (`YYYY-MM-DD`, see `AppConfig.today()`).
+    /// - Returns: One note per followed series with new episodes.
+    /// - Throws: Database errors.
     func notes(userID: UUID, today: String) async throws -> [NewEpisodesNote] {
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$followed == true).all()
         guard !entries.isEmpty else { return [] }
@@ -64,6 +76,12 @@ struct NewEpisodesService {
     }
 
     /// „Demnächst“: followed series with regular episodes airing after today and at most `days` days ahead.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - today: The current day (`YYYY-MM-DD`).
+    ///   - days: The size of the window in days.
+    /// - Returns: One note per series, the soonest next episode first.
+    /// - Throws: Database errors.
     func upcoming(userID: UUID, today: String, days: Int = 14) async throws -> [UpcomingNote] {
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$followed == true).all()
         guard !entries.isEmpty else { return [] }
@@ -82,6 +100,11 @@ struct NewEpisodesService {
     }
 
     /// All series the user follows (for the account page), by name.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - today: The current day (`YYYY-MM-DD`); the next episode is the first regular one airing after it.
+    /// - Returns: The followed series sorted by name, each with its next episode if known.
+    /// - Throws: Database errors.
     func followedSeries(userID: UUID, today: String) async throws -> [FollowedSeries] {
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$followed == true).all()
         guard !entries.isEmpty else { return [] }

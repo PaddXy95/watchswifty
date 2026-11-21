@@ -3,11 +3,21 @@ import Vapor
 
 /// Creates the first admin from ADMIN_USERNAME / ADMIN_PASSWORD while no user exists (not without password login);
 /// logs where the switch-over to OIDC stands.
+///
+/// With OIDC configured and password login off, the environment admin is never created; the first sign-in through
+/// the provider becomes admin instead. The password must have at least 8 characters, otherwise only a warning is logged.
+/// - Parameters:
+///   - config: The app configuration with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+///   - login: The login setup in effect.
+///   - db: The database.
+///   - logger: Receives the notices and warnings.
+///   - hasher: Hashes the admin password.
+/// - Throws: Database or hashing errors.
 func bootstrapAdmin(config: AppConfig, login: LoginSettings, db: any Database, logger: Logger, hasher: any PasswordHasher) async throws {
     if let oidc = login.oidc {
         let readiness = try await OIDCLoginService.readiness(db: db, oidc: oidc)
         if !login.passwordLogin, config.adminPassword != nil, readiness.total == 0 {
-            logger.notice("ADMIN_USERNAME/ADMIN_PASSWORD werden ignoriert, weil der Passwort-Login unter System abgeschaltet ist.")
+            logger.notice("ADMIN_USERNAME/ADMIN_PASSWORD werden ignoriert, weil der Passwort-Login unter Admin → System abgeschaltet ist.")
         }
         let creates = login.passwordLogin && readiness.total == 0 && config.adminUsername != nil && config.adminPassword != nil
         if !creates {
@@ -30,6 +40,10 @@ func bootstrapAdmin(config: AppConfig, login: LoginSettings, db: any Database, l
 }
 
 /// Startup hints while OIDC is configured (spec „Passwort-Login abgeschaltet“).
+/// - Parameters:
+///   - login: The login setup in effect.
+///   - readiness: How many accounts (and whether an admin) are linked with the provider.
+/// - Returns: German warnings for the log; empty without OIDC, or when nothing needs attention.
 func startupWarnings(login: LoginSettings, readiness: OIDCReadiness) -> [String] {
     guard let oidc = login.oidc else { return [] }
     if readiness.total == 0 { return ["Kein Benutzer vorhanden – der erste Login über \(oidc.displayName) wird Admin."] }

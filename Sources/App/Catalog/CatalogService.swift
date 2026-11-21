@@ -4,16 +4,25 @@ import Vapor
 
 /// Reads and refreshes the shared TMDB cache (`titles`, `episodes`).
 struct CatalogService {
+    /// The database holding the cache.
     let db: any Database
+    /// The TMDB client used for fetches (normally with the requesting user's token).
     let tmdb: any TMDBClient
 
     /// Set for a request of a user without a TMDB token: a cached title is only served when this user uses it, so the
     /// answer is the same as for an uncached title and does not reveal what other users track (security audit F14).
     var tokenlessUser: UUID?
 
+    /// Default maximum age for ``refreshIfStale(_:now:maxAge:)`` (7 days).
     static let maxAge: TimeInterval = 7 * 86_400
 
     /// Cached title, or fetched from TMDB (a new series also loads all episodes).
+    /// - Parameters:
+    ///   - kind: Series or movie.
+    ///   - tmdbID: The title's TMDB id.
+    /// - Returns: The cached title, or a newly fetched and saved one.
+    /// - Throws: `TMDBError.missingToken` when ``tokenlessUser`` is set and does not use the cached title; otherwise the
+    ///   errors of ``refresh(_:now:)``.
     func title(kind: TitleKind, tmdbID: Int) async throws -> Title {
         if let cached = try await Title.query(on: db)
             .filter(\.$kind == kind.rawValue).filter(\.$tmdbID == tmdbID).first() {
@@ -27,6 +36,15 @@ struct CatalogService {
         return title
     }
 
+    /// Fetches the title from TMDB and overwrites the cached data, setting `refreshedAt` to `now`.
+    ///
+    /// A movie updates only its `titles` row. A series also loads every season and upserts its episodes in one
+    /// transaction; episodes TMDB no longer returns are kept (watches point to them), they just stop being "current".
+    /// Missing optional fields are stored as `""`/`0` so "TMDB has none" differs from "not fetched yet" (nil).
+    /// - Parameters:
+    ///   - title: The title to refresh; a new, unsaved title is inserted.
+    ///   - now: The refresh time stored on the title and on returned episodes.
+    /// - Throws: `TMDBError` from the client (a missing IMDb id for a series is tolerated), or database errors.
     func refresh(_ title: Title, now: Date = .now) async throws {
         switch title.titleKind {
         case .movie:
@@ -67,17 +85,35 @@ struct CatalogService {
         }
     }
 
+    /// Refreshes the title only when it was never refreshed or its last refresh is at least `maxAge` old.
+    /// - Parameters:
+    ///   - title: The cached title.
+    ///   - now: The reference time.
+    ///   - maxAge: The age from which the title counts as stale.
+    /// - Throws: The errors of ``refresh(_:now:)``.
     func refreshIfStale(_ title: Title, now: Date = .now, maxAge: TimeInterval = CatalogService.maxAge) async throws {
         if let refreshed = title.refreshedAt, now.timeIntervalSince(refreshed) < maxAge { return }
         try await refresh(title, now: now)
     }
 
+    /// Cached episodes of a title, sorted by season and episode number.
+    /// - Parameter titleID: The title's ID.
+    /// - Returns: All cached episodes, including ones TMDB no longer returns.
+    /// - Throws: Database errors.
     func episodes(of titleID: UUID) async throws -> [Episode] {
         try await Episode.query(on: db).filter(\.$title.$id == titleID)
             .sort(\.$season).sort(\.$number).all()
     }
 
     /// Inserts or updates the fetched episodes; new rows get `firstSeenAt`, every returned row `lastSeenAt` = `now`.
+    ///
+    /// Unchanged rows only get the new `lastSeenAt`; rows missing from `fetched` are left untouched.
+    /// - Parameters:
+    ///   - fetched: The episodes TMDB returned for the series.
+    ///   - titleID: The series' ID.
+    ///   - now: The refresh time.
+    ///   - db: The database (the caller's transaction).
+    /// - Throws: Database errors.
     private func upsertEpisodes(_ fetched: [TMDBEpisode], titleID: UUID, now: Date, on db: any Database) async throws {
         let existing = try await Episode.query(on: db).filter(\.$title.$id == titleID).all()
         var byKey = Dictionary(existing.map { ("\($0.season)/\($0.number)", $0) }, uniquingKeysWith: { first, _ in first })
@@ -114,6 +150,8 @@ struct CatalogService {
 }
 
 extension Request {
+    /// The catalog service for this request, using the logged-in user's TMDB token; for a user without a token it is
+    /// restricted to cached titles that user uses (``CatalogService/tokenlessUser``).
     var catalog: CatalogService {
         CatalogService(db: db, tmdb: tmdb, tokenlessUser: tmdbToken == nil ? auth.get(User.self)?.id : nil)
     }

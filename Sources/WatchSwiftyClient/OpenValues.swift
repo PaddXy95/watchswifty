@@ -2,18 +2,27 @@
 /// The generated client uses these open types instead of closed enums (`typeOverrides` in
 /// `openapi-generator-config.yaml`), so an unknown value decodes, can be shown neutrally and is sent back unchanged.
 public protocol OpenStringValue: RawRepresentable, Codable, Hashable, Sendable where RawValue == String {
+    /// Creates a value from any string, known to this client or not.
+    /// - Parameter rawValue: The string from the API.
     init(rawValue: String)
     /// The values this client was generated with, in the order of the API description.
     static var known: [Self] { get }
 }
 
 extension OpenStringValue {
+    /// Whether this client knows the value (it is in `known`).
     public var isKnown: Bool { Self.known.contains(self) }
 
+    /// Decodes the value from a single string; unknown strings are kept.
+    /// - Parameter decoder: The decoder.
+    /// - Throws: `DecodingError` when the value is not a string.
     public init(from decoder: any Decoder) throws {
         self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
     }
 
+    /// Encodes the raw string.
+    /// - Parameter encoder: The encoder.
+    /// - Throws: `EncodingError` from the encoder.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawValue)
@@ -23,6 +32,8 @@ extension OpenStringValue {
 /// Schema `Service`: the streaming service of a watch.
 public struct ServiceValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let netflix = Self(rawValue: "netflix")
@@ -42,6 +53,8 @@ public struct ServiceValue: OpenStringValue {
 /// Schema `WatchOrigin`: whether a watch was entered by hand or imported.
 public struct WatchOriginValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let manual = Self(rawValue: "manual")
@@ -52,6 +65,8 @@ public struct WatchOriginValue: OpenStringValue {
 /// Schema `MappingStatus`: state of a Netflix title mapping.
 public struct MappingStatusValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let pending = Self(rawValue: "pending")
@@ -62,9 +77,11 @@ public struct MappingStatusValue: OpenStringValue {
     public static let known: [Self] = [.pending, .auto, .confirmed, .review, .ignored]
 }
 
-/// Schema `FilmStatus`: state of a film list entry.
-public struct FilmStatusValue: OpenStringValue {
+/// Schema `ImportStatus`: state of a standard import entry.
+public struct ImportStatusValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let pending = Self(rawValue: "pending")
@@ -78,6 +95,8 @@ public struct FilmStatusValue: OpenStringValue {
 /// Schema `DeviceKind`: device token from the browser login or created by hand.
 public struct DeviceKindValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let device = Self(rawValue: "device")
@@ -88,6 +107,8 @@ public struct DeviceKindValue: OpenStringValue {
 /// How notifications are sent (`NotifyChannel`).
 public struct NotifyChannelValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let mail = Self(rawValue: "mail")
@@ -98,6 +119,8 @@ public struct NotifyChannelValue: OpenStringValue {
 /// Schema `Genre`: one genre list for series and movies.
 public struct GenreValue: OpenStringValue {
     public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let action = Self(rawValue: "action")
@@ -129,4 +152,19 @@ public struct GenreValue: OpenStringValue {
                                        .family, .fantasy, .history, .horror, .music, .mystery, .romance,
                                        .scienceFiction, .tvMovie, .thriller, .war, .western, .kids, .news,
                                        .reality, .soap, .talk, .politics]
+}
+
+/// Schema `OfferKind`: how a title is offered at a streaming service (watch later availability).
+public struct OfferKindValue: OpenStringValue {
+    public let rawValue: String
+    /// Wraps any raw string value.
+    /// - Parameter rawValue: The string from the API.
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let flatrate = Self(rawValue: "flatrate")
+    public static let free = Self(rawValue: "free")
+    public static let ads = Self(rawValue: "ads")
+    public static let rent = Self(rawValue: "rent")
+    public static let buy = Self(rawValue: "buy")
+    public static let known: [Self] = [.flatrate, .free, .ads, .rent, .buy]
 }

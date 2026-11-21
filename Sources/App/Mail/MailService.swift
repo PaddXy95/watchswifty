@@ -4,11 +4,20 @@ import Vapor
 
 /// Sends a mail with the stored settings; gives up after `deadline` (the request waits for it).
 struct MailService {
+    /// Source of the stored SMTP settings.
     let settings: MailSettingsService
+    /// The SMTP sender (live or fake).
     let sender: any MailSender
+    /// Maximum time to wait for a send before failing with `MailError.timeout`.
     let deadline: Duration
 
-    /// Throws `MailError` (`.notConfigured`, `.timeout`, or the server's problem).
+    /// Sends a mail with the stored settings.
+    ///
+    /// Renders the mail with the configured sender and a new `Message-ID`, then sends it.
+    /// - Parameters:
+    ///   - mail: The mail to send.
+    ///   - now: The `Date` header value.
+    /// - Throws: `MailError` (`.notConfigured`, `.timeout`, or the server's problem); database errors.
     func send(_ mail: OutgoingMail, now: Date = .now) async throws {
         guard let settings = try await settings.state().settings else { throw MailError.notConfigured }
         let domain = settings.fromAddress.split(separator: "@").last.map(String.init) ?? "watchswifty"
@@ -27,6 +36,9 @@ struct MailService {
         }
     }
 
+    /// Sends the test mail to an address.
+    /// - Parameter raw: The recipient as entered.
+    /// - Throws: `APIError.validation` for an invalid address; `MailError` when sending fails.
     func sendTest(to raw: String) async throws {
         guard let address = EmailAddress.normalize(raw) else { throw APIError.validation(EmailAddress.invalidMessage) }
         try await send(MailTexts.test(to: address))
@@ -34,12 +46,14 @@ struct MailService {
 }
 
 extension Application {
+    /// A mail service for background code.
     var mail: MailService {
         MailService(settings: MailSettingsService(db: db, cipher: tokenCipher), sender: mailSender, deadline: appConfig.mailDeadline)
     }
 }
 
 extension Request {
+    /// A mail service for this request.
     var mail: MailService {
         MailService(settings: mailSettings, sender: application.mailSender, deadline: application.appConfig.mailDeadline)
     }

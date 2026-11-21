@@ -15,6 +15,11 @@ struct ForgotPasswordService {
     /// App-wide lock: the throttle check and issuing the token run as one step, so parallel requests send one mail.
     let lock: AsyncMutex
 
+    /// Sends a reset mail for the account, unless it is unknown, has no password or readable address, mail is not set
+    /// up, or a reset link was issued less than `throttle` seconds ago. Failures are only logged.
+    /// - Parameters:
+    ///   - raw: The username as entered.
+    ///   - now: The reference time for the throttle and the token.
     func handle(username raw: String, now: Date = .now) async {
         let username = User.normalize(raw)
         do {
@@ -39,6 +44,7 @@ struct ForgotPasswordService {
 }
 
 extension Request {
+    /// The forgot-password service, wired with the app-wide mail service and lock.
     var forgotPassword: ForgotPasswordService {
         ForgotPasswordService(db: application.db, cipher: application.tokenCipher, mail: application.mail, logger: application.logger,
                               lock: application.forgotPasswordLock)

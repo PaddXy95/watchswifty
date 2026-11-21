@@ -157,4 +157,22 @@ struct IsolationTests {
             }
         }
     }
+
+    @Test func watchLaterIsPerUser() async throws {
+        try await withTestApp { app in
+            let pat = try await createUser(app, "pat")
+            _ = try await createUser(app, "sepp")
+            let movie = try await seedMovie(app, tmdbID: 603, name: "Patsfilm")
+            try await WatchLaterEntry(userID: pat.requireID(), titleID: movie.requireID(), addedAt: .now, addedOn: "2026-11-07")
+                .save(on: app.db)
+            let sepp = try await login(app, "sepp")
+            try await app.testing().test(.POST, "/watch-later/movie/603/remove", headers: sepp.adding(.htmx)) { res async in
+                #expect(res.status == .notFound)
+            }
+            #expect(try await WatchLaterEntry.query(on: app.db).count() == 1)
+            try await app.testing().test(.GET, "/watch-later", headers: sepp) { res async in
+                #expect(!res.body.string.contains("Patsfilm"))
+            }
+        }
+    }
 }

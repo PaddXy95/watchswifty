@@ -12,8 +12,10 @@ struct OIDCSettings: Codable, Sendable, Equatable {
     var baseURL: String
     var passwordLogin: Bool = true
 
+    /// The callback URL to register at the provider.
     var redirectURL: String { baseURL + "/auth/oidc/callback" }
 
+    /// The provider config built from these settings; `nil` when the redirect URL is not a valid URL.
     var config: OIDCConfig? {
         URL(string: redirectURL).map {
             OIDCConfig(issuer: issuer, clientID: clientID, clientSecret: clientSecret, redirectURL: $0, displayName: displayName)
@@ -21,12 +23,16 @@ struct OIDCSettings: Codable, Sendable, Equatable {
     }
 }
 
+/// What is stored in `app_settings.oidc_config`.
 enum OIDCSettingsState: Equatable, Sendable {
+    /// Nothing stored.
     case notConfigured
     /// Stored, but the server key cannot decrypt it (TOKEN_KEY changed).
     case unreadable
+    /// Readable settings.
     case configured(OIDCSettings)
 
+    /// The settings, when configured and readable.
     var settings: OIDCSettings? {
         if case .configured(let settings) = self { return settings }
         return nil
@@ -59,6 +65,9 @@ struct OIDCSettingsService {
     let forced: Bool
     let logger: Logger
 
+    /// Reads and decrypts the stored settings.
+    /// - Returns: `.notConfigured`, `.unreadable` (cannot be decrypted or decoded) or the settings.
+    /// - Throws: Database errors.
     func state() async throws -> OIDCSettingsState {
         guard let sealed = try await AppSettings.query(on: db).first()?.oidcConfig, !sealed.isEmpty else { return .notConfigured }
         guard let json = cipher.open(sealed),
@@ -66,6 +75,13 @@ struct OIDCSettingsService {
         return .configured(settings)
     }
 
+    /// Validates and stores the form input, keeping the stored password-login switch.
+    ///
+    /// An empty client secret keeps the stored one, but only while issuer and client ID stay the same.
+    /// - Parameter input: The form or API input.
+    /// - Returns: The stored settings.
+    /// - Throws: `APIError.validation` for an invalid display name, issuer, client ID, base URL or a missing secret;
+    ///   database or encryption errors.
     @discardableResult
     func save(_ input: OIDCSettingsInput) async throws -> OIDCSettings {
         let stored = try await state().settings
@@ -76,6 +92,11 @@ struct OIDCSettingsService {
     }
 
     /// Switching off needs a configured provider and the acting admin linked with it (else they lock themselves out).
+    /// - Parameters:
+    ///   - enabled: The new state of the password login.
+    ///   - actingUser: The admin making the change.
+    /// - Throws: `APIError.validation` when OIDC is not set up, `PASSWORD_LOGIN=true` forces the login on, or the admin
+    ///   is not linked; database or encryption errors.
     func setPasswordLogin(_ enabled: Bool, actingUser: User) async throws {
         guard var settings = try await state().settings else {
             if enabled { return }
@@ -91,6 +112,8 @@ struct OIDCSettingsService {
         try await write(settings)
     }
 
+    /// Removes the OIDC setup.
+    /// - Throws: `APIError.validation` while the password login is off (and not forced); database errors.
     func delete() async throws {
         if let settings = try await state().settings, !settings.passwordLogin, !forced {
             throw APIError.validation(Self.deleteNeedsPasswordLoginMessage)
@@ -99,6 +122,8 @@ struct OIDCSettingsService {
     }
 
     /// Stores (or removes) the settings without checks – startup seeding for tests and the service's own writes.
+    /// - Parameter settings: The settings to seal and store, or `nil` to remove them.
+    /// - Throws: Encoding, encryption or database errors.
     func write(_ settings: OIDCSettings?) async throws {
         let row = try await AppSettings.query(on: db).first() ?? AppSettings()
         row.oidcConfig = try settings.map { try cipher.seal(String(decoding: try JSONEncoder().encode($0), as: UTF8.self)) }
@@ -106,6 +131,13 @@ struct OIDCSettingsService {
         await store.reload(db: db, cipher: cipher, forced: forced, logger: logger)
     }
 
+    /// Checks and normalizes the input: display name up to 40 characters (empty becomes „SSO“), an `http(s)` issuer
+    /// with host and without query or fragment, a client ID, a valid base URL and a secret (entered or kept).
+    /// - Parameters:
+    ///   - input: The form or API input.
+    ///   - stored: The current settings, for keeping the secret.
+    /// - Returns: The settings with `passwordLogin` at its default.
+    /// - Throws: `APIError.validation` with the matching German message.
     private static func validated(_ input: OIDCSettingsInput, stored: OIDCSettings?) throws -> OIDCSettings {
         let name = input.displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard name.count <= 40 else { throw APIError.validation(nameMessage) }
@@ -134,23 +166,28 @@ struct OIDCSettingsService {
     }
 }
 
+/// Adds `app_settings.oidc_config` (the sealed OIDC settings).
 struct AddOIDCConfig: AsyncMigration {
+    /// Adds the column.
     func prepare(on database: any Database) async throws {
         try await database.schema(AppSettings.schema).field("oidc_config", .string).update()
     }
 
+    /// Removes the column.
     func revert(on database: any Database) async throws {
         try await database.schema(AppSettings.schema).deleteField("oidc_config").update()
     }
 }
 
 extension Application {
+    /// The OIDC settings service for this app.
     var oidcSettings: OIDCSettingsService {
         OIDCSettingsService(db: db, cipher: tokenCipher, store: loginSettings, forced: appConfig.passwordLoginForced, logger: logger)
     }
 }
 
 extension Request {
+    /// The OIDC settings service for this request.
     var oidcSettings: OIDCSettingsService {
         OIDCSettingsService(db: db, cipher: application.tokenCipher, store: application.loginSettings,
                             forced: application.appConfig.passwordLoginForced, logger: logger)

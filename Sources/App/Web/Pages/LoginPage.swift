@@ -1,7 +1,13 @@
 import Elementary
 
+/// Sign-in page at `/login` (no navigation).
+///
+/// Shows the „Mit … anmelden“ (sign in with …) button when OIDC is configured, the password form unless the password
+/// login is switched off, and below it „Passwort vergessen?“ (forgot password) when mail is set up.
 struct LoginPage: HTML {
+    /// Message of a failed attempt, shown as an alert.
     let error: String?
+    /// Username prefilled after a failed attempt.
     let username: String
     /// Where to continue after signing in (only the app login, see `isSafeReturnTo`).
     var returnTo: String? = nil
@@ -12,6 +18,7 @@ struct LoginPage: HTML {
     /// Password login switch (System): without it only the OIDC button is shown.
     var passwordLogin = true
 
+    /// Start URL of the OIDC flow, carrying `returnTo` along.
     private var ssoHref: String {
         "/auth/oidc/start" + (returnTo.map { "?returnTo=" + formEncode($0) } ?? "")
     }

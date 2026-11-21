@@ -1,7 +1,9 @@
 import Fluent
 import Vapor
 
+/// Password login and logout: `GET`/`POST /login` and `POST /logout`.
 struct AuthController {
+    /// Form fields of `POST /login`; `returnTo` is only followed when `isSafeReturnTo(_:)` accepts it.
     struct LoginInput: Content {
         var username: String
         var password: String
@@ -10,6 +12,8 @@ struct AuthController {
 
     static let failureMessage = "Benutzername oder Passwort falsch."
 
+    /// Registers the login and logout routes behind the session authenticator.
+    /// - Parameter routes: The public routes builder.
     func register(on routes: any RoutesBuilder) {
         let sessioned = routes.grouped(User.sessionAuthenticator())
         sessioned.get("login", use: loginPage)
@@ -17,6 +21,10 @@ struct AuthController {
         sessioned.post("logout", use: logout)
     }
 
+    /// `GET /login`: renders the login page, or redirects a signed-in user to the safe `returnTo` or `/`.
+    /// - Parameter req: The request, optionally with a `returnTo` query parameter.
+    /// - Returns: The login page or the redirect.
+    /// - Throws: Errors reading the mail settings or rendering.
     func loginPage(req: Request) async throws -> Response {
         let returnTo = (try? req.query.get(String.self, at: "returnTo")).flatMap { isSafeReturnTo($0) ? $0 : nil }
         if req.auth.has(User.self) { return req.redirect(to: returnTo ?? "/", redirectType: .normal) }
@@ -24,6 +32,14 @@ struct AuthController {
     }
 
     /// The login page (password form and/or the OIDC button).
+    /// - Parameters:
+    ///   - req: The request.
+    ///   - status: The HTTP status.
+    ///   - error: The German error message to show, if any.
+    ///   - username: Prefill for the username field.
+    ///   - returnTo: The already validated return path, kept in the form.
+    /// - Returns: The rendered login page.
+    /// - Throws: Errors reading the mail settings or rendering.
     static func loginResponse(_ req: Request, status: HTTPStatus, error: String?, username: String = "",
                               returnTo: String?) async throws -> Response {
         let config = req.application.loginSettings.current
@@ -33,6 +49,14 @@ struct AuthController {
         return try await HTMLResponse(status: status, page).encodeResponse(for: req)
     }
 
+    /// `POST /login`: checks username and password and signs the user in on a new session.
+    ///
+    /// Unknown users and accounts without password are verified against a dummy hash, and every failure waits
+    /// `loginFailureDelay`, so neither the answer nor its timing reveals which usernames exist.
+    /// - Parameter req: The request with the login form.
+    /// - Returns: A redirect to the safe `returnTo` or `/`, or the login page with „Benutzername oder Passwort falsch.“
+    ///   (wrong username or password).
+    /// - Throws: `Abort(.notFound)` while the password login is off; decoding, database and hashing errors.
     func login(req: Request) async throws -> Response {
         guard req.application.loginSettings.current.passwordLogin else { throw Abort(.notFound) }
         let input = try req.content.decode(LoginInput.self)
@@ -52,6 +76,9 @@ struct AuthController {
                                             returnTo: returnTo)
     }
 
+    /// `POST /logout`: signs out, destroys the session and redirects to `/login`.
+    /// - Parameter req: The request.
+    /// - Returns: The redirect to `/login`.
     func logout(req: Request) async throws -> Response {
         req.auth.logout(User.self)
         req.session.unauthenticate(User.self)

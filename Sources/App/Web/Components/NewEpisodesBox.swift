@@ -2,8 +2,13 @@ import Elementary
 import ElementaryHTMX2
 
 /// „Neue Folgen“ box on the start page (followed series only).
+///
+/// Each note links to the series and has „Erledigt“ (done), which posts to `/tv/<id>/new-episodes/dismiss` and
+/// replaces its `<li>`. Announced episodes follow under „Demnächst“ (coming soon).
 struct NewEpisodesBox: HTML {
+    /// Followed series with new episodes.
     let notes: [NewEpisodesNote]
+    /// Followed series with announced episodes, listed under „Demnächst“ (coming soon).
     var upcoming: [UpcomingNote] = []
 
     var body: some HTML {

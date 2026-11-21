@@ -1,24 +1,37 @@
 import Elementary
 
+/// Everything the Netflix import page shows besides the result of an upload (built by `ImportStateService`).
 struct ImportState {
+    /// Matching progress, rendered in the upload section.
     let progress: ImportProgress
+    /// Netflix names without a clear match that wait for a decision („Zu prüfen“, to review), with their pending rows.
     let review: [ReviewItem]
+    /// The newest rows without a match („Nicht zugeordnet“, unmatched), limited in number.
     let unmatched: [UnmatchedItem]
+    /// Total number of unmatched rows; the page notes how many are not listed.
     let unmatchedTotal: Int
+    /// Mappings for the active filter with the matched title's name (nil when there is none).
     let mappings: [(NetflixMapping, String?)]
+    /// Active mapping filter: `all`, `auto`, `confirmed` or `ignored`.
     let mappingFilter: String
 }
 
+/// Netflix import page at `/import`, the „Import“ tab of „Konto“ (account): CSV upload with matching progress, the rows
+/// to review, unmatched rows and the filterable list of mappings (filter links `/import?status=…`).
 struct ImportPage: HTML {
     let navContext: NavContext
+    /// Counts of an upload just processed, shown as a notice.
     let summary: ImportSummary?
+    /// Error of a failed upload.
     let error: String?
     let state: ImportState
 
+    /// Mapping filters as (query value, German label).
     private let filters = [("all", "Alle"), ("auto", "automatisch"), ("confirmed", "bestätigt"), ("ignored", "ignoriert")]
 
     var body: some HTML {
         PageLayout(title: "Import", nav: navContext) {
+            SectionTabs.account(.importing)
             h1 { "Import" }
             section(.class("import-upload")) {
                 h2 { "Upload" }
@@ -34,8 +47,8 @@ struct ImportPage: HTML {
                 }
                 state.progress
                 p(.class("muted")) {
-                    "Eigene Filmliste aus Numbers oder Excel? "
-                    a(.href("/import/films")) { "Filmliste importieren" }
+                    "Verlauf aus einem anderen Tracker? "
+                    a(.href("/import/standard")) { "Aus anderen Trackern importieren" }
                 }
             }
             section {

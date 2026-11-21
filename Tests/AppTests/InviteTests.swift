@@ -17,8 +17,8 @@ struct InviteSummaryBody: Codable {
 
 @Suite("Invite")
 struct InviteTests {
-    static let mailOffError = "Einladungen gehen erst, wenn der Mail-Versand unter System eingerichtet ist."
-    static let mailOffHint = "Einladungen per Mail gehen erst, wenn der Mail-Versand unter System eingerichtet ist."
+    static let mailOffError = "Einladungen gehen erst, wenn der Mail-Versand unter Admin → System eingerichtet ist."
+    static let mailOffHint = "Einladungen per Mail gehen erst, wenn der Mail-Versand unter Admin → System eingerichtet ist."
     static let failure = MailError(message: "Mailserver nicht erreichbar (refused).")
 
     func admin(_ app: Application) async throws -> HTTPHeaders {

@@ -11,6 +11,8 @@ struct OIDCKeySet: Sendable {
     /// Signing keys from a JWKS document, key by key: encryption keys (`use: enc`), unsupported types or algorithms
     /// (`oct`, X25519, `RSA-OAEP-256` …) are skipped instead of failing the whole set; keys without `kid` get a local
     /// one. Throws `OIDCError.misconfigured` when no usable signing key remains.
+    /// - Parameter data: The JWKS JSON document.
+    /// - Returns: The key set with the IDs of the keys that named one.
     static func from(jwks data: Data) async throws -> OIDCKeySet {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let entries = root["keys"] as? [[String: Any]] else {
@@ -42,6 +44,7 @@ struct OIDCTokenValidator: Sendable {
     ]
     static let leeway: TimeInterval = 60
 
+    /// The JOSE header fields read before the signature is verified.
     private struct Header: Decodable {
         let alg: String?
         let kid: String?
@@ -60,9 +63,25 @@ struct OIDCTokenValidator: Sendable {
         let email: String?
         let name: String?
 
+        /// Does nothing: the claims are checked in `validate` against the injected clock.
         func verify(using algorithm: some JWTAlgorithm) async throws {}
     }
 
+    /// Verifies an ID token and returns the identity it carries.
+    ///
+    /// A `kid` missing from the key set fails as `unknownKey`, so the caller can reload the JWKS; without `kid` every key
+    /// is tried. `exp` and `iat` allow `leeway` seconds of clock skew. `azp` must equal the client ID when present or when
+    /// there are several audiences.
+    /// - Parameters:
+    ///   - idToken: The compact JWT from the token endpoint.
+    ///   - keySet: The provider's signing keys.
+    ///   - issuer: The expected `iss`.
+    ///   - clientID: The expected audience.
+    ///   - nonce: The nonce of the flow.
+    ///   - now: The reference time for `exp` and `iat`.
+    /// - Returns: Issuer, subject and the optional profile claims.
+    /// - Throws: `OIDCError.symmetricSigning` for HS* tokens, `OIDCError.unknownKey(kid:)` for an unknown key ID, and
+    ///   `OIDCError.failed(logReason:)` for every other failed check.
     func validate(_ idToken: String, keys keySet: OIDCKeySet, issuer: String, clientID: String, nonce: String,
                   now: Date) async throws -> OIDCIdentity {
         let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)

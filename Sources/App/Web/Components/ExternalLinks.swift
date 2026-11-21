@@ -2,7 +2,14 @@ import Elementary
 import Foundation
 
 /// TMDB, IMDb, Rotten Tomatoes and (series only) SeriesGraph links of a title (web page and API).
+///
+/// Without an IMDb ID the IMDb link is a name search; Rotten Tomatoes is always a name search.
+/// - Parameter title: The cached title.
+/// - Returns: (label, URL) pairs in display order.
 func externalLinks(for title: Title) -> [(label: String, url: String)] {
+    /// Percent-encodes `text` for a query value, keeping only alphanumerics and `-._~`.
+    /// - Parameter text: The text to encode.
+    /// - Returns: The encoded text, or `text` unchanged if encoding fails.
     func encoded(_ text: String) -> String {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
@@ -24,8 +31,10 @@ func externalLinks(for title: Title) -> [(label: String, url: String)] {
 
 /// Links to TMDB, IMDb, Rotten Tomatoes and (series only) SeriesGraph, opened in a new tab.
 struct ExternalLinks: HTML {
+    /// The title whose links are shown.
     let title: Title
 
+    /// The links of ``externalLinks(for:)`` as (label, URL) pairs.
     private var links: [(String, String)] { externalLinks(for: title).map { ($0.label, $0.url) } }
 
     var body: some HTML {

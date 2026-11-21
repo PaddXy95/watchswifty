@@ -5,23 +5,36 @@ import Vapor
 /// Browser part of the app login: the app opens `/api/auth/authorize` in a system browser sheet, the user signs in
 /// (password or later Authentik) and confirms; the app receives a one-time code at `dev.patmei.watchswifty:/auth`.
 struct APIAuthorizeController {
+    /// The only accepted redirect URI (the iOS app's custom scheme).
     static let redirectURI = "dev.patmei.watchswifty:/auth"
 
+    /// Query (GET) or form (POST) parameters of the consent page, named as in OAuth/PKCE.
     struct Params: Content {
         var redirect_uri: String
         var state: String
         var code_challenge: String
         var code_challenge_method: String
         var device_name: String
+        /// `connect` grants the connection; anything else denies it (POST only).
         var decision: String?
     }
 
+    /// Registers `GET` and `POST /api/auth/authorize` with session authentication (signing in is handled by the pages).
+    /// - Parameter routes: The routes builder to register on.
     func register(on routes: any RoutesBuilder) {
         let sessioned = routes.grouped(User.sessionAuthenticator())
         sessioned.get("api", "auth", "authorize", use: show)
         sessioned.post("api", "auth", "authorize", use: decide)
     }
 
+    /// Handles `GET /api/auth/authorize`: renders the consent page `AuthorizePage`.
+    ///
+    /// With SSO set up, anonymous visitors and SSO accounts arriving at another address are redirected to the canonical
+    /// one; SSO accounts without a fresh provider check go through the provider first, anonymous visitors to `/login`
+    /// with `returnTo`.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The consent page or a redirect.
+    /// - Throws: `Abort(.badRequest)` for invalid parameters (see `validated(_:)`), query decoding errors.
     func show(req: Request) async throws -> Response {
         let params = try validated(try req.query.decode(Params.self))
         let config = req.application.loginSettings.current
@@ -39,6 +52,13 @@ struct APIAuthorizeController {
         return try await HTMLResponse(AuthorizePage(params: params)).encodeResponse(for: req)
     }
 
+    /// Handles `POST /api/auth/authorize`: redirects to the app with a one-time code and `state` when the user chose
+    /// `connect`, otherwise with `error=access_denied`.
+    ///
+    /// Not signed in redirects to `/login`; SSO accounts without a fresh provider check go through the provider first.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The redirect.
+    /// - Throws: `Abort(.badRequest)` for invalid parameters, form decoding errors.
     func decide(req: Request) async throws -> Response {
         let params = try validated(try req.content.decode(Params.self))
         guard let user = req.auth.get(User.self) else { return req.redirect(to: "/login", redirectType: .normal) }
@@ -56,6 +76,10 @@ struct APIAuthorizeController {
 
     /// Signed-in SSO accounts go through the provider first, so an account blocked there gets no new device token
     /// (spec „App verbinden“). Nil when no detour is needed.
+    /// - Parameters:
+    ///   - req: The incoming request.
+    ///   - returnTo: Where the provider login returns to.
+    /// - Returns: The redirect to `/auth/oidc/start`, or nil.
     private func reauthRedirect(_ req: Request, returnTo: String) -> Response? {
         let config = req.application.loginSettings.current
         guard let user = req.auth.get(User.self), user.isSSOAccount(config.oidc, passwordLogin: config.passwordLogin),
@@ -65,6 +89,8 @@ struct APIAuthorizeController {
     }
 
     /// The GET address of the consent page for these parameters.
+    /// - Parameter params: The validated parameters.
+    /// - Returns: The path with its query.
     static func showPath(_ params: Params) -> String {
         var components = URLComponents()
         components.path = "/api/auth/authorize"
@@ -78,6 +104,11 @@ struct APIAuthorizeController {
     }
 
     /// Rejects anything but the app's own redirect and a proper PKCE challenge – never redirects on errors.
+    /// The device name is trimmed and must have 1 to 60 characters.
+    /// - Parameter input: The decoded parameters.
+    /// - Returns: The parameters with the trimmed device name.
+    /// - Throws: `Abort(.badRequest)` with a German reason for a foreign redirect URI, an invalid PKCE challenge or
+    ///   method, an empty or overlong `state`, or an invalid device name.
     private func validated(_ input: Params) throws -> Params {
         var params = input
         params.device_name = input.device_name.trimmingCharacters(in: .whitespacesAndNewlines)

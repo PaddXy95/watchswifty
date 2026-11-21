@@ -2,6 +2,21 @@ import Fluent
 import FluentSQLiteDriver
 import Vapor
 
+/// Wires the whole application: app-wide services, middleware, sessions, database, commands, migrations, routes,
+/// startup tasks and the background workers.
+///
+/// `entrypoint.swift` and the tests (with fakes) call this same function. Migrations run in the listed order, so new
+/// ones are appended at the end. The background jobs start only when `config.backgroundJobsEnabled` is set and the
+/// process serves HTTP (`servesHTTP(arguments:)`).
+/// - Parameters:
+///   - app: The application to configure.
+///   - config: The server configuration.
+///   - tmdbProvider: Factory for TMDB clients bound to a user's token.
+///   - releaseFetcher: GitHub release lookup for the update check; the live one when nil.
+///   - mailSender: Mail transport; live SMTP when nil.
+///   - oidcProvider: OIDC provider used for every setup; the live one when nil.
+///   - webhookSender: Webhook transport; the live one when nil.
+/// - Throws: `ConfigError` for an unusable token key or data folder, database and migration errors.
 func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider,
                releaseFetcher: (any ReleaseFetcher)? = nil, mailSender: (any MailSender)? = nil,
                oidcProvider: (any OIDCProvider)? = nil, webhookSender: (any WebhookSender)? = nil) async throws {
@@ -15,6 +30,7 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.mailSender = mailSender ?? LiveMailSender()
     app.webhookSender = webhookSender ?? LiveWebhookSender(userAgent: "WatchSwifty/\(config.appVersion.version)")
     app.backgroundTasks = BackgroundTasks()
+    app.providerCatalog = ProviderCatalog()
     app.dailyRunTrigger = DailyRunTrigger()
     app.oidcIdentityLock = AsyncMutex()
     app.forgotPasswordLock = AsyncMutex()
@@ -87,6 +103,12 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(AddTitleGenres())
     app.migrations.add(AddWatchUserIndex())
     app.migrations.add(CreateWebSession())
+    app.migrations.add(CreateImportEntry())
+    app.migrations.add(DropFilmListEntries())
+    app.migrations.add(CreateWatchLater())
+    app.migrations.add(CreateTitleAvailability())
+    app.migrations.add(CreateStreamingServices())
+    app.migrations.add(CreateAvailabilityNotice())
 
     try routes(app)
     try await app.autoMigrate()
@@ -109,12 +131,13 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     let backgroundJobs = config.backgroundJobsEnabled && servesHTTP(arguments: app.environment.arguments)
     app.matchingWorker = MatchingWorker(db: app.db, provider: tmdbProvider, logger: app.logger, cipher: app.tokenCipher,
                                         enabled: backgroundJobs, lock: app.importLock)
-    app.filmListWorker = FilmListWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
-                                        today: config.today, enabled: backgroundJobs)
+    app.importWorker = ImportWorker(db: app.db, provider: tmdbProvider, cipher: app.tokenCipher, logger: app.logger,
+                                    today: config.today, enabled: backgroundJobs)
     app.libraryRefresh = LibraryRefreshWorker(db: app.db, provider: tmdbProvider, logger: app.logger, matching: app.matchingWorker)
     app.lifecycle.use(LibraryRefreshLifecycle())
     if backgroundJobs {
         app.lifecycle.use(MatchingWorkerLifecycle())
+        app.lifecycle.use(ImportWorkerLifecycle())
         app.lifecycle.use(DailyRefreshLifecycle())
         app.lifecycle.use(UpdateCheckLifecycle())
     }
@@ -122,6 +145,8 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
 
 /// True when the process runs the web server (`serve`, also the default command), not a one-off command such as
 /// `reset-password` – only then do the background jobs start.
+/// - Parameter arguments: The process arguments (`app.environment.arguments`).
+/// - Returns: Whether the command is `serve` or none is given.
 func servesHTTP(arguments: [String]) -> Bool {
     guard let command = arguments.dropFirst().first, !command.hasPrefix("-") else { return true }
     return command == "serve"

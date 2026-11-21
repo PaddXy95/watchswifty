@@ -12,6 +12,8 @@ struct SearchHit {
     let totalEpisodes: Int?
     let movieWatched: Bool
     let rating: Int?
+    /// On the user's „Später ansehen“ list.
+    var watchLater = false
 
     /// Web badge: „3/10 gesehen“, „gesehen“.
     var status: String? {
@@ -20,11 +22,17 @@ struct SearchHit {
     }
 }
 
+/// Runs TMDB searches and adds the user's own progress to the hits.
 struct SearchService {
     let db: any Database
     let tmdb: any TMDBClient
 
     /// TMDB multi search (at least 2 characters after trimming, otherwise no results).
+    /// - Parameters:
+    ///   - userID: The user whose progress, ratings and „Später ansehen“ (watch later) list are added.
+    ///   - rawQuery: The query as typed.
+    /// - Returns: One hit per TMDB result, in TMDB's order.
+    /// - Throws: TMDB errors (e.g. no token) and database errors.
     func search(userID: UUID, query rawQuery: String) async throws -> [SearchHit] {
         let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return [] }
@@ -41,7 +49,20 @@ struct SearchService {
         let episodes = titleIDs.isEmpty ? [] : try await Episode.query(on: db)
             .filter(\.$title.$id ~~ titleIDs).filter(\.$season >= 1).all()
 
+        let laterTV = try await WatchLaterService(db: db).containsTMDB(userID: userID, kind: .tv,
+                                                                       tmdbIDs: results.filter { $0.kind == .tv }.map(\.id))
+        let laterMovies = try await WatchLaterService(db: db).containsTMDB(userID: userID, kind: .movie,
+                                                                           tmdbIDs: results.filter { $0.kind == .movie }.map(\.id))
         return results.map { result in
+            var hit = hit(for: result)
+            hit.watchLater = (result.kind == .tv ? laterTV : laterMovies).contains(result.id)
+            return hit
+        }
+
+        /// Builds the hit for one TMDB result from the cached title, the user's watches and library entry.
+        /// - Parameter result: The TMDB result.
+        /// - Returns: The hit; without a cached title it carries no progress.
+        func hit(for result: TMDBSearchResult) -> SearchHit {
             guard let title = cached.first(where: { $0.tmdbID == result.id && $0.titleKind == result.kind }), let id = title.id else {
                 return SearchHit(result: result, inLibrary: false, watchedEpisodes: nil, totalEpisodes: nil, movieWatched: false, rating: nil)
             }
