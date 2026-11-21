@@ -439,3 +439,5 @@ code.new-token { user-select: all; word-break: break-all; padding: 0 var(--space
 .new-since { font-size: var(--text-sm); color: var(--ok); }
 h2 .count { font-size: var(--text-sm); font-weight: 400; }
 .attribution { font-size: var(--text-sm); }
+.provider-choice input { width: auto; flex: none; margin: 0; }
+.provider-choice span { overflow-wrap: anywhere; }
