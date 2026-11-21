@@ -17,6 +17,23 @@ Every user enters their own [TMDB token](tmdb.md) and, optionally, their e-mail 
 Changing the address requires the current password. Admins only see other users' addresses shortened, for example
 `p•••@example.org`.
 
+## Streaming services
+
+Under **Konto → Streamingdienste** (account → streaming services) every user picks their country (default Germany)
+and the services they subscribe to; the list of services comes from TMDB, so a [TMDB token](tmdb.md) is needed to
+choose. Your services are shown first, with a green ✓, in the block **Verfügbarkeit** (availability) on series and
+movie pages and on **Später ansehen** (watch later). Changing the country fetches the availability of your list for it
+in the background.
+
+## Später ansehen (watch later)
+
+**+ Später** in the search or **Später ansehen** on a series or movie page puts a title on your list. The page
+**Später ansehen** splits it into **Bei deinen Diensten** (at your services) and the rest, with where the rest can be
+watched. A title leaves the list as soon as you record a watch; imported watches only count when they are dated on or
+after the day you added the title, so importing an old history does not empty the list. With the notification
+„Wenn ein Titel aus „Später ansehen“ bei einem meiner Dienste verfügbar wird“ you get a message when a listed title
+arrives at one of your services (see [Notifications](notifications.md)).
+
 ## Forgot password
 
 If [mail](email.md) is set up and the user has an address under **Konto**, no admin is needed: choose
