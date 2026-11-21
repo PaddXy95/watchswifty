@@ -6,6 +6,9 @@ let maxImportTitleLength = 500
 
 /// Lowercased, diacritics folded (ß → ss), dashes/colons → spaces, other punctuation dropped,
 /// trailing "(n)" removed, whitespace collapsed.
+///
+/// - Parameter s: The title to normalize.
+/// - Returns: The comparison form used by all import matching.
 func normalizeTitle(_ s: String) -> String {
     var text = s.replacingOccurrences(of: "ß", with: "ss").replacingOccurrences(of: "ẞ", with: "SS")
     text = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "de_DE")).lowercased()
@@ -23,7 +26,11 @@ func normalizeTitle(_ s: String) -> String {
 
 /// Removes a trailing "(n)" and the whitespace around it, like the regex `\s*\(\d+\)\s*$` but in linear time: the
 /// regex backtracks quadratically over long whitespace runs (security audit F05).
+///
+/// - Parameter text: The text to trim.
+/// - Returns: The text without a trailing "(n)", or unchanged when it has none.
 func removingTrailingNumber(_ text: String) -> String {
+    /// Whether the character is a single decimal digit scalar.
     func isDigit(_ c: Character) -> Bool { c.unicodeScalars.count == 1 && c.unicodeScalars.first!.properties.generalCategory == .decimalNumber }
     var end = text.endIndex
     while end > text.startIndex, text[text.index(before: end)].isWhitespace { end = text.index(before: end) }
@@ -41,6 +48,11 @@ func removingTrailingNumber(_ text: String) -> String {
 }
 
 /// Levenshtein distance over Unicode scalars.
+///
+/// - Parameters:
+///   - a: The first string.
+///   - b: The second string.
+/// - Returns: The number of single-scalar insertions, deletions or substitutions between them.
 func levenshtein(_ a: String, _ b: String) -> Int {
     let a = Array(a.unicodeScalars), b = Array(b.unicodeScalars)
     if a.isEmpty { return b.count }
@@ -57,6 +69,11 @@ func levenshtein(_ a: String, _ b: String) -> Int {
     return previous[b.count]
 }
 
+/// Similarity in 0…1 based on the Levenshtein distance relative to the longer string; two empty strings are 1.
+/// - Parameters:
+///   - a: The first string.
+///   - b: The second string.
+/// - Returns: 1 for equal strings, falling towards 0 the more edits are needed.
 func similarity(_ a: String, _ b: String) -> Double {
     let longest = max(a.unicodeScalars.count, b.unicodeScalars.count)
     guard longest > 0 else { return 1 }

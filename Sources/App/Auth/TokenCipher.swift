@@ -4,14 +4,23 @@ import Foundation
 import Logging
 
 /// Encrypts the users' TMDB tokens at rest (AES-GCM with a server key). Stored form: `enc:v1:` + Base64(nonce|ciphertext|tag).
+///
+/// The same cipher seals the other secrets at rest (KNot webhook keys, e-mail addresses, SMTP and OIDC settings) and
+/// the OIDC flow cookie.
 struct TokenCipher: Sendable {
     static let prefix = "enc:v1:"
     let key: SymmetricKey
 
+    /// Creates a cipher.
+    /// - Parameter key: The 256-bit server key (see `TokenKeyLoader`).
     init(key: SymmetricKey) {
         self.key = key
     }
 
+    /// Encrypts a value for storage; every call uses a fresh nonce.
+    /// - Parameter token: The plain value.
+    /// - Returns: `enc:v1:` followed by the Base64 of nonce, ciphertext and tag.
+    /// - Throws: `ConfigError.invalid` when the sealed box has no combined form, or a CryptoKit error.
     func seal(_ token: String) throws -> String {
         guard let combined = try AES.GCM.seal(Data(token.utf8), using: key).combined else {
             throw ConfigError.invalid("Token konnte nicht verschlüsselt werden.")
@@ -21,6 +30,8 @@ struct TokenCipher: Sendable {
 
     /// Plain token; nil for no token or one this key cannot decrypt. Values without the prefix are
     /// legacy plaintext (stored before encryption) and are returned as they are.
+    /// - Parameter stored: The stored value, if any.
+    /// - Returns: The plain value, or `nil` for a missing, empty or undecryptable value.
     func open(_ stored: String?) -> String? {
         guard let stored, !stored.isEmpty else { return nil }
         guard stored.hasPrefix(Self.prefix) else { return stored }
@@ -34,6 +45,15 @@ struct TokenCipher: Sendable {
 /// Finds the server key: `TOKEN_KEY` (Base64, 32 bytes), else the file `TOKEN_KEY_FILE`, else `token.key` next to the
 /// database (created on first start). In-memory databases (tests) get a random key.
 enum TokenKeyLoader {
+    /// Loads the server key from the first source that is set, in the order above.
+    /// - Parameters:
+    ///   - key: The `TOKEN_KEY` value, if set.
+    ///   - file: The `TOKEN_KEY_FILE` path, if set.
+    ///   - databasePath: The SQLite path; `token.key` lives next to it (`:memory:` gets a random key).
+    ///   - logger: Logs a notice when a key file is generated.
+    /// - Returns: The server key.
+    /// - Throws: `ConfigError.invalid` when a key is not 32 bytes of Base64, the key file cannot be read, or the generated
+    ///   `token.key` (mode 0600) cannot be created.
     static func load(key: String?, file: String?, databasePath: String, logger: Logger) throws -> SymmetricKey {
         if let key {
             return try decode(key, source: "TOKEN_KEY")
@@ -60,6 +80,12 @@ enum TokenKeyLoader {
         return generated
     }
 
+    /// Decodes a Base64 key of exactly 32 bytes (surrounding whitespace is ignored).
+    /// - Parameters:
+    ///   - text: The Base64 text.
+    ///   - source: Where the text came from, named in the error.
+    /// - Returns: The key.
+    /// - Throws: `ConfigError.invalid` for invalid Base64 or a wrong length.
     private static func decode(_ text: String, source: String) throws -> SymmetricKey {
         guard let data = Data(base64Encoded: text.trimmingCharacters(in: .whitespacesAndNewlines)), data.count == 32 else {
             throw ConfigError.invalid("\(source): erwartet 32 Byte als Base64 (z. B. `openssl rand -base64 32`).")
@@ -69,6 +95,11 @@ enum TokenKeyLoader {
 }
 
 /// Encrypts tokens still stored in plaintext (from before encryption existed); returns how many were converted.
+/// - Parameters:
+///   - db: The database.
+///   - cipher: Seals the tokens.
+/// - Returns: The number of converted TMDB tokens.
+/// - Throws: Database or encryption errors.
 func encryptStoredTokens(db: any Database, cipher: TokenCipher) async throws -> Int {
     let users = try await User.query(on: db).filter(\.$tmdbToken != nil).all()
     var converted = 0

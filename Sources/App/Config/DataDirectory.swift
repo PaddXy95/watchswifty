@@ -2,6 +2,8 @@ import Foundation
 
 /// Fails with a German hint instead of an SQLite crash when the database folder is not writable
 /// (typically a bind mount owned by another user).
+/// - Parameter databasePath: The SQLite file path (`:memory:` is skipped).
+/// - Throws: `ConfigError.invalid` when the folder of the database file is not writable.
 func checkDataDirectory(databasePath: String) throws {
     guard databasePath != ":memory:" else { return }
     let directory = URL(fileURLWithPath: databasePath).deletingLastPathComponent().path

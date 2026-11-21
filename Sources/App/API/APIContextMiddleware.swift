@@ -3,6 +3,15 @@ import Vapor
 
 /// Resolves the bearer token (session cookies are ignored) and makes the request available to the handlers.
 struct APIContextMiddleware: AsyncMiddleware {
+    /// Authenticates a presented bearer token and runs the rest of the chain inside `APIContext.current`.
+    ///
+    /// An unknown or expired token does not fail here: it is kept as `tokenProblem`, so only operations that call
+    /// `APIContext.requireUser()` reject the request and public ones (version, token exchange) still work.
+    /// - Parameters:
+    ///   - request: The incoming request.
+    ///   - next: The rest of the responder chain.
+    /// - Returns: The response of the chain.
+    /// - Throws: Database errors while looking up the token, and whatever the chain throws.
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
         var user: User?
         var problem: APIError?

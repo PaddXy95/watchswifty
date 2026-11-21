@@ -1,6 +1,7 @@
 import Fluent
 import Foundation
 
+/// How an App API token came into being.
 enum APITokenKind: String, Codable, Sendable {
     /// Issued to an app through the browser login.
     case device
@@ -21,8 +22,17 @@ final class APIToken: Model, @unchecked Sendable {
     @Field(key: "expires_at") var expiresAt: Date
     @OptionalField(key: "last_used_at") var lastUsedAt: Date?
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates a token record.
+    /// - Parameters:
+    ///   - userID: The owning user.
+    ///   - name: The device or token name.
+    ///   - kind: How the token was created.
+    ///   - tokenHash: SHA-256 hex digest of the token.
+    ///   - createdAt: Creation time.
+    ///   - expiresAt: Expiry time.
     init(userID: UUID, name: String, kind: APITokenKind, tokenHash: String, createdAt: Date, expiresAt: Date) {
         self.$user.id = userID
         self.name = name
@@ -32,10 +42,13 @@ final class APIToken: Model, @unchecked Sendable {
         self.expiresAt = expiresAt
     }
 
+    /// The token's kind; an unknown stored value counts as `.device`.
     var tokenKind: APITokenKind { APITokenKind(rawValue: kind) ?? .device }
 }
 
+/// Migration creating the `api_tokens` table (unique token hash, rows deleted with their user).
 struct CreateAPIToken: AsyncMigration {
+    /// Creates the table.
     func prepare(on database: any Database) async throws {
         try await database.schema(APIToken.schema)
             .id()
@@ -50,6 +63,7 @@ struct CreateAPIToken: AsyncMigration {
             .create()
     }
 
+    /// Drops the table.
     func revert(on database: any Database) async throws {
         try await database.schema(APIToken.schema).delete()
     }

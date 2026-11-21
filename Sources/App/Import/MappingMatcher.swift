@@ -1,4 +1,9 @@
 /// The single result whose (original) name equals the candidate after normalization; nil if none or several.
+///
+/// - Parameters:
+///   - candidate: The Netflix name to match.
+///   - results: TMDB search results for that name.
+/// - Returns: The unambiguous hit, or nil.
 func autoMatch(candidate: String, in results: [TMDBSearchResult]) -> TMDBSearchResult? {
     let wanted = normalizeTitle(candidate)
     guard !wanted.isEmpty else { return nil }

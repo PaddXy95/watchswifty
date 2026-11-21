@@ -1,5 +1,6 @@
 import Foundation
 
+/// A streaming service (or other way of watching) that a watch can be recorded with; the raw value is stored.
 enum StreamingService: String, Codable, Sendable, CaseIterable {
     case netflix
     case primeVideo = "prime_video"
@@ -12,6 +13,7 @@ enum StreamingService: String, Codable, Sendable, CaseIterable {
     case purchased
     case other
 
+    /// The German display name, e.g. „Kino“ (cinema), „Gekauft“ (purchased), „Sonstiges“ (other).
     var label: String {
         switch self {
         case .netflix: "Netflix"
@@ -28,8 +30,11 @@ enum StreamingService: String, Codable, Sendable, CaseIterable {
     }
 }
 
+/// How a watch was recorded; the raw value is stored in `watches.origin`.
 enum WatchOrigin: String, Codable, Sendable {
+    /// Entered by hand (web UI or App API); the standard import also stores its watches as manual.
     case manual
+    /// Created by the Netflix import (`WatchService.recordImportedWatch`); resetting a Netflix mapping deletes only these.
     case `import`
 }
 
@@ -42,6 +47,8 @@ struct WatchLink: Sendable, Equatable {
 extension StreamingService {
     /// Search on the service when its web search can be opened with the title (checked 2026-11: Netflix, Prime Video
     /// on amazon.de, Apple TV+, Paramount+); otherwise the service's start page. Nil for Kino, Gekauft, Sonstiges.
+    /// - Parameter title: The title name to search for.
+    /// - Returns: The button label and URL, or nil for services without a link.
     func watchLink(for title: String) -> WatchLink? {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
@@ -62,6 +69,7 @@ extension StreamingService {
 
 extension StreamingService {
     /// Maps a service name as people write it („Amazon Prime“, „WowTV“, „Gekauft“); unknown names → `.other`.
+    /// - Parameter label: The service name as written, matched by its leading letters, ignoring case and non-letters.
     init?(label: String) {
         let key = label.lowercased().filter { $0.isLetter }
         guard !key.isEmpty else { return nil }

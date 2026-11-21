@@ -15,8 +15,16 @@ final class WatchLaterEntry: Model, @unchecked Sendable {
     @Field(key: "added_on") var addedOn: String
     @Field(key: "baselined") var baselined: Bool
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates a list entry.
+    /// - Parameters:
+    ///   - userID: The list's owner.
+    ///   - titleID: The title put on the list.
+    ///   - addedAt: When it was added.
+    ///   - addedOn: The day it was added (`YYYY-MM-DD`).
+    ///   - baselined: Whether the present offers were already recorded as known.
     init(userID: UUID, titleID: UUID, addedAt: Date, addedOn: String, baselined: Bool = false) {
         self.$user.id = userID
         self.$title.id = titleID
@@ -37,10 +45,18 @@ final class TitleAvailability: Model, @unchecked Sendable {
     @Field(key: "regions") var regions: String
     @OptionalField(key: "tmdb_link") var tmdbLink: String?
 
+    /// `regions` as a list of country codes.
     var regionList: [String] { regions.split(separator: ",").map(String.init) }
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates the fetch state of a title.
+    /// - Parameters:
+    ///   - titleID: The title.
+    ///   - fetchedAt: When the offers were fetched.
+    ///   - regions: The countries stored at that fetch (stored sorted).
+    ///   - tmdbLink: TMDB's watch page link for the title, if any.
     init(titleID: UUID, fetchedAt: Date, regions: [String], tmdbLink: String?) {
         self.$title.id = titleID
         self.fetchedAt = fetchedAt
@@ -62,10 +78,17 @@ final class TitleProvider: Model, @unchecked Sendable {
     @Field(key: "kind") var kind: String
     @Field(key: "display_priority") var displayPriority: Int
 
+    /// `kind` as ``OfferKind``; nil for an unknown stored value.
     var offerKind: OfferKind? { OfferKind(rawValue: kind) }
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates the stored row of one TMDB offer.
+    /// - Parameters:
+    ///   - titleID: The title.
+    ///   - region: The country code of the offer.
+    ///   - offer: The offer as returned by TMDB.
     init(titleID: UUID, region: String, offer: TMDBOffer) {
         self.$title.id = titleID
         self.region = region
@@ -85,8 +108,13 @@ final class UserStreamingService: Model, @unchecked Sendable {
     @Parent(key: "user_id") var user: User
     @Field(key: "provider_id") var providerID: Int
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates a streaming service entry.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - providerID: The service's TMDB provider id.
     init(userID: UUID, providerID: Int) {
         self.$user.id = userID
         self.providerID = providerID
@@ -116,10 +144,19 @@ final class AvailabilityNotice: Model, @unchecked Sendable {
     @Field(key: "noticed_at") var noticedAt: Date
     @Field(key: "state") var state: String
 
+    /// `state` as ``NoticeState``; nil for an unknown stored value.
     var noticeState: NoticeState? { NoticeState(rawValue: state) }
 
+    /// Creates an empty model (required by Fluent).
     init() {}
 
+    /// Creates a known offer.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleID: The title on the user's list.
+    ///   - providerID: The service's TMDB provider id.
+    ///   - noticedAt: When the offer was first recorded.
+    ///   - state: Whether it is a baseline, skipped, pending or sent.
     init(userID: UUID, titleID: UUID, providerID: Int, noticedAt: Date, state: NoticeState) {
         self.$user.id = userID
         self.$title.id = titleID

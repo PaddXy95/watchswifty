@@ -11,8 +11,15 @@ final class SeasonNote: Model, @unchecked Sendable {
     @Field(key: "season_number") var season: Int
     @Field(key: "comment") var comment: String
 
+    /// Creates an empty note; required by Fluent.
     init() {}
 
+    /// Creates a season comment.
+    /// - Parameters:
+    ///   - userID: The owning user.
+    ///   - titleID: The series.
+    ///   - season: The season number.
+    ///   - comment: The comment text (already trimmed and length-checked by `WatchService`).
     init(userID: UUID, titleID: UUID, season: Int, comment: String) {
         self.$user.id = userID
         self.$title.id = titleID

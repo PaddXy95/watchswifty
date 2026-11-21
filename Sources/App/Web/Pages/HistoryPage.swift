@@ -1,7 +1,11 @@
 import Elementary
 
+/// „Verlauf“ (history) page at `/history`, a tab of „Bibliothek“ (library): a table of the user's viewings.
+///
+/// Shows „Noch keine Einträge.“ (no entries yet) instead of the table when there are none.
 struct HistoryPage: HTML {
     let nav: NavContext
+    /// First page of rows; when there are more, `HistoryRows` adds the „Mehr laden“ (load more) row.
     let rows: HistoryRows
 
     var body: some HTML {

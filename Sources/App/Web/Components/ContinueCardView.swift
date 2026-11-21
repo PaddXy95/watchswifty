@@ -2,9 +2,17 @@ import Elementary
 import ElementaryHTMX2
 import Foundation
 
+/// Card for one series on the „Weiterschauen“ (continue watching) page: poster, next episode, episodes left, last
+/// service and rating, with „✓ gesehen“ (watched), „Ausblenden“ (hide) and, if known, a link to the streaming service.
+///
+/// The card (`#card-<tmdbID>`) is htmx-boosted. „✓ gesehen“ posts the next episode to `/tv/<id>/next` and replaces the
+/// closest `.card` with the response. The poster link is left out of the tab order, since the title links to the same
+/// page.
 struct ContinueCardView: HTML {
+    /// The continue-watching entry to render.
     let card: ContinueCard
 
+    /// „noch 1 Folge“ / „noch n Folgen“ (n episodes left).
     private var remainingText: String { card.remaining == 1 ? "noch 1 Folge" : "noch \(card.remaining) Folgen" }
 
     var body: some HTML {

@@ -2,14 +2,28 @@ import Fluent
 import Foundation
 import Vapor
 
+/// Counters of one ``runNotifications(db:notifications:today:now:logger:)`` pass, logged by the daily pass.
 struct NotificationPassResult: Equatable, Sendable {
+    /// Digests sent and recorded.
     var sent = 0
+    /// Users whose digest could not be sent or recorded.
     var failed = 0
+    /// Old sent-notice records deleted.
     var cleaned = 0
 }
 
 /// Part of the daily pass: one digest per user with something due (episodes and „Später ansehen“ availability); recorded only after it went out, so a failure
 /// is retried the next day. Users without a channel are skipped quietly (their items wait until one exists).
+///
+/// Ends with ``EpisodeNoticeService/cleanup(today:)``. Errors are logged, never thrown; the loop stops when the task is
+/// cancelled.
+/// - Parameters:
+///   - db: The database.
+///   - notifications: Sends the digests.
+///   - today: Today as `YYYY-MM-DD`.
+///   - now: The sending time recorded on the notices.
+///   - logger: Receives warnings and errors.
+/// - Returns: How many digests were sent and failed, and how many old records were cleaned up.
 func runNotifications(db: any Database, notifications: NotificationService, today: String, now: Date = .now,
                       logger: Logger) async -> NotificationPassResult {
     var result = NotificationPassResult()

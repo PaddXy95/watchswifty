@@ -1,5 +1,8 @@
 /// TMDB provider ids (watch providers, region DE) of the services WatchSwifty has a search link for (`watchLink`).
 extension StreamingService {
+    /// Maps a TMDB provider id to the service with a search link.
+    /// - Parameter tmdbProviderID: The TMDB watch provider id.
+    /// - Returns: nil for providers without a search link.
     init?(tmdbProviderID: Int) {
         switch tmdbProviderID {
         case 8, 1796: self = .netflix                  // Netflix, Netflix basic with Ads

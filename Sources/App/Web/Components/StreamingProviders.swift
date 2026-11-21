@@ -3,10 +3,15 @@ import ElementaryHTMX2
 
 /// Konto → Streamingdienste: state of the block.
 struct AccountStreaming: Sendable {
+    /// Selected country code (e.g. `DE`).
     var region: String
+    /// Countries offered in the „Land“ (country) select.
     var regions: [TMDBRegion]
+    /// Streaming services TMDB lists for `region`.
     var providers: [TMDBProviderInfo]
+    /// TMDB provider IDs the user has chosen.
     var selected: Set<Int>
+    /// Whether the user has a TMDB token; without one, no choices are shown.
     var hasToken: Bool
     /// TMDB could not be asked (shown instead of the choices).
     var loadError: String? = nil
@@ -14,7 +19,9 @@ struct AccountStreaming: Sendable {
 
 /// Logo of a streaming service (TMDB image, small).
 struct ProviderLogo: HTML, Sendable {
+    /// TMDB logo path, or `nil` for a placeholder with the first letter of `name`.
     let path: String?
+    /// Name of the service.
     let name: String
 
     var body: some HTML {
@@ -28,8 +35,12 @@ struct ProviderLogo: HTML, Sendable {
 }
 
 /// The checkboxes of one country (also swapped in by htmx when the country changes).
+///
+/// The container is `#streaming-providers`; the „Land“ (country) select replaces it (outer HTML).
 struct StreamingProviderChoices: HTML, Sendable {
+    /// Services TMDB lists for the country, one checkbox each.
     let providers: [TMDBProviderInfo]
+    /// Chosen provider IDs; those not in `providers` are kept as hidden inputs.
     let selected: Set<Int>
 
     var body: some HTML {
@@ -54,7 +65,12 @@ struct StreamingProviderChoices: HTML, Sendable {
 }
 
 /// Konto → Streamingdienste (spec §2).
+///
+/// Without a TMDB token it shows a hint, after a failed TMDB request the error; otherwise the form posting to
+/// `/account/streaming`. Changing the „Land“ (country) select fetches `/account/streaming/providers` into
+/// `#streaming-providers`.
 struct AccountStreamingSection: HTML, Sendable {
+    /// State of the block.
     let state: AccountStreaming
 
     var body: some HTML {

@@ -17,6 +17,12 @@ actor LiveOIDCProvider: OIDCProvider {
     private var keySet: OIDCKeySet?
     private var keysLoadedAt: Date?
 
+    /// Creates a client for one provider config.
+    /// - Parameters:
+    ///   - config: The provider config.
+    ///   - transport: HTTP to the provider.
+    ///   - logger: The logger.
+    ///   - now: The clock for caches and token validation.
     init(config: OIDCConfig, transport: any OIDCTransport, logger: Logger, now: @escaping @Sendable () -> Date = { .now }) {
         self.config = config
         self.transport = transport
@@ -24,6 +30,13 @@ actor LiveOIDCProvider: OIDCProvider {
         self.now = now
     }
 
+    /// Builds the authorization request: code flow, scope `openid profile email`, PKCE `S256`.
+    /// - Parameters:
+    ///   - state: The flow's `state` value.
+    ///   - nonce: The nonce the ID token must carry.
+    ///   - codeChallenge: The PKCE S256 challenge.
+    /// - Returns: The `authorization_endpoint` with all parameters (`+` percent-encoded).
+    /// - Throws: `OIDCError` from the discovery, or `.misconfigured` when the endpoint is no URL.
     func authorizationURL(state: String, nonce: String, codeChallenge: String) async throws -> URL {
         let discovery = try await discovery()
         guard var components = URLComponents(string: discovery.authorizationEndpoint) else {
@@ -45,6 +58,16 @@ actor LiveOIDCProvider: OIDCProvider {
         return url
     }
 
+    /// Redeems the code at the token endpoint and validates the ID token.
+    ///
+    /// When the token names an unknown key and the keys are older than `keyReloadInterval`, the JWKS is reloaded once
+    /// and the validation repeated.
+    /// - Parameters:
+    ///   - code: The authorization code.
+    ///   - codeVerifier: The PKCE verifier.
+    ///   - nonce: The nonce of the flow.
+    /// - Returns: The verified identity.
+    /// - Throws: `OIDCError` from discovery, token request or validation.
     func exchange(code: String, codeVerifier: String, nonce: String) async throws -> OIDCIdentity {
         let discovery = try await discovery()
         let idToken = try await tokenRequest(discovery, code: code, codeVerifier: codeVerifier)
@@ -61,10 +84,16 @@ actor LiveOIDCProvider: OIDCProvider {
         }
     }
 
+    /// The issuer of the (cached) discovery.
+    /// - Returns: The issuer exactly as the discovery states it.
+    /// - Throws: `OIDCError` from the discovery.
     func discoveredIssuer() async throws -> String {
         try await discovery().issuer
     }
 
+    /// Drops the cached discovery and keys and loads both afresh („Verbindung testen“, test connection).
+    /// - Returns: The issuer and the number of usable signing keys.
+    /// - Throws: `OIDCError` from discovery or JWKS.
     func check() async throws -> OIDCCheck {
         dropDiscovery()
         let discovery = try await discovery()
@@ -74,6 +103,11 @@ actor LiveOIDCProvider: OIDCProvider {
 
     // MARK: - Discovery and keys
 
+    /// The discovery document, cached for `discoveryLifetime`.
+    /// - Returns: The validated discovery.
+    /// - Throws: `OIDCError.unreachable` for network errors and HTTP 5xx; `.misconfigured` for other statuses, an
+    ///   incomplete document, a different issuer or only unsupported signing algorithms; `.symmetricSigning` when no
+    ///   supported algorithm is offered and HS* is among them.
     private func discovery() async throws -> OIDCDiscovery {
         if let cached = cachedDiscovery, now().timeIntervalSince(cached.loadedAt) <= Self.discoveryLifetime {
             return cached.value
@@ -105,11 +139,18 @@ actor LiveOIDCProvider: OIDCProvider {
         return discovery
     }
 
+    /// Forgets the cached discovery and keys.
     private func dropDiscovery() {
         cachedDiscovery = nil
         keySet = nil
     }
 
+    /// The cached key set, or the JWKS loaded from `jwks_uri`; a failed request (network error or non-200) also drops
+    /// the discovery.
+    /// - Parameter discovery: The discovery naming the `jwks_uri`.
+    /// - Returns: The key set.
+    /// - Throws: `OIDCError.unreachable` for network errors and HTTP 5xx, `.failed` for other statuses,
+    ///   `.misconfigured` for an invalid URL, an unreadable JWKS or one without usable keys.
     private func keys(_ discovery: OIDCDiscovery) async throws -> OIDCKeySet {
         if let keySet { return keySet }
         guard let url = URL(string: discovery.jwksURI) else { throw OIDCError.misconfigured(logReason: "jwks_uri ist keine URL") }
@@ -134,14 +175,27 @@ actor LiveOIDCProvider: OIDCProvider {
 
     // MARK: - Token endpoint
 
+    /// The part of the token response WatchSwifty reads.
     private struct TokenResponse: Decodable {
         let id_token: String?
     }
 
+    /// The OAuth error code of a failed token request.
     private struct TokenError: Decodable {
         let error: String?
     }
 
+    /// Exchanges the code for an ID token, authenticating with `client_secret_basic` when offered (or nothing is
+    /// announced), else with `client_secret_post`.
+    ///
+    /// Network errors and HTTP 404 drop the cached discovery, so moved endpoints are found again.
+    /// - Parameters:
+    ///   - discovery: The discovery naming the token endpoint.
+    ///   - code: The authorization code.
+    ///   - codeVerifier: The PKCE verifier.
+    /// - Returns: The raw ID token.
+    /// - Throws: `OIDCError.unreachable` for network errors and HTTP 5xx, `.failed` for other statuses or a response
+    ///   without `id_token`, `.misconfigured` for an invalid endpoint or no supported client authentication.
     private func tokenRequest(_ discovery: OIDCDiscovery, code: String, codeVerifier: String) async throws -> String {
         guard let url = URL(string: discovery.tokenEndpoint) else { throw OIDCError.misconfigured(logReason: "token_endpoint ist keine URL") }
         var fields = [

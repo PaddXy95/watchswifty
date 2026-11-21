@@ -2,7 +2,7 @@ import Fluent
 import Foundation
 import Vapor
 
-/// Everything the series page (web) and `GET /v1/tv/{id}` (API) show, built in one place.
+/// Everything the series page (web) and `GET /v1/tv/{tmdbID}` (API) show, built in one place.
 struct SeriesDetailModel {
     let title: Title
     let seasons: [SeasonModel]
@@ -13,6 +13,7 @@ struct SeriesDetailModel {
     let defaultService: StreamingService?
 }
 
+/// Builds the series and movie detail data shared by the web title page and the App API.
 struct SeriesDetailService {
     let db: any Database
     let catalog: CatalogService
@@ -21,6 +22,7 @@ struct SeriesDetailService {
 
     /// Stale caches are refreshed; titles cached before overviews/runtimes/genres existed fetch them once.
     /// Failures (no token, TMDB down) only log – the cached data is shown.
+    /// - Parameter title: The title about to be shown.
     func refreshForDetails(_ title: Title) async {
         do {
             let episodesMissingOverview = title.titleKind == .tv
@@ -36,16 +38,35 @@ struct SeriesDetailService {
         }
     }
 
+    /// The user's library entry for a title, if one exists (read only, never created).
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleID: The title.
+    /// - Returns: The entry, or nil.
+    /// - Throws: Database errors.
     func entry(userID: UUID, titleID: UUID) async throws -> UserTitle? {
         try await UserTitle.query(on: db).filter(\.$user.$id == userID).filter(\.$title.$id == titleID).first()
     }
 
     /// A movie's watches, newest first.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleID: The movie.
+    /// - Returns: The user's watches without an episode, newest day first, then newest recorded first.
+    /// - Throws: Database errors.
     func movieWatches(userID: UUID, titleID: UUID) async throws -> [Watch] {
         try await watches.watchesQuery(userID: userID).filter(\.$title.$id == titleID).filter(\.$episode.$id == nil)
             .sort(\.$watchedOn, .descending).sort(\.$createdAt, .descending).all()
     }
 
+    /// The series page model: seasons with the user's watches, rating, comment, hidden and followed flags, and the service
+    /// of the last watch as the default for new ones.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - title: The series.
+    ///   - open: The season to show open, or nil for the default (see ``seasons(title:userID:open:)``).
+    /// - Returns: The detail model.
+    /// - Throws: Database errors, or an error when `title` has no ID.
     func detail(userID: UUID, title: Title, open: Int? = nil) async throws -> SeriesDetailModel {
         let titleID = try title.requireID()
         let entry = try await entry(userID: userID, titleID: titleID)
@@ -57,6 +78,15 @@ struct SeriesDetailService {
 
     /// Season view models; `open` forces a season open, otherwise the season of the next episode
     /// (or the first season when nothing is watched yet) is open.
+    ///
+    /// Seasons are numbered ascending with specials (season 0) last; each episode carries the user's watches, newest
+    /// first. "Today" comes from `WatchService.today` (`AppConfig.today()` for requests).
+    /// - Parameters:
+    ///   - title: The series.
+    ///   - userID: The user.
+    ///   - open: The season to show open, or nil for the default.
+    /// - Returns: The season view models.
+    /// - Throws: Database errors.
     func seasons(title: Title, userID: UUID, open: Int?) async throws -> [SeasonModel] {
         let today = watches.today()
         let episodes = try await catalog.episodes(of: title.requireID())
@@ -79,6 +109,7 @@ struct SeriesDetailService {
 }
 
 extension Request {
+    /// The detail service for this request, using the request's catalog, watches and logger.
     var seriesDetails: SeriesDetailService {
         SeriesDetailService(db: db, catalog: catalog, watches: watches, logger: logger)
     }

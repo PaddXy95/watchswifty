@@ -1,15 +1,23 @@
 import Foundation
 
+/// What a Netflix history title denotes: an episode of a show, or a movie.
 enum ParsedNetflixTitle: Sendable, Equatable, Codable {
+    /// An episode; `season` is nil when the title names none (or an unnumbered miniseries marker).
     case episode(show: String, season: Int?, episodeTitle: String)
+    /// A movie (a title without `: ` separators).
     case movie(title: String)
 }
 
 private let numberedMarkers: Set<String> = ["Staffel", "Season", "Teil", "Part", "Kapitel", "Ausgabe", "Buch", "Volume"]
 private let unnumberedMarkers: Set<String> = ["Miniserie", "Limitierte Serie", "Limited Series"]
 
+/// Reads a season marker such as "Staffel 2" or "Miniserie" from one title segment.
+///
 /// Returns nil when the segment is not a season marker, `.some(nil)` for an unnumbered marker
 /// (miniseries), `.some(n)` for "Staffel n" and friends.
+///
+/// - Parameter segment: One `: `-separated part of a Netflix title.
+/// - Returns: The season number as described above.
 private func seasonMarker(_ segment: String) -> Int?? {
     if unnumberedMarkers.contains(segment) { return .some(nil) }
     let words = segment.split(separator: " ")
@@ -25,6 +33,9 @@ private func seasonMarker(_ segment: String) -> Int?? {
 /// Splits a Netflix history title into show / season / episode, or a movie.
 /// The first season marker (not first or last segment) wins; without one, the last
 /// segment is the episode title; a single segment is a movie.
+///
+/// - Parameter raw: The title as it appears in the export.
+/// - Returns: The parsed episode or movie.
 func parseNetflixTitle(_ raw: String) -> ParsedNetflixTitle {
     let segments = raw.components(separatedBy: ": ")
     guard segments.count >= 2 else { return .movie(title: raw) }

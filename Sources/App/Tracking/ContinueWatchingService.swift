@@ -3,6 +3,7 @@ import Foundation
 import SQLKit
 import Vapor
 
+/// One card on the „Weiterschauen“ (continue watching) shelf: a series with its next episode.
 struct ContinueCard: Sendable {
     let titleID: UUID
     let tmdbID: Int
@@ -10,12 +11,16 @@ struct ContinueCard: Sendable {
     let posterPath: String?
     let rating: Int?
     let next: EpisodeInfo
+    /// Aired, unwatched regular episodes from `next` onwards (including `next`).
     let remaining: Int
+    /// Day of the newest dated watch; nil when all watches are undated.
     let lastWatchedOn: String?
+    /// Service of the most recent watch that has one.
     let lastService: StreamingService?
     /// Service for the card's button: the most recently used one that has a link (see `watchLink(for:)`).
     let watchService: StreamingService?
-    /// Newest dated watch, else the day the newest (undated) watch was recorded.
+    /// Later of the newest dated watch and the day the newest undated watch was recorded (see
+    /// `ContinueWatchingService.lastActivity(_:)`).
     var lastActivityOn: String = ""
 }
 
@@ -25,20 +30,45 @@ struct ContinueWatchingService {
 
     /// Later of the newest dated watch and the day the newest undated (bulk-marked) watch was made,
     /// so catching up after an old import keeps the series on the shelf.
+    /// - Parameter watches: The watches of one series.
+    /// - Returns: The day (`YYYY-MM-DD`), or nil without watches.
     static func lastActivity(_ watches: [WatchRow]) -> String? {
         let dated = watches.compactMap(\.watchedOn).max()
         let undatedDay = watches.filter { $0.watchedOn == nil }.compactMap(\.createdAt).max().map { CalendarDay.today(now: $0) }
         return [dated, undatedDay].compactMap { $0 }.max()
     }
 
+    /// All cards: series that are not hidden and have an aired, unwatched regular episode after the highest watched one.
+    ///
+    /// Series with dated watches come first (newest day first), then series with only undated watches (newest recorded
+    /// first).
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - today: The current day (`YYYY-MM-DD`, see `AppConfig.today()`).
+    /// - Returns: The cards in shelf order.
+    /// - Throws: Database errors.
     func cards(userID: UUID, today: String) async throws -> [ContinueCard] {
         try await build(userID: userID, onlyTitle: nil, today: today)
     }
 
+    /// The card of one series, e.g. to swap it in after its next episode was marked watched.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleID: The series.
+    ///   - today: The current day (`YYYY-MM-DD`).
+    /// - Returns: The card, or nil when the series is caught up, hidden or not watched.
+    /// - Throws: Database errors.
     func card(userID: UUID, titleID: UUID, today: String) async throws -> ContinueCard? {
         try await build(userID: userID, onlyTitle: titleID, today: today).first
     }
 
+    /// Builds and sorts the cards, for all series or only `onlyTitle`.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - onlyTitle: Limits the result to this series, or nil for all.
+    ///   - today: The current day (`YYYY-MM-DD`).
+    /// - Returns: The cards in shelf order.
+    /// - Throws: Database errors.
     private func build(userID: UUID, onlyTitle: UUID?, today: String) async throws -> [ContinueCard] {
         // Only series with an aired episode after the highest watched one get a card; their watches are all that is
         // read (caught-up series often hold most of a user's watches).
@@ -90,6 +120,12 @@ struct ContinueWatchingService {
     /// episode (`nextEpisode(in:watched:today:)`) and how many aired ones there are from there on
     /// (`remainingAiredCount(in:from:watched:today:)`). Everything after the highest watched episode is unwatched, so SQL
     /// counts them and returns one row per series instead of every episode of every watched series.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - onlyTitle: Limits the result to this series, or nil for all.
+    ///   - today: The current day (`YYYY-MM-DD`).
+    /// - Returns: The next episode and remaining count, keyed by series; caught-up series are missing.
+    /// - Throws: Database errors.
     private func pendingEpisodes(userID: UUID, onlyTitle: UUID?,
                                  today: String) async throws -> [UUID: (next: EpisodeInfo, remaining: Int)] {
         guard let sql = db as? any SQLDatabase else {
@@ -100,6 +136,7 @@ struct ContinueWatchingService {
                 return (next, remainingAiredCount(in: episodes, from: next, watched: watched, today: today))
             }
         }
+        /// One result row: the next episode of a series plus the remaining count.
         struct Row: Decodable {
             let id: UUID
             let title_id: UUID
@@ -111,6 +148,8 @@ struct ContinueWatchingService {
             let remaining: Int
         }
         /// Season and episode as one sortable number.
+        /// - Parameter table: The alias of the episodes table.
+        /// - Returns: `season_number * 1000000 + episode_number`.
         func position(_ table: String) -> any SQLExpression {
             SQLGroupExpression(SQLBinaryExpression(
                 SQLBinaryExpression(SQLColumn("season_number", table: table), .multiply, SQLLiteral.numeric("1000000")),
@@ -176,11 +215,23 @@ struct TitleRow: Sendable {
     /// See `Title.genres`.
     let genres: String?
 
+    /// Copies the columns of a loaded title.
+    /// - Parameter title: A saved title.
+    /// - Throws: An error when the title has no ID.
     init(_ title: Title) throws {
         self.init(id: try title.requireID(), tmdbID: title.tmdbID, kind: title.titleKind, name: title.name,
                   posterPath: title.posterPath, runtime: title.runtime, genres: title.genres)
     }
 
+    /// Creates a row from its columns.
+    /// - Parameters:
+    ///   - id: The title's ID.
+    ///   - tmdbID: The TMDB ID.
+    ///   - kind: Series or movie.
+    ///   - name: The title name.
+    ///   - posterPath: The TMDB poster path.
+    ///   - runtime: The stored runtime in minutes.
+    ///   - genres: The stored genre list.
     init(id: UUID, tmdbID: Int, kind: TitleKind, name: String, posterPath: String?, runtime: Int?, genres: String?) {
         self.id = id
         self.tmdbID = tmdbID
@@ -191,9 +242,16 @@ struct TitleRow: Sendable {
         self.genres = genres
     }
 
+    /// The stored genres decoded; nil when not loaded yet.
     var genreList: [Genre]? { Genre.list(genres) }
 
     /// The given titles; `kind` limits them to series or movies.
+    /// - Parameters:
+    ///   - ids: The title IDs; an empty array returns no rows.
+    ///   - kind: Only series or only movies, or nil for both.
+    ///   - db: The database; SQL databases get a plain projection, others fall back to Fluent models.
+    /// - Returns: The found titles, in no particular order.
+    /// - Throws: Database errors.
     static func all(_ ids: [UUID], kind: TitleKind? = nil, on db: any Database) async throws -> [TitleRow] {
         guard !ids.isEmpty else { return [] }
         guard let sql = db as? any SQLDatabase else {
@@ -201,6 +259,7 @@ struct TitleRow: Sendable {
             if let kind { query = query.filter(\.$kind == kind.rawValue) }
             return try await query.all().map(TitleRow.init)
         }
+        /// The raw SQL row, with column names as stored.
         struct Row: Decodable {
             let id: UUID
             let tmdb_id: Int
@@ -221,21 +280,34 @@ struct TitleRow: Sendable {
         }
     }
 
+    /// The given titles that are series.
+    /// - Parameters:
+    ///   - ids: The title IDs.
+    ///   - db: The database.
+    /// - Returns: The found series.
+    /// - Throws: Database errors.
     static func series(_ ids: [UUID], on db: any Database) async throws -> [TitleRow] {
         try await all(ids, kind: .tv, on: db)
     }
 }
 
-/// A user's rating and „ausgeblendet“ flag of a title, read without building Fluent models.
+/// A user's rating and „Ausgeblendet“ (hidden) flag of a title, read without building Fluent models.
 struct EntryRow: Sendable {
     let rating: Int?
     let hidden: Bool
 
     /// Keyed by title; `titleIDs` nil = all of the user's entries.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleIDs: Limits the result to these titles; an empty array returns no entries.
+    ///   - db: The database.
+    /// - Returns: The user's entries keyed by title ID.
+    /// - Throws: Database errors.
     static func all(userID: UUID, titleIDs: [UUID]? = nil, on db: any Database) async throws -> [UUID: EntryRow] {
         if let titleIDs, titleIDs.isEmpty { return [:] }
         let rows: [(UUID, EntryRow)]
         if let sql = db as? any SQLDatabase {
+            /// The raw SQL row, with column names as stored.
             struct Row: Decodable {
                 let title_id: UUID
                 let rating: Int?

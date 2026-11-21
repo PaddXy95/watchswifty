@@ -20,10 +20,16 @@ final class UserTitle: Model, @unchecked Sendable {
     /// Day of the last „Erledigt“ on the new-episodes note.
     @OptionalField(key: "new_seen_until") var newSeenUntil: String?
 
+    /// Whether the series is followed („Beobachten“, watch for new episodes); nil counts as not followed.
     var isFollowed: Bool { followed ?? false }
 
+    /// Creates an empty entry; required by Fluent.
     init() {}
 
+    /// Creates a visible, unrated library entry.
+    /// - Parameters:
+    ///   - userID: The owning user.
+    ///   - titleID: The series or movie.
     init(userID: UUID, titleID: UUID) {
         self.$user.id = userID
         self.$title.id = titleID

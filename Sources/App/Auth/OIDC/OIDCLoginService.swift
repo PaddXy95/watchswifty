@@ -11,6 +11,9 @@ struct OIDCLoginService {
     let lock: AsyncMutex
 
     /// The account linked with this identity (issuer compared without a trailing slash).
+    /// - Parameter identity: The verified identity.
+    /// - Returns: The linked account, or `nil`.
+    /// - Throws: Database errors.
     func account(for identity: OIDCIdentity) async throws -> User? {
         let candidates = try await User.query(on: db).filter(\.$oidcSubject == identity.subject).all()
         return candidates.first { user in
@@ -20,6 +23,13 @@ struct OIDCLoginService {
 
     /// Creates the confirmed account (no password, linked, address from the provider). Returns the existing account
     /// when the identity got linked meanwhile (double submit). The very first user becomes admin.
+    ///
+    /// Runs under `app.oidcIdentityLock`, so concurrent submits cannot create two accounts for one identity.
+    /// - Parameters:
+    ///   - identity: The verified identity.
+    ///   - raw: The username as entered.
+    /// - Returns: The new (or already linked) account.
+    /// - Throws: `APIError.validation` for an invalid or taken username; database or encryption errors.
     func createAccount(_ identity: OIDCIdentity, username raw: String) async throws -> User {
         let username = User.normalize(raw)
         if let error = AccountValidation.usernameError(username) { throw APIError.validation(error) }
@@ -40,6 +50,13 @@ struct OIDCLoginService {
 
     /// Links `user` with the identity (replaces a link to another issuer). Fails when the identity belongs to another
     /// account – also when that happens concurrently (unique index).
+    ///
+    /// Runs under `app.oidcIdentityLock`. An existing link of `user` to the configured provider is never replaced.
+    /// - Parameters:
+    ///   - user: The account to link.
+    ///   - identity: The verified identity.
+    /// - Throws: `APIError.validation` when the identity belongs to another account or `user` is already linked with
+    ///   the configured provider; database errors.
     func link(_ user: User, to identity: OIDCIdentity) async throws {
         let taken = APIError.validation("Dieses \(oidc.displayName)-Konto ist schon mit einem anderen WatchSwifty-Konto verknüpft.")
         try await lock.withLock {
@@ -63,6 +80,11 @@ struct OIDCLoginService {
 
     /// Rewrites the issuer of every account linked with `from` (trailing slash ignored) to `to`, in one transaction.
     /// Throws without changing anything when that would create duplicate identities.
+    /// - Parameters:
+    ///   - from: The old issuer.
+    ///   - to: The new issuer, stored exactly as given.
+    /// - Returns: The number of moved accounts.
+    /// - Throws: `APIError.validation` naming the clashing account; database errors.
     func moveIssuer(from: String, to: String) async throws -> Int {
         try await lock.withLock {
             try await db.transaction { db in
@@ -83,11 +105,18 @@ struct OIDCLoginService {
         }
     }
 
+    /// The error for an account that is already linked with the provider.
+    /// - Parameter oidc: The provider in effect (for its display name).
+    /// - Returns: An `APIError.validation` with a German message.
     static func alreadyLinked(_ oidc: OIDCConfig) -> APIError {
         APIError.validation("Das Konto ist schon mit \(oidc.displayName) verknüpft.")
     }
 
     /// Linked accounts without password take the provider's address on every sign-in (missing or invalid: unchanged).
+    /// - Parameters:
+    ///   - user: The signed-in account.
+    ///   - identity: The verified identity.
+    /// - Throws: Database or encryption errors.
     func syncEmail(_ user: User, from identity: OIDCIdentity) async throws {
         guard user.emailFromProvider(oidc), let address = identity.email.flatMap(EmailAddress.normalize),
               user.emailState(cipher).address != address else { return }
@@ -97,6 +126,8 @@ struct OIDCLoginService {
 
     /// Prefill for „Benutzername“: `preferred_username` (without `@`), the part before `@` of it or of the address,
     /// then the name – each lowercased, reduced to the allowed characters and cut to 32; nil when nothing fits.
+    /// - Parameter identity: The verified identity.
+    /// - Returns: The first candidate that passes `AccountValidation.usernameError(_:)`, or `nil`.
     static func suggestUsername(_ identity: OIDCIdentity) -> String? {
         let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789._-")
         var candidates: [String] = []
@@ -126,6 +157,11 @@ struct OIDCReadiness: Equatable, Sendable {
 
 extension OIDCLoginService {
     /// Counts accounts linked with the configured issuer (older issuers do not count).
+    /// - Parameters:
+    ///   - db: The database.
+    ///   - oidc: The provider in effect.
+    /// - Returns: Linked and total account counts and whether an admin is linked.
+    /// - Throws: Database errors.
     static func readiness(db: any Database, oidc: OIDCConfig) async throws -> OIDCReadiness {
         let users = try await User.query(on: db).all()
         let linked = users.filter { $0.isLinked(oidc) }
@@ -135,6 +171,7 @@ extension OIDCLoginService {
 
 extension Request {
     /// Only valid while OIDC is configured.
+    /// - Throws: `Abort(.notFound)` while OIDC is not configured.
     var oidcLogin: OIDCLoginService {
         get throws {
             guard let oidc = application.loginSettings.current.oidc else { throw Abort(.notFound) }

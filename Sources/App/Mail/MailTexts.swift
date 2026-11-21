@@ -2,6 +2,9 @@ import Foundation
 
 /// The mails WatchSwifty sends (plain text, German).
 enum MailTexts {
+    /// Test mail sent from the system page.
+    /// - Parameter to: Recipient address.
+    /// - Returns: The mail.
     static func test(to: String) -> OutgoingMail {
         OutgoingMail(to: to, subject: "WatchSwifty: Testmail", body: """
             Hallo,
@@ -13,6 +16,12 @@ enum MailTexts {
             """)
     }
 
+    /// „Passwort zurücksetzen“ (reset password) mail with a one-time link valid for one hour.
+    /// - Parameters:
+    ///   - to: Recipient address.
+    ///   - username: The account's username.
+    ///   - link: The reset link.
+    /// - Returns: The mail.
     static func reset(to: String, username: String, link: String) -> OutgoingMail {
         OutgoingMail(to: to, subject: "WatchSwifty: Passwort zurücksetzen", body: """
             Hallo \(username),
@@ -30,6 +39,14 @@ enum MailTexts {
     }
 
     /// Admin's „Verknüpfungslink“: binds whoever signs in at the provider to this account.
+    /// - Parameters:
+    ///   - to: Recipient address.
+    ///   - username: The account's username.
+    ///   - inviter: Username of the admin who created the link.
+    ///   - ssoName: Display name of the OIDC provider.
+    ///   - link: The one-time linking link.
+    ///   - expires: When the link expires (shown as a date).
+    /// - Returns: The mail.
     static func ssoLink(to: String, username: String, inviter: String, ssoName: String, link: String, expires: Date) -> OutgoingMail {
         OutgoingMail(to: to, subject: "WatchSwifty: Konto mit \(ssoName) verknüpfen", body: """
             Hallo \(username),
@@ -48,7 +65,18 @@ enum MailTexts {
             """)
     }
 
+    /// Invitation mail for an account without password.
+    ///
     /// With `ssoName` the invitation can also be accepted through the OIDC provider; without password login only so.
+    /// - Parameters:
+    ///   - to: Recipient address.
+    ///   - username: The new account's username.
+    ///   - inviter: Username of the inviting admin.
+    ///   - link: The invitation link.
+    ///   - expires: When the link expires (shown as a date).
+    ///   - ssoName: Display name of the OIDC provider, if set up.
+    ///   - passwordLogin: Whether password login is enabled.
+    /// - Returns: The mail.
     static func invite(to: String, username: String, inviter: String, link: String, expires: Date, ssoName: String? = nil,
                        passwordLogin: Bool = true) -> OutgoingMail {
         let until = CalendarDay.display(CalendarDay.today(now: expires))

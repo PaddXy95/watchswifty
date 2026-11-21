@@ -10,16 +10,22 @@ struct AvailabilityDue: Sendable, Equatable {
     let year: Int?
     /// Service names, by display priority.
     let providers: [String]
+    /// The pending notices behind this item, marked as sent after a successful send.
     let noticeIDs: [UUID]
 }
 
 /// Which offers of „Später ansehen“ titles a user already knows (spec §4.3, §6).
 struct AvailabilityNoticeService {
+    /// The database holding the notices.
     let db: any Database
 
     /// After a successful fetch of the title: per list entry whose user's country the fetch covered, records offers at
     /// the user's services as `.baseline` (entry not yet baselined) or as new (`.pending` / `.skipped`), and forgets
     /// offers that are gone, so a return is reported again.
+    /// - Parameters:
+    ///   - titleID: The fetched title.
+    ///   - now: The time recorded on new notices.
+    /// - Throws: Database errors.
     func reconcile(titleID: UUID, now: Date = .now) async throws {
         try await reconcile(entries: try await WatchLaterEntry.query(on: db).filter(\.$title.$id == titleID).all(), titleID: titleID, now: now)
     }
@@ -27,6 +33,11 @@ struct AvailabilityNoticeService {
     /// `reconcile` for entries loaded earlier: each one is read again, so an entry removed or re-baselined meanwhile (by
     /// the user while a fetch was running) is not written with stale state. Concurrent runs may insert the same notice;
     /// the second insert is ignored.
+    /// - Parameters:
+    ///   - loaded: The list entries of the title, loaded before the fetch.
+    ///   - titleID: The fetched title.
+    ///   - now: The time recorded on new notices.
+    /// - Throws: Database errors.
     func reconcile(entries loaded: [WatchLaterEntry], titleID: UUID, now: Date = .now) async throws {
         guard !loaded.isEmpty else { return }
         let availability = AvailabilityService(db: db)
@@ -58,17 +69,29 @@ struct AvailabilityNoticeService {
 
     /// Marks all of the user's entries so the next fetch records the present offers as known (services, country or the
     /// switch changed).
+    /// - Parameter userID: The user.
+    /// - Throws: Database errors.
     func rebaseline(userID: UUID) async throws {
         try await WatchLaterEntry.query(on: db).filter(\.$user.$id == userID).set(\.$baselined, to: false).update()
     }
 
     /// Switching the notification on: offers still waiting from before (no channel, failed send) are not reported.
+    ///
+    /// Their state changes from `.pending` to `.skipped`.
+    /// - Parameter userID: The user.
+    /// - Throws: Database errors.
     func dropPending(userID: UUID) async throws {
         try await AvailabilityNotice.query(on: db).filter(\.$user.$id == userID).filter(\.$state == NoticeState.pending.rawValue)
             .set(\.$state, to: NoticeState.skipped.rawValue).update()
     }
 
     /// Pending offers of titles still on the list whose offer still exists, one item per title, by name.
+    ///
+    /// Only subscription, free and ad-supported offers (``AvailabilityService/notifyKinds``) in the user's country count;
+    /// titles whose pending offers all disappeared are left out.
+    /// - Parameter userID: The user.
+    /// - Returns: The digest items, sorted case-insensitively by title name.
+    /// - Throws: Database errors.
     func due(userID: UUID) async throws -> [AvailabilityDue] {
         let pending = try await AvailabilityNotice.query(on: db).filter(\.$user.$id == userID)
             .filter(\.$state == NoticeState.pending.rawValue).all()
@@ -95,6 +118,10 @@ struct AvailabilityNoticeService {
     }
 
     /// Marks the items' notices as sent.
+    ///
+    /// Called only after the digest was sent successfully.
+    /// - Parameter items: The items that were sent.
+    /// - Throws: Database errors.
     func markSent(_ items: [AvailabilityDue]) async throws {
         let ids = items.flatMap(\.noticeIDs)
         guard !ids.isEmpty else { return }
@@ -104,6 +131,11 @@ struct AvailabilityNoticeService {
     }
 
     /// Titles with an offer that appeared at or after `since` (not a baseline), with the earliest such time („neu seit“).
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - since: The start of the window.
+    /// - Returns: For each such title ID, the earliest time a new offer was recorded.
+    /// - Throws: Database errors.
     func newSince(userID: UUID, since: Date) async throws -> [UUID: Date] {
         let notices = try await AvailabilityNotice.query(on: db).filter(\.$user.$id == userID)
             .filter(\.$state != NoticeState.baseline.rawValue).filter(\.$noticedAt >= since).all()
@@ -115,12 +147,17 @@ struct AvailabilityNoticeService {
     }
 
     /// The user's services (TMDB provider ids).
+    /// - Parameter userID: The user.
+    /// - Returns: The provider ids of the user's streaming services.
+    /// - Throws: Database errors.
     func serviceIDs(userID: UUID) async throws -> Set<Int> {
         Set(try await UserStreamingService.query(on: db).filter(\.$user.$id == userID).all().map(\.providerID))
     }
 }
 
 /// Runs `insert`, ignoring a unique-constraint failure (a concurrent request inserted the same row first).
+/// - Parameter insert: The insert to run.
+/// - Throws: Any error of `insert` other than a constraint failure (any kind is ignored, not only unique ones).
 func ignoringDuplicate(_ insert: () async throws -> Void) async throws {
     do {
         try await insert()

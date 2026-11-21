@@ -2,11 +2,15 @@ import Elementary
 
 /// „Neues Konto anlegen“ after the first sign-in through the provider (spec „Neues Konto anlegen“).
 struct NewAccountPage: HTML {
+    /// Display name of the provider.
     let ssoName: String
+    /// Password login is on: the hint suggests signing in with the password and linking under „Konto“.
     let passwordLogin: Bool
+    /// Prefilled username (the provider's suggestion or the last input).
     let username: String
     /// Set when the provider's suggestion is already taken.
     var takenSuggestion: String? = nil
+    /// Validation error of the last submit.
     var error: String? = nil
 
     var body: some HTML {

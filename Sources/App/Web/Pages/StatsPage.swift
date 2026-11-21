@@ -4,17 +4,22 @@ import Elementary
 /// year/month table sits folded under „Alle Zahlen“.
 struct StatsPage: HTML {
     let navContext: NavContext
+    /// All figures for the selected period and the year/month table.
     let stats: Stats
 
+    /// German month names, index 0 is January.
     static let monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni",
                              "Juli", "August", "September", "Oktober", "November", "Dezember"]
 
+    /// The period's time in whole days („≈ 3 Tage“, about 3 days); nil below one day.
     private var days: String? {
         guard stats.period.minutes >= 1440 else { return nil }
         let days = Int((Double(stats.period.minutes) / 1440).rounded())
         return days == 1 ? "≈ 1 Tag" : "≈ \(groupedThousands(days)) Tage"
     }
 
+    /// Note that viewings without known runtime are missing from the time (and that runtimes are being fetched from TMDB);
+    /// nil when every runtime is known.
     private var runtimeNote: String? {
         let unknown = stats.period.unknownRuntime
         guard unknown > 0 else { return nil }
@@ -59,6 +64,8 @@ struct StatsPage: HTML {
         }
     }
 
+    /// Dashboard of the selected period: stat tiles (with the change against the previous period when there is one),
+    /// the time chart per year or month, services, top lists, genres and ratings.
     @HTMLBuilder private var dashboard: some HTML {
         let previous = stats.previous
         let compare = stats.year.map { " ggü. \($0 - 1)" } ?? ""
@@ -167,6 +174,8 @@ struct StatsPage: HTML {
         }
     }
 
+    /// The folded „Alle Zahlen“ (all figures) table: one expandable row per year with its months, the undated row and the
+    /// total; bars are scaled to the largest year or month.
     @HTMLBuilder private var allNumbers: some HTML {
         details(.class("stats-all")) {
             summary { "Alle Zahlen" }
@@ -205,6 +214,8 @@ struct StatsPage: HTML {
 
 extension StatsPage {
     /// „2× · 4 Std. 32 Min.“ (time only when the runtime is known).
+    /// - Parameter movie: The movie's figures.
+    /// - Returns: The entry for a `RankedList`, linking to the movie page.
     static func movieItem(_ movie: MovieStat) -> RankedItem {
         RankedItem(href: "/movie/\(movie.tmdbID)", posterPath: movie.posterPath, name: movie.name,
                    detail: "\(movie.watches)×" + (movie.minutes > 0 ? " · \(formatDuration(minutes: movie.minutes))" : ""),
@@ -212,6 +223,7 @@ extension StatsPage {
     }
 }
 
+/// Legend for the stacked bars (series and movies); hidden from screen readers.
 struct ChartLegend: HTML {
     var body: some HTML {
         span(.class("chart-legend"), .custom(name: "aria-hidden", value: "true")) {
@@ -221,11 +233,18 @@ struct ChartLegend: HTML {
     }
 }
 
+/// A count for the figures table: grouped thousands, or „–“ for zero.
+/// - Parameter value: The count.
+/// - Returns: The text for the cell.
 func countText(_ value: Int) -> String { value == 0 ? "–" : groupedThousands(value) }
 
+/// Dashboard tile with a big value, a caption and an optional change, styled up or down by its leading „+“ or „−“.
 struct StatTile: HTML {
+    /// The formatted figure.
     let value: String
+    /// What the figure counts.
     let caption: String
+    /// Percentage change against the previous period, e.g. „+12 % ggü. 2025“ (vs. 2025); nil hides it.
     var delta: String? = nil
 
     var body: some HTML {
@@ -239,9 +258,13 @@ struct StatTile: HTML {
     }
 }
 
+/// Cells of one row of the figures table: caption, movies, series, episodes, time and a bar.
 struct PeriodCells: HTML {
+    /// Row caption (year, month, „ohne Datum“ or „Gesamt“).
     let caption: String
+    /// Figures of the row.
     let stats: PeriodStats
+    /// Largest time among the sibling rows; scales the bar (0 leaves it empty).
     let maxMinutes: Int
 
     var body: some HTML {
@@ -254,8 +277,11 @@ struct PeriodCells: HTML {
     }
 }
 
+/// Horizontal bar filled to `value` as a share of `max` (empty when `max` is 0); hidden from screen readers.
 struct Bar: HTML {
+    /// Value to show.
     let value: Int
+    /// Value of a full bar.
     let max: Int
 
     var body: some HTML {

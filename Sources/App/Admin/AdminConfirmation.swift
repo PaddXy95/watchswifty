@@ -10,22 +10,34 @@ enum AdminConfirmation: Sendable {
     /// App API: the acting admin's current password from the request.
     case password(String?)
 
+    /// Error text when the web confirmation is missing or older than five minutes.
     static let neededMessage = "Bitte zuerst bestätigen, dass du es bist (gilt 5 Minuten)."
+    /// Error text when an App API request lacks the current password.
     static let passwordNeededMessage = "Zur Bestätigung bitte dein aktuelles Passwort mitschicken."
+    /// Error text for accounts without a usable password, which can only confirm in the browser.
     static let browserOnlyMessage = "Dein Konto hat kein Passwort – Admin-Rechte bitte im Browser vergeben."
     /// Web session key: when the admin last confirmed with their password (seconds since 1970).
     static let sessionKey = "admin.confirmedAt"
 
+    /// Builds the 403 `confirmationRequired` API error.
+    /// - Parameter message: The German message to return.
+    /// - Returns: The API error.
     static func required(_ message: String) -> APIError {
         APIError(status: .forbidden, code: "confirmationRequired", message: message)
     }
 
+    /// 403 `confirmInBrowser` error for accounts that cannot confirm with a password.
     static let browserOnly = APIError(status: .forbidden, code: "confirmInBrowser", message: browserOnlyMessage)
 }
 
 extension UserAdminService {
     /// Throws unless `actor` confirmed: on the web within the last five minutes, in the App API with the current
     /// password (accounts without a usable password confirm through the provider, so only in the browser).
+    /// - Parameters:
+    ///   - actor: The admin performing the action.
+    ///   - confirmation: The web confirmation flag or the password sent with the API request.
+    /// - Throws: `AdminConfirmation.required(_:)` when the confirmation is missing, stale or the password is wrong;
+    ///   `AdminConfirmation.browserOnly` for SSO accounts or accounts without a password in the App API.
     func requireConfirmation(by actor: User, _ confirmation: AdminConfirmation) async throws {
         switch confirmation {
         case let .recent(confirmed):

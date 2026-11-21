@@ -3,10 +3,15 @@ import ElementaryHTMX2
 
 /// Private comment editor (series, season or movie); saves via htmx and replaces itself.
 struct CommentBox: HTML {
+    /// Element id of the form; also the prefix of the textarea id (`<id>-text`).
     let id: String
+    /// URL the form posts the comment to.
     let action: String
+    /// Label above the textarea, e.g. „Kommentar zur Staffel“ (comment on the season).
     let caption: String
+    /// The saved comment, or `nil` for none.
     let comment: String?
+    /// Shows „Gespeichert.“ (saved) next to the button after a successful save.
     var saved = false
 
     var body: some HTML {

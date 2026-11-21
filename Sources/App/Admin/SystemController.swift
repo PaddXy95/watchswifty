@@ -1,9 +1,16 @@
 import Fluent
 import Vapor
 
+/// Web routes of the admin page „System“ under `/admin/system`: update check, mail, notifications and SSO login.
+///
+/// All routes are admin-only (`RequireAdminMiddleware`); validation errors re-render the page with the message (and the
+/// entered values where the block has a form), with the affected block opened.
 struct SystemController {
+    /// Form field with the recipient of a test mail.
     struct TestMailInput: Content { var to: String }
 
+    /// Registers the system routes behind `RequireAdminMiddleware`.
+    /// - Parameter protected: The route group requiring a logged-in user.
     func register(on protected: any RoutesBuilder) {
         let system = protected.grouped(RequireAdminMiddleware()).grouped("admin", "system")
         system.get(use: show)
@@ -20,12 +27,21 @@ struct SystemController {
         system.post("password-login", use: setPasswordLogin)
     }
 
+    /// `GET /admin/system`: renders the system page, opening the block named by `?open=`.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The system page.
+    /// - Throws: Database errors.
     func show(req: Request) async throws -> HTMLResponse {
         // `?open=updates` (update hint in the footer); unknown values open nothing.
         try await page(req, open: (try? req.query.get(String.self, at: "open")).flatMap(SystemBlock.init(rawValue:)))
     }
 
+    /// `POST /admin/system/update-check`: turns the automatic update check on or off.
+    ///
     /// Turning automatic checks on asks GitHub at once, so the admin sees the result.
+    /// - Parameter req: The incoming request (`enabled` is non-empty when checked).
+    /// - Returns: The page with a notice and the updates block open.
+    /// - Throws: Database errors.
     func toggle(req: Request) async throws -> HTMLResponse {
         // An unchecked checkbox sends nothing, so the body may be empty.
         let enabled = ((try? req.content.get(String.self, at: "enabled")) ?? "").isEmpty == false
@@ -37,11 +53,19 @@ struct SystemController {
                               open: .updates)
     }
 
+    /// `POST /admin/system/check-now`: asks GitHub for the latest release right away.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The system page with the updates block open.
+    /// - Throws: Database errors.
     func checkNow(req: Request) async throws -> HTMLResponse {
         try await req.application.updates.checkNow()
         return try await page(req, open: .updates)
     }
 
+    /// `POST /admin/system/mail`: validates and stores the SMTP settings (sealed with `TokenCipher`).
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice, or with the error and the entered values.
+    /// - Throws: Decoding and database errors.
     func saveMail(req: Request) async throws -> HTMLResponse {
         let input = try req.content.decode(MailSettingsInput.self)
         do {
@@ -52,11 +76,19 @@ struct SystemController {
         return try await page(req, notice: "E-Mail-Einstellungen gespeichert.", open: .mail)
     }
 
+    /// `POST /admin/system/mail/delete`: removes the mail settings.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice.
+    /// - Throws: Database errors.
     func deleteMail(req: Request) async throws -> HTMLResponse {
         try await req.mailSettings.delete()
         return try await page(req, notice: "E-Mail-Einstellungen gelöscht.", open: .mail)
     }
 
+    /// `POST /admin/system/mail/test`: sends a test mail with the stored settings.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice, or with the validation or SMTP error.
+    /// - Throws: Decoding and database errors.
     func testMail(req: Request) async throws -> HTMLResponse {
         let to = try req.content.decode(TestMailInput.self).to
         do {
@@ -72,11 +104,16 @@ struct SystemController {
 
     // MARK: - Benachrichtigungen
 
+    /// Form fields of the notifications block: daily run time (`HH:MM`) and optional KNot webhook URL.
     struct NotificationsInput: Content {
         var dailyRunTime: String
         var webhookURL: String?
     }
 
+    /// `POST /admin/system/notifications`: stores the daily run time and the webhook address.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice, or with the error and the entered values.
+    /// - Throws: Decoding and database errors.
     func saveNotifications(req: Request) async throws -> HTMLResponse {
         let input = try req.content.decode(NotificationsInput.self)
         do {
@@ -88,6 +125,10 @@ struct SystemController {
         return try await page(req, notice: "Benachrichtigungen gespeichert.", open: .notifications)
     }
 
+    /// `POST /admin/system/notifications/webhook/delete`: removes the KNot webhook.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice.
+    /// - Throws: Database errors.
     func deleteWebhook(req: Request) async throws -> HTMLResponse {
         try await req.notificationSettings.removeWebhook()
         return try await page(req, notice: "Webhook entfernt.", open: .notifications)
@@ -95,6 +136,10 @@ struct SystemController {
 
     // MARK: - Anmeldung (SSO)
 
+    /// `POST /admin/system/oidc`: stores the OIDC setup and, if complete, tests the connection.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice including the test result, or with the validation or test error.
+    /// - Throws: Decoding and database errors.
     func saveOIDC(req: Request) async throws -> HTMLResponse {
         let input = try req.content.decode(OIDCSettingsInput.self)
         let saved: OIDCSettings
@@ -112,6 +157,10 @@ struct SystemController {
         }
     }
 
+    /// `POST /admin/system/oidc/test`: tests the stored OIDC setup.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with the result; 422 without setup, 503 when the test fails.
+    /// - Throws: Database errors.
     func testOIDC(req: Request) async throws -> HTMLResponse {
         guard let config = req.application.loginSettings.current.oidc else {
             return try await page(req, status: .unprocessableEntity, error: OIDCSettingsService.needsOIDCMessage, open: .oidc)
@@ -122,6 +171,10 @@ struct SystemController {
         }
     }
 
+    /// `POST /admin/system/oidc/delete`: removes the OIDC setup.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice, or with the error.
+    /// - Throws: Database errors.
     func deleteOIDC(req: Request) async throws -> HTMLResponse {
         do {
             try await req.oidcSettings.delete()
@@ -131,6 +184,10 @@ struct SystemController {
         return try await page(req, notice: "Anmelde-Einstellungen gelöscht.", open: .oidc)
     }
 
+    /// `POST /admin/system/password-login`: turns password login on or off.
+    /// - Parameter req: The incoming request.
+    /// - Returns: The page with a notice, or with the error.
+    /// - Throws: Database errors.
     func setPasswordLogin(req: Request) async throws -> HTMLResponse {
         let enabled = (try? req.content.get(String.self, at: "enabled")) == "true"
         do {
@@ -142,6 +199,10 @@ struct SystemController {
     }
 
     /// „Verbindung testen“: discovery and keys afresh; the text for the page either way.
+    /// - Parameters:
+    ///   - req: The incoming request.
+    ///   - config: The OIDC setup to test.
+    /// - Returns: The German success text (issuer and key count), or a `CheckFailure` with the reason.
     static func check(_ req: Request, _ config: OIDCConfig) async -> Result<String, CheckFailure> {
         do {
             let result = try await req.application.oidcProviders.provider(for: config).check()
@@ -154,8 +215,22 @@ struct SystemController {
         }
     }
 
+    /// German message of a failed OIDC connection test.
     struct CheckFailure: Error { let message: String }
 
+    /// Renders the system page with the update, mail, SSO and notification state.
+    /// - Parameters:
+    ///   - req: The incoming request.
+    ///   - status: HTTP status of the response.
+    ///   - notice: German success notice to show.
+    ///   - error: German error message to show.
+    ///   - mailForm: Entered mail values to show again after an error.
+    ///   - testRecipient: Test mail recipient; defaults to the admin's own address.
+    ///   - oidcForm: Entered OIDC values to show again after an error.
+    ///   - notificationsForm: Entered notification values to show again after an error.
+    ///   - open: The block to open.
+    /// - Returns: The rendered page.
+    /// - Throws: Database errors.
     private func page(_ req: Request, status: HTTPStatus = .ok, notice: String? = nil, error: String? = nil,
                       mailForm: MailFormValues? = nil, testRecipient: String? = nil,
                       oidcForm: OIDCFormValues? = nil, notificationsForm: (time: String, url: String)? = nil,
@@ -181,6 +256,8 @@ struct SystemController {
     }
 
     /// Suggestion for „Adresse von WatchSwifty“ (only pre-fills the form; links use the stored value only).
+    /// - Parameter req: The incoming request (`Host` and `X-Forwarded-Proto` headers).
+    /// - Returns: `http(s)://host`, or an empty string without `Host` header.
     static func requestOrigin(_ req: Request) -> String {
         guard let host = req.headers.first(name: .host), !host.isEmpty else { return "" }
         let scheme = req.headers.first(name: "X-Forwarded-Proto")?.split(separator: ",").first

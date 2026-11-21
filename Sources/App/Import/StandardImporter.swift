@@ -12,7 +12,14 @@ struct StandardImporter {
     /// (security audit F14). nil for the worker, which always runs with the user's token.
     var tokenlessUser: UUID? = nil
 
+    /// Matches a pending entry to a TMDB title and records it, or saves it for review or as not found.
+    ///
     /// IDs first (with a plausibility check), then title and year; unclear entries go to review.
+    ///
+    /// A plausible ID hit is recorded; an implausible one goes to review together with the search results. Does
+    /// nothing when the entry no longer exists.
+    /// - Parameter entry: A pending entry.
+    /// - Throws: `TMDBError` from TMDB calls, or a database error.
     func resolve(_ entry: ImportEntry) async throws {
         // A new upload may have replaced the list while the worker held this entry.
         guard let id = entry.id, try await ImportEntry.find(id, on: db) != nil else { return }
@@ -54,6 +61,11 @@ struct StandardImporter {
     }
 
     /// Search with the user's own words in the entry's kind: always shows the hits for picking.
+    ///
+    /// - Parameters:
+    ///   - entry: The entry to search for.
+    ///   - query: The user's search words.
+    /// - Throws: `TMDBError` from the search, or a database error.
     func search(_ entry: ImportEntry, query: String) async throws {
         let results = try await tmdb.search(query, kind: entry.titleKind)
         try await save(entry, status: results.isEmpty ? .notFound : .review, candidates: Array(results.prefix(8)))
@@ -62,6 +74,14 @@ struct StandardImporter {
     /// Records the entry for the given title. Viewings already known (same movie/episode on the same day ±1, or any
     /// viewing of it for an undated row) are not added again; episodes the catalog lacks are counted as missing, after
     /// one refresh of a series that was cached before.
+    ///
+    /// Viewings are saved as manual watches (a future or invalid date is stored as undated); new viewings unhide the
+    /// title and may end a „Später ansehen“ (watch later) entry, the rating replaces the old one and the comment is
+    /// appended when new. Nothing is written when a new upload replaced the entry meanwhile.
+    /// - Parameters:
+    ///   - entry: The entry to record.
+    ///   - tmdbID: The TMDB ID of the chosen title (in the entry's kind).
+    /// - Throws: `TMDBError` from fetching or refreshing the title, or a database error.
     func record(_ entry: ImportEntry, tmdbID: Int) async throws {
         let catalog = CatalogService(db: db, tmdb: tmdb, tokenlessUser: tokenlessUser)
         let kind = entry.titleKind
@@ -73,7 +93,9 @@ struct StandardImporter {
 
         var episodeIDs: [String: UUID] = [:]
         if kind == .tv {
+            /// Lookup key of an episode by season and number.
             func key(_ season: Int, _ number: Int) -> String { "\(season)#\(number)" }
+            /// Maps the title's cached episodes by season and number to their IDs.
             func index() async throws -> [String: UUID] {
                 var ids: [String: UUID] = [:]
                 for episode in try await catalog.episodes(of: titleID) where ids[key(episode.season, episode.number)] == nil {
@@ -156,6 +178,12 @@ struct StandardImporter {
         }
     }
 
+    /// Saves a review or not-found result and clears the entry's error.
+    /// - Parameters:
+    ///   - entry: The entry.
+    ///   - status: The new status.
+    ///   - candidates: The candidates to show (empty clears them).
+    /// - Throws: A database error.
     private func save(_ entry: ImportEntry, status: ImportEntryStatus, candidates: [TMDBSearchResult]) async throws {
         entry.status = status.rawValue
         entry.setCandidates(candidates)
@@ -163,11 +191,23 @@ struct StandardImporter {
         try await entry.save(on: db)
     }
 
+    /// The cached title for a TMDB ID, if any.
+    /// - Parameters:
+    ///   - kind: Series or movie.
+    ///   - tmdbID: The TMDB ID.
+    /// - Returns: The cached title, or nil.
+    /// - Throws: A database error.
     private func cachedTitle(kind: TitleKind, tmdbID: Int) async throws -> Title? {
         try await Title.query(on: db).filter(\.$kind == kind.rawValue).filter(\.$tmdbID == tmdbID).first()
     }
 
     /// The title behind an ID from the file (cache first); nil when TMDB does not know it.
+    ///
+    /// - Parameters:
+    ///   - kind: Series or movie.
+    ///   - tmdbID: The TMDB ID from the file.
+    /// - Returns: The title as a search result, or nil.
+    /// - Throws: `TMDBError` other than `notFound`, or a database error.
     private func lookup(kind: TitleKind, tmdbID: Int) async throws -> TMDBSearchResult? {
         if let cached = try await cachedTitle(kind: kind, tmdbID: tmdbID) {
             return TMDBSearchResult(id: tmdbID, kind: kind, name: cached.name, originalName: cached.originalName,
@@ -201,6 +241,14 @@ actor ImportWorker {
     private var running = false
     private var rerun = false
 
+    /// Creates the worker; passes only start via `kick()` when `enabled` is true.
+    /// - Parameters:
+    ///   - db: The database.
+    ///   - provider: Builds a TMDB client from a user's token.
+    ///   - cipher: Opens the users' encrypted TMDB tokens.
+    ///   - logger: Logger for pass summaries and stops.
+    ///   - today: The current day (`AppConfig.today()`), so viewings are never dated in the future.
+    ///   - enabled: Whether `kick()` starts passes; `processAll()` works regardless.
     init(db: any Database, provider: TMDBProvider, cipher: TokenCipher, logger: Logger,
          today: @escaping @Sendable () -> String, enabled: Bool) {
         self.db = db
@@ -211,12 +259,18 @@ actor ImportWorker {
         self.enabled = enabled
     }
 
+    /// Starts a pass in the background (no-op when disabled).
     func kick() {
         guard enabled else { return }
         Task { _ = try? await self.processAll() }
     }
 
     /// One pass over all pending entries; returns how many were resolved. A call during a pass schedules another pass.
+    ///
+    /// A user without a TMDB token gets the error on every entry. Any error is stored on its entry; a TMDB error for
+    /// which `stopsPass(_:)` is true also ends the user's pass (the rest stays pending), otherwise the next entry follows.
+    /// - Returns: The number of resolved entries (0 when another pass was running).
+    /// - Throws: A database error.
     func processAll() async throws -> Int {
         if running {
             rerun = true
@@ -263,6 +317,9 @@ actor ImportWorker {
 }
 
 extension ImportWorker {
+    /// Whether a TMDB error makes the rest of a user's entries fail too (token, rate limit, network, server error).
+    /// - Parameter error: The error of one entry.
+    /// - Returns: true when the user's remaining entries should wait for the next pass.
     static func stopsPass(_ error: TMDBError) -> Bool {
         switch error {
         case .missingToken, .unauthorized, .rateLimited, .network: true
@@ -273,8 +330,10 @@ extension ImportWorker {
 }
 
 extension Application {
+    /// Storage key of the app-wide `ImportWorker`.
     private struct ImportWorkerKey: StorageKey { typealias Value = ImportWorker }
 
+    /// The app-wide standard import worker; reading it before it is set traps.
     var importWorker: ImportWorker {
         get {
             guard let worker = storage[ImportWorkerKey.self] else { fatalError("Import worker not configured") }
@@ -286,6 +345,7 @@ extension Application {
 
 /// Resumes entries left pending by a restart.
 struct ImportWorkerLifecycle: LifecycleHandler {
+    /// Kicks the import worker once the application has booted.
     func didBootAsync(_ application: Application) async throws {
         await application.importWorker.kick()
     }
