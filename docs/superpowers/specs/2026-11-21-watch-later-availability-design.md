@@ -215,11 +215,11 @@ den Abfragen, beim Hinzufügen direkt nach der Sofort-Abfrage.
 Im Tageslauf: `title_availability` mit `fetched_at` älter als 30 Tage samt ihren `title_providers` löschen.
 `availability_notices` bleiben dabei bestehen (sonst käme nach einer langen Pause eine doppelte Nachricht).
 
-## 5. Detailseite: Block „Wo läuft das?“
+## 5. Detailseite: Block „Verfügbarkeit“
 
 Wie im Entwurf `detail-availability-v2.html` (mit Haken und grünem Rand aus Rückmeldung), unter dem Kopf der Seite,
 vor Staffeln bzw. Sichtungen, für Serien und Filme:
-- Überschrift „Wo läuft das?“ + Land.
+- Überschrift „Verfügbarkeit“ + Land (z. B. „Verfügbarkeit · Deutschland“).
 - **In deinen Abos:** Angebote `flatrate` bei eigenen Diensten – grüner Rand und ✓.
 - **Weitere Abos:** übrige `flatrate`, leicht abgeschwächt.
 - **Gratis / mit Werbung:** `free` und `ads`.
