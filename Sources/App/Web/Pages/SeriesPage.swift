@@ -1,17 +1,32 @@
 import Elementary
 import ElementaryHTMX2
 
+/// Series detail page at `/tv/:tmdbID`.
+///
+/// The header holds poster, genres, overview, external links, rating, the „Später ansehen“ (watch later), follow and
+/// hide toggles and the series comment. Below follow the streaming availability (when given), the form to mark the
+/// whole series (only when episodes are known) and the season list.
 struct SeriesPage: HTML {
     let nav: NavContext
+    /// The cached series.
     let title: Title
+    /// Seasons with their episodes and the user's viewings.
     let seasons: [SeasonModel]
+    /// The user's rating (1–10), nil when unrated.
     let rating: Int?
+    /// The user's comment on the series.
     let comment: String?
+    /// The user has hidden the series (`HiddenToggle`).
     let hidden: Bool
+    /// The user follows the series (notices about new episodes).
     var followed = false
+    /// Today (`YYYY-MM-DD`) for date defaults and the aired check.
     let today: String
+    /// Streaming service preselected in the watch forms.
     let defaultService: StreamingService?
+    /// The series is on the user's „Später ansehen“ list.
     var watchLater = false
+    /// Streaming availability block; nil leaves it out.
     var availability: AvailabilityView? = nil
 
     var body: some HTML {

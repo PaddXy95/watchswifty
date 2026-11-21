@@ -21,22 +21,33 @@ struct StandardImportRow: Sendable, Equatable {
     let comment: String?
 }
 
+/// Result of parsing a standard import file.
 struct StandardImportFile: Sendable, Equatable {
     let rows: [StandardImportRow]
     /// Lines with an unknown type, without a title or (episodes) without season/episode number.
     let skippedRows: Int
 }
 
+/// Why a standard import file could not be parsed.
 enum StandardImportError: Error, Equatable {
+    /// No line contains both the `type` and `title` columns.
     case noHeader
 }
 
 /// Parses a standard import file: the header is the first line with the columns `type` and `title` (any case, any
 /// order, extra columns ignored); `;` or `,` as separator.
+///
+/// `;` is tried first, then `,`. Empty lines are ignored; lines with an unknown type, no title, or (episodes) no
+/// season/episode number are counted as skipped. Unreadable optional values (year, IDs, day, rating) become nil.
+/// - Parameter text: The file content.
+/// - Returns: The valid rows and the number of skipped lines.
+/// - Throws: `StandardImportError.noHeader` when no header line is found.
 func parseStandardImport(_ text: String) throws -> StandardImportFile {
     var input = text
     if input.hasPrefix("\u{FEFF}") { input.removeFirst() }
+    /// The value without surrounding whitespace and newlines.
     func clean(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// Index of the first record that contains the `type` and `title` columns.
     func headerIndex(_ records: [CSVRecord]) -> Int? {
         records.firstIndex { record in
             let names = Set(record.fields.map { clean($0).lowercased() })
@@ -53,6 +64,7 @@ func parseStandardImport(_ text: String) throws -> StandardImportFile {
     guard let start else { throw StandardImportError.noHeader }
 
     let header = records[start].fields.map { clean($0).lowercased() }
+    /// Index of a header column, or nil when the file lacks it.
     func column(_ name: String) -> Int? { header.firstIndex(of: name) }
     let columns = (type: column("type"), title: column("title"), year: column("year"), tmdb: column("tmdb_id"),
                    imdb: column("imdb_id"), season: column("season"), episode: column("episode"),
@@ -62,6 +74,7 @@ func parseStandardImport(_ text: String) throws -> StandardImportFile {
     var rows: [StandardImportRow] = []
     var skipped = 0
     for record in records[(start + 1)...] {
+        /// The cleaned field at a column index, or an empty string when the column or field is missing.
         func value(_ index: Int?) -> String {
             guard let index, index < record.fields.count else { return "" }
             return clean(record.fields[index])
@@ -97,6 +110,9 @@ func parseStandardImport(_ text: String) throws -> StandardImportFile {
 }
 
 /// `YYYY-MM-DD` (also with a time after `T` or a space), `DD.MM.YYYY`, `D.M.YYYY`, `M/D/YY` → ISO day.
+///
+/// - Parameter raw: The date as written in the file.
+/// - Returns: The ISO day, or nil when unreadable.
 func importDay(_ raw: String) -> String? {
     let text = raw.trimmingCharacters(in: .whitespaces)
     if text.prefixMatch(of: /\d{4}-\d{2}-\d{2}[T ]/) != nil {
@@ -106,6 +122,9 @@ func importDay(_ raw: String) -> String? {
 }
 
 /// 1–10; decimals (`7.5`, `7,5`) rounded, values above 10 capped, 0, negative, non-finite or empty = no rating.
+///
+/// - Parameter raw: The rating as written in the file.
+/// - Returns: A rating 1–10, or nil for no rating.
 func importRating(_ raw: String) -> Int? {
     guard let value = Double(raw.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")),
           value.isFinite, value > 0 else { return nil }
@@ -115,6 +134,8 @@ func importRating(_ raw: String) -> Int? {
 
 extension StreamingService {
     /// The service key (`prime_video`) or a name as people write it; unknown → `.other`, empty → nil.
+    ///
+    /// - Parameter importValue: The `service` column value.
     init?(importValue: String) {
         let text = importValue.trimmingCharacters(in: .whitespaces)
         if let service = StreamingService(rawValue: text.lowercased()) {
@@ -148,6 +169,12 @@ struct ImportDraft: Sendable, Equatable {
 
 /// Groups rows into one draft per title, in order of first appearance. Episode rows ignore `imdb_id` for the key (it
 /// may be the episode's own id) but keep it as a hint.
+///
+/// Rows are keyed by TMDB ID, else IMDb ID (not for episodes), else normalized title and year. The draft takes kind,
+/// title and year from the first row, the first IDs, the last rating, and distinct comments joined (capped at
+/// `WatchService.maxCommentLength`); `series` rows add no viewing.
+/// - Parameter rows: The parsed rows in file order.
+/// - Returns: One draft per title.
 func groupStandardImport(_ rows: [StandardImportRow]) -> [ImportDraft] {
     var order: [String] = []
     var groups: [String: [StandardImportRow]] = [:]

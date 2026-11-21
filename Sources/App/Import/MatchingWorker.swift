@@ -2,9 +2,13 @@ import Fluent
 import Foundation
 import Vapor
 
+/// Counts of one `MatchingWorker.processAll` pass.
 struct MatchingRunResult: Sendable, Equatable {
+    /// Rows recorded as watches.
     var matched = 0
+    /// Rows whose name is mapped but no episode fit.
     var unmatched = 0
+    /// Pending rows (of all users) whose name waits under „Zu prüfen“ (to review) after the pass.
     var awaitingReview = 0
 }
 
@@ -30,6 +34,7 @@ actor MatchingWorker {
     /// owner's token failed: a failure only holds back that owner's rows (security audit F13).
     private var refreshed: Set<UUID> = []
     private var refreshFailed: Set<OwnerTitle> = []
+    /// A title together with the user whose token was used to refresh it.
     private struct OwnerTitle: Hashable {
         let owner: UUID
         let title: UUID
@@ -38,6 +43,15 @@ actor MatchingWorker {
     static let staleCacheAge: TimeInterval = 3600
     private var rerunRequested = false
 
+    /// Creates the worker; runs only start via `kick()` when `enabled` is true.
+    /// - Parameters:
+    ///   - db: The database.
+    ///   - provider: Builds a TMDB client from a user's token.
+    ///   - logger: Logger for run summaries and failures.
+    ///   - cipher: Opens the users' encrypted TMDB tokens.
+    ///   - enabled: Whether `kick()` starts runs; `processAll()` works regardless.
+    ///   - lock: The import lock shared with `MappingService`.
+    ///   - retryDelay: How long to wait before retrying after a run with per-user failures.
     init(db: any Database, provider: TMDBProvider, logger: Logger, cipher: TokenCipher, enabled: Bool, lock: AsyncMutex = AsyncMutex(),
          retryDelay: Duration = .seconds(300)) {
         self.db = db
@@ -49,9 +63,16 @@ actor MatchingWorker {
         self.retryDelay = retryDelay
     }
 
+    /// The last matching problem recorded for a user, shown on the import page.
+    /// - Parameter userID: The user.
+    /// - Returns: The German error message, or nil after a clean run.
     func lastError(for userID: UUID) -> String? { errors[userID] }
 
     /// Runs `body` (actor-isolated) while holding the shared import lock.
+    ///
+    /// - Parameter body: The work to run under the lock.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: Whatever `body` throws.
     private func locked<T>(_ body: () async throws -> T) async throws -> T {
         await lock.lock()
         do {
@@ -75,6 +96,8 @@ actor MatchingWorker {
         Task { await self.runLoop() }
     }
 
+    /// Runs passes until no kick arrived during the last one, logs each result, then schedules a retry when some user
+    /// failed. A thrown pass records its error for every user with pending rows.
     private func runLoop() async {
         repeat {
             rerunRequested = false
@@ -101,11 +124,14 @@ actor MatchingWorker {
         }
     }
 
+    /// Clears the retry flag and kicks a new run.
     private func retryNow() {
         retryScheduled = false
         kick()
     }
 
+    /// Records a run-wide failure for every user who still has pending rows, so they see it and get a retry.
+    /// - Parameter message: The German error message.
     private func recordForPendingUsers(_ message: String) async {
         guard let users = try? await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).all().map(\.$user.id) else { return }
         for user in Set(users) {
@@ -114,9 +140,15 @@ actor MatchingWorker {
         }
     }
 
+    /// Watch service over the worker's database.
     private var watches: WatchService { WatchService(db: db) }
 
     /// One pass over all pending work. A call while another pass is in progress returns at once.
+    ///
+    /// Repeats steps 1–4 until nothing changes, then clears the errors of users who had pending mappings and did not
+    /// fail in this pass.
+    /// - Returns: The counts of this pass (empty when another pass was running).
+    /// - Throws: A database error.
     func processAll() async throws -> MatchingRunResult {
         guard !processing else { return MatchingRunResult() }
         processing = true
@@ -147,10 +179,17 @@ actor MatchingWorker {
     // MARK: Step 1 – mapping keys
 
     /// Gives every pending row without a mapping its (name, kind) mapping.
+    ///
+    /// - Returns: Whether any row got a mapping.
+    /// - Throws: A database error.
     private func assignMappings() async throws -> Bool {
         try await locked { try await assignMappingsLocked() }
     }
 
+    /// Lock-held part of `assignMappings()`: movies map to their full title, episodes to their show name; a seasonless
+    /// "X: Y" whose show name occurs in only one of the user's rows is first tried as a movie with that full title.
+    /// - Returns: Whether any row got a mapping.
+    /// - Throws: A database error.
     private func assignMappingsLocked() async throws -> Bool {
         let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue).filter(\.$mapping.$id == nil).all()
         guard !rows.isEmpty else { return false }
@@ -179,6 +218,13 @@ actor MatchingWorker {
         return true
     }
 
+    /// The user's mapping for a (name, kind) pair, created as `pending` if missing.
+    /// - Parameters:
+    ///   - userID: The owner.
+    ///   - name: The Netflix name.
+    ///   - kind: Series or movie.
+    /// - Returns: The existing or newly saved mapping.
+    /// - Throws: A database error.
     private func mapping(userID: UUID, name: String, kind: TitleKind) async throws -> NetflixMapping {
         if let existing = try await NetflixMapping.query(on: db).filter(\.$user.$id == userID)
             .filter(\.$netflixName == name).filter(\.$kind == kind.rawValue).first() {
@@ -193,6 +239,9 @@ actor MatchingWorker {
 
     /// Resolves pending mappings with each owner's own token. A user without (or with a rejected)
     /// token is skipped for the rest of the run; other users continue.
+    ///
+    /// - Returns: Whether any mapping was resolved, and every user who had pending mappings.
+    /// - Throws: A database error while loading mappings or users; errors while resolving are recorded per user.
     private func resolveMappings() async throws -> (changed: Bool, users: Set<UUID>) {
         let pending = try await NetflixMapping.query(on: db).filter(\.$status == MappingStatus.pending.rawValue).all()
         var changed = false
@@ -220,13 +269,27 @@ actor MatchingWorker {
         return (changed, Set(byUser.keys))
     }
 
+    /// Marks a user as failed for this run (skipped from now on, retried later) and records the message.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - message: The German error message shown on the import page.
     private func fail(_ userID: UUID, _ message: String) {
         failedThisRun.insert(userID)
         errors[userID] = message
     }
 
+    /// Resolves one pending mapping via a TMDB search.
+    ///
     /// TMDB lookups happen outside the lock; the result is only written if the user has not
     /// decided on this mapping in the meantime (still `pending`).
+    ///
+    /// A single unambiguous search hit becomes `auto` (and is cached); otherwise the mapping goes to `review` with up to
+    /// five candidates, and a movie attempt hands its "X: Y" rows to show X.
+    /// - Parameters:
+    ///   - mapping: The pending mapping.
+    ///   - tmdb: A client with the owner's token.
+    ///   - catalog: Catalog service over that client.
+    /// - Throws: `TMDBError` from the search or title fetch (except `notFound`), or a database error.
     private func resolve(_ mapping: NetflixMapping, tmdb: any TMDBClient, catalog: CatalogService) async throws {
         let results = try await tmdb.search(mapping.netflixName, kind: mapping.titleKind)
         var titleID: UUID?
@@ -255,6 +318,10 @@ actor MatchingWorker {
     }
 
     /// Single "X: Y" rows tried as a movie first: no clear movie → treat them as an episode of show X.
+    ///
+    /// Deletes the movie mapping once no row refers to it any more.
+    /// - Parameter movieMapping: The movie mapping that found no clear title.
+    /// - Throws: A database error.
     private func redirectFallbackRows(from movieMapping: NetflixMapping) async throws {
         let mappingID = try movieMapping.requireID()
         let rows = try await NetflixRow.query(on: db).filter(\.$mapping.$id == mappingID).filter(\.$parsedKind == "episode").all()
@@ -270,10 +337,14 @@ actor MatchingWorker {
 
     // MARK: Step 3 – ignored names
 
+    /// Marks pending rows of ignored names as `ignored`.
+    /// - Throws: A database error.
     private func ignoreRowsOfIgnoredMappings() async throws {
         try await locked { try await ignoreRowsLocked() }
     }
 
+    /// Lock-held part of `ignoreRowsOfIgnoredMappings()`.
+    /// - Throws: A database error.
     private func ignoreRowsLocked() async throws {
         let ignored = try await Self.pendingRows(on: db).filter(NetflixMapping.self, \.$status == MappingStatus.ignored.rawValue)
             .unique().all(\.$mapping.$id).compactMap { $0 }
@@ -285,6 +356,9 @@ actor MatchingWorker {
 
     /// Pending rows joined to their mapping: steps that look at mappings of a status across all users filter in
     /// the database instead of binding every mapping ID (security audit F15).
+    ///
+    /// - Parameter db: The database.
+    /// - Returns: A query of pending rows joined to `NetflixMapping`.
     private nonisolated static func pendingRows(on db: any Database) -> QueryBuilder<NetflixRow> {
         NetflixRow.query(on: db).filter(\.$status == RowStatus.pending.rawValue)
             .join(NetflixMapping.self, on: \NetflixRow.$mapping.$id == \NetflixMapping.$id)
@@ -292,6 +366,9 @@ actor MatchingWorker {
 
     // MARK: Step 4 – episodes / movies
 
+    /// Matches the pending rows of every `auto` or `confirmed` mapping that has a title, one mapping per lock hold.
+    /// - Returns: How many rows were matched and how many became unmatched.
+    /// - Throws: A database error.
     private func matchRows() async throws -> (Int, Int) {
         let groups = Set(try await Self.pendingRows(on: db)
             .filter(NetflixMapping.self, \.$status ~~ [MappingStatus.auto.rawValue, MappingStatus.confirmed.rawValue])
@@ -308,6 +385,10 @@ actor MatchingWorker {
 
     /// Matches one mapping's pending rows, re-reading mapping and rows under the lock so a
     /// decision the user made in the meantime is honoured.
+    ///
+    /// - Parameter mappingID: The mapping whose rows are matched.
+    /// - Returns: How many rows were matched and how many became unmatched.
+    /// - Throws: A database error; TMDB refresh failures are recorded for the owner instead.
     private func matchGroup(_ mappingID: UUID) async throws -> (Int, Int) {
         guard let mapping = try await NetflixMapping.find(mappingID, on: db),
               [.auto, .confirmed].contains(mapping.mappingStatus), let titleID = mapping.$title.id else { return (0, 0) }
@@ -316,6 +397,7 @@ actor MatchingWorker {
             .filter(\.$mapping.$id == mappingID).all()
         guard !rows.isEmpty else { return (0, 0) }
 
+        /// Episode IDs per row from the cached episodes (one `[nil]` per row for a movie, meaning the title itself).
         func episodeMatches() async throws -> [[UUID?]] {
             guard mapping.titleKind == .tv else { return rows.map { _ in [nil] } }
             let catalog = CatalogService(db: db, tmdb: MissingTokenTMDBClient())   // cache reads only
@@ -366,12 +448,17 @@ actor MatchingWorker {
         return (matched, unmatched)
     }
 
+    /// Counts the pending rows (of all users) whose name waits for review.
+    /// - Returns: How many pending rows (of all users) belong to names under review.
+    /// - Throws: A database error.
     private func awaitingReviewCount() async throws -> Int {
         try await Self.pendingRows(on: db).filter(NetflixMapping.self, \.$status == MappingStatus.review.rawValue).count()
     }
 }
 
+/// Starts a matching run after boot, so rows left pending by a restart are processed.
 struct MatchingWorkerLifecycle: LifecycleHandler {
+    /// Kicks the matching worker once the application has booted.
     func didBootAsync(_ application: Application) async throws {
         await application.matchingWorker.kick()
     }

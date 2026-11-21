@@ -13,6 +13,13 @@ struct WatchRow: Sendable {
     let createdAt: Date?
 
     /// The user's watches; `episodesOnly` leaves out movie watches, `titleIDs` limits them to these titles.
+    /// - Parameters:
+    ///   - userID: The user whose watches are read.
+    ///   - episodesOnly: When true, movie watches (no episode) are left out.
+    ///   - titleIDs: Limits the result to these titles; nil = all titles, an empty array returns no rows.
+    ///   - db: The database; SQL databases get a plain projection, others fall back to Fluent models.
+    /// - Returns: One row per watch, in no particular order.
+    /// - Throws: Database errors.
     static func all(userID: UUID, episodesOnly: Bool = false, titleIDs: [UUID]? = nil, on db: any Database) async throws -> [WatchRow] {
         if let titleIDs, titleIDs.isEmpty { return [] }
         guard let sql = db as? any SQLDatabase else {
@@ -24,6 +31,7 @@ struct WatchRow: Sendable {
                          origin: $0.watchOrigin, createdAt: $0.createdAt)
             }
         }
+        /// The raw SQL row, with column names as stored.
         struct Row: Decodable {
             let title_id: UUID
             let episode_id: UUID?

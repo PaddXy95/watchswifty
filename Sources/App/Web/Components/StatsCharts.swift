@@ -2,32 +2,43 @@ import Elementary
 
 /// One column of a `ColumnChart`; segments are stacked bottom to top, each coloured by its CSS class.
 struct ChartColumn: Sendable {
+    /// One stacked part of a column.
     struct Segment: Sendable {
+        /// Value in the chart's unit (minutes or a count).
         let value: Int
+        /// CSS class that colours the segment, e.g. `seg-series`.
         let cssClass: String
     }
 
+    /// Short label below the column.
     let label: String
+    /// Segments, stacked bottom to top.
     let segments: [Segment]
     /// Tooltip (SVG `<title>`) for the whole column.
     let title: String
 
+    /// Sum of all segment values.
     var total: Int { segments.reduce(0) { $0 + $1.value } }
 }
 
 /// Column chart as server-rendered SVG (no JavaScript): the plot stretches to the container width, labels and the
 /// value axis are HTML so text keeps its size. Hovering a column shows its `title`.
 struct ColumnChart: HTML {
+    /// Columns from left to right.
     let columns: [ChartColumn]
     /// Top of the value axis (at least the largest column).
     let axisMax: Int
     /// Tick labels at 50 % and 100 % of `axisMax`.
     let tickLabels: (half: String, full: String)
+    /// Accessible name of the chart (`aria-label` of the SVG).
     let label: String
 
+    /// Width of one column slot in SVG user units.
     private static let slot = 10.0
+    /// Width of a bar, centred in its slot.
     private static let barWidth = 7.0
 
+    /// A positioned segment rectangle in SVG user units (the plot is 100 units high).
     private struct Box {
         let x: Double
         let y: Double
@@ -35,6 +46,11 @@ struct ColumnChart: HTML {
         let cssClass: String
     }
 
+    /// Stacks the column's non-zero segments from the bottom, scaled to ``axisMax``.
+    /// - Parameters:
+    ///   - column: The column to lay out.
+    ///   - index: Position of the column, which sets the x offset.
+    /// - Returns: The segment rectangles; none when `axisMax` is 0.
     private func boxes(_ column: ChartColumn, at index: Int) -> [Box] {
         guard axisMax > 0 else { return [] }
         var top = 100.0
@@ -84,6 +100,10 @@ struct ColumnChart: HTML {
 }
 
 /// Value axis for minutes: a round number of hours (or minutes under two hours) that halves evenly.
+///
+/// Up to two hours the top is 30, 60 or 120 minutes; above, a number of hours from a fixed list of round values.
+/// - Parameter maxMinutes: Largest value to show.
+/// - Returns: The axis maximum in minutes and the German labels for 50 % and 100 %.
 func minutesAxis(maxMinutes: Int) -> (max: Int, half: String, full: String) {
     guard maxMinutes > 120 else {
         let top = [30, 60, 120].first { $0 >= maxMinutes } ?? 120
@@ -96,6 +116,8 @@ func minutesAxis(maxMinutes: Int) -> (max: Int, half: String, full: String) {
 }
 
 /// Value axis for counts: the next even number (at least 2).
+/// - Parameter maxCount: Largest value to show.
+/// - Returns: The axis maximum and the labels for 50 % and 100 %.
 func countAxis(maxCount: Int) -> (max: Int, half: String, full: String) {
     let top = max(2, (maxCount + 1) / 2 * 2)
     return (top, groupedThousands(top / 2), groupedThousands(top))
@@ -103,9 +125,14 @@ func countAxis(maxCount: Int) -> (max: Int, half: String, full: String) {
 
 /// „Zeit pro Monat“ (or per year): series and movies stacked.
 struct TimeChart: HTML {
+    /// One bar per month (or per year).
     let bars: [ChartBar]
+    /// The bars are years; the accessible label becomes „Zeit pro Jahr“ (time per year).
     let perYear: Bool
 
+    /// Tooltip of a bar: total time, then episodes and movies with their times, or „nichts gesehen“ (nothing watched).
+    /// - Parameter bar: The bar to describe.
+    /// - Returns: The German tooltip text.
     private func title(_ bar: ChartBar) -> String {
         let total = bar.seriesMinutes + bar.movieMinutes
         guard bar.episodes + bar.movies > 0 else { return "\(bar.label): nichts gesehen" }
@@ -130,7 +157,10 @@ struct TimeChart: HTML {
 }
 
 /// Rated titles per rating 1 … 10, then unrated.
+///
+/// Series and movies are stacked in the colours of the time chart.
 struct RatingChart: HTML {
+    /// One bucket per rating plus one for unrated titles, in any order.
     let ratings: [RatingStats]
 
     var body: some HTML {
@@ -156,6 +186,7 @@ struct ServiceBars: HTML {
     /// Like the other lists of the dashboard, so the panel is no taller than its neighbours; the rest folds out.
     static let visible = 5
 
+    /// Services sorted by watch time, largest first (the first one sets the bar scale).
     let services: [ServiceShare]
 
     var body: some HTML {
@@ -178,8 +209,11 @@ struct ServiceBars: HTML {
 
 /// One service: name with episode and movie counts, bar relative to the largest service, time and share of all.
 struct ServiceRow: HTML {
+    /// The service's watch time and counts.
     let share: ServiceShare
+    /// Watch time of all services in minutes, the base of the percentage.
     let total: Int
+    /// Watch time of the largest service in minutes, the base of the bar width.
     let largest: Int
 
     var body: some HTML {
@@ -201,21 +235,30 @@ struct ServiceRow: HTML {
 }
 
 /// „1 Folge“, „80 Folgen“.
+/// - Parameters:
+///   - value: The count.
+///   - one: Singular noun, e.g. „Folge“.
+///   - many: Plural noun, e.g. „Folgen“.
+/// - Returns: The count with thousands separators and the matching noun.
 func countLabel(_ value: Int, _ one: String, _ many: String) -> String {
     "\(groupedThousands(value)) \(value == 1 ? one : many)"
 }
 
 /// One row of a ranked list: poster, name, detail line and rating, linking to the title.
 struct RankedItem: Sendable {
+    /// Link target of the row.
     let href: String
     let posterPath: String?
     let name: String
+    /// Muted second line under the name.
     let detail: String
+    /// The user's rating, shown as „★ n“, or `nil`.
     let rating: Int?
 }
 
 /// Numbered list of titles (top series, movies, episodes, completed series).
 struct RankedList: HTML {
+    /// The rows in rank order.
     let items: [RankedItem]
 
     var body: some HTML {
@@ -238,6 +281,7 @@ struct RankedList: HTML {
 
 /// Time per genre, split into series and movie time (colors of the time chart), with the number of titles.
 struct GenreBars: HTML {
+    /// Genres in display order.
     let genres: [GenreStat]
 
     var body: some HTML {
@@ -262,6 +306,11 @@ struct GenreBars: HTML {
         }
     }
 
+    /// Width of a bar segment in percent of the largest genre's total time.
+    /// - Parameters:
+    ///   - value: Minutes of the segment.
+    ///   - largest: Total minutes of the largest genre.
+    /// - Returns: The rounded percentage; 0 when `largest` is 0.
     static func percent(_ value: Int, of largest: Int) -> Int {
         largest > 0 ? Int((Double(value) / Double(largest) * 100).rounded()) : 0
     }

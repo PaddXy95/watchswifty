@@ -5,22 +5,32 @@ import NIOHTTP1
 
 /// A notification without recipient: KNot (or the mail path) decides where it goes.
 struct NotificationMessage: Sendable, Equatable {
+    /// Subject line (mail subject, KNot `subject`).
     var subject: String
+    /// Plain-text body.
     var body: String
 }
 
 /// A failed webhook call, with a German message (never contains the key).
 struct WebhookError: Error, Equatable, Sendable {
+    /// The German reason shown to the user.
     let message: String
 
+    /// No webhook address or key is set up.
     static let notConfigured = WebhookError(message: "Der Webhook ist nicht eingerichtet.")
+    /// The webhook did not answer within the deadline.
     static let timeout = WebhookError(message: "Der Webhook hat nicht rechtzeitig geantwortet.")
 
+    /// The webhook could not be reached.
+    /// - Parameter detail: The underlying error's description.
+    /// - Returns: The error.
     static func connect(_ detail: String) -> WebhookError {
         WebhookError(message: "Webhook nicht erreichbar (\(detail)).")
     }
 
     /// KNot's answers (see its docs/usage.md) in words; redirects are errors because the client never follows them.
+    /// - Parameter code: The HTTP status code of a non-2xx answer.
+    /// - Returns: The error with a message explaining that status.
     static func status(_ code: Int) -> WebhookError {
         let message = switch code {
         case 400: "KNot hat die Nachricht abgelehnt (400)."
@@ -38,6 +48,10 @@ struct WebhookError: Error, Equatable, Sendable {
 /// Posts a notification to a webhook in KNot's format.
 protocol WebhookSender: Sendable {
     /// Throws `WebhookError`.
+    /// - Parameters:
+    ///   - message: The notification.
+    ///   - url: The webhook address.
+    ///   - key: The user's KNot key, sent as `X-API-Key`.
     func send(_ message: NotificationMessage, url: String, key: String) async throws
 }
 
@@ -45,10 +59,19 @@ protocol WebhookSender: Sendable {
 /// mail server is down, so the deadline is 60 s (a shorter one would report a delivered mail as failed and send it
 /// twice). Redirects are not followed, so the key only ever goes to the address the admin entered.
 struct LiveWebhookSender: WebhookSender {
+    /// `User-Agent` header sent with each call.
     let userAgent: String
+    /// Read timeout and overall deadline of a call.
     var deadline: TimeAmount = .seconds(60)
+    /// Connection timeout.
     var connectTimeout: TimeAmount = .seconds(10)
 
+    /// Posts the message with a fresh HTTP client that is shut down afterwards.
+    /// - Parameters:
+    ///   - message: The notification.
+    ///   - url: The webhook address.
+    ///   - key: The user's KNot key.
+    /// - Throws: ``WebhookError`` (timeout, connection failure or non-2xx status).
     func send(_ message: NotificationMessage, url: String, key: String) async throws {
         var configuration = HTTPClient.Configuration()
         configuration.redirectConfiguration = .disallow
@@ -63,6 +86,13 @@ struct LiveWebhookSender: WebhookSender {
         try? await client.shutdown()
     }
 
+    /// Sends the request and maps transport failures and non-2xx answers to ``WebhookError``.
+    /// - Parameters:
+    ///   - message: The notification.
+    ///   - url: The webhook address.
+    ///   - key: The user's KNot key.
+    ///   - client: The HTTP client to use.
+    /// - Throws: ``WebhookError/timeout``, ``WebhookError/connect(_:)`` or ``WebhookError/status(_:)``.
     private func post(_ message: NotificationMessage, url: String, key: String, client: HTTPClient) async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .POST

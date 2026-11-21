@@ -11,16 +11,22 @@ struct OIDCIdentity: Codable, Sendable, Equatable {
 
 /// Why an OIDC sign-in failed. `logReason` is for the log only and never contains a code or token.
 enum OIDCError: Error, Equatable {
+    /// The provider could not be reached (network error, timeout or HTTP 5xx).
     case unreachable
+    /// The provider answered the authorization request with `access_denied`.
     case denied
+    /// The sign-in failed a check (provider error, token exchange, ID token validation).
     case failed(logReason: String)
     /// The provider signs ID tokens with HS* (Authentik without signing key) – rejected.
     case symmetricSigning
+    /// The provider setup does not fit (discovery, issuer, endpoints, keys or signing algorithms).
     case misconfigured(logReason: String)
     /// The token names a key the current JWKS does not contain (the provider may have rotated keys).
     case unknownKey(kid: String?)
 
     /// Message for the login page (spec „Fehlerfälle“); `name` is the SSO display name.
+    /// - Parameter name: The SSO display name.
+    /// - Returns: The German message.
     func message(name: String) -> String {
         switch self {
         case .unreachable: "\(name) ist gerade nicht erreichbar."
@@ -30,6 +36,8 @@ enum OIDCError: Error, Equatable {
     }
 
     /// Text for admins (System page, API): the cause, never a code or token.
+    /// - Parameter name: The SSO display name.
+    /// - Returns: The German description.
     func adminDescription(name: String) -> String {
         switch self {
         case .unreachable: "\(name) ist nicht erreichbar."

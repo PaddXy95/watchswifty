@@ -9,6 +9,14 @@ struct OutgoingMail: Sendable, Equatable {
 
 /// Builds the RFC 5322 message the SMTP client sends: plain text, UTF-8, quoted-printable, 7-bit safe, CRLF.
 enum MailMessage {
+    /// Renders the full message with headers and quoted-printable body.
+    /// - Parameters:
+    ///   - mail: Recipient, subject and body.
+    ///   - fromAddress: Sender address.
+    ///   - fromName: Sender display name.
+    ///   - date: Value of the `Date` header.
+    ///   - messageID: Value of the `Message-ID` header, including angle brackets.
+    /// - Returns: The message bytes.
     static func render(_ mail: OutgoingMail, fromAddress: String, fromName: String, date: Date, messageID: String) -> Data {
         let headers = [
             "From: \(displayName(fromName)) <\(fromAddress)>",
@@ -23,9 +31,12 @@ enum MailMessage {
         return Data((headers.joined(separator: "\r\n") + "\r\n\r\n" + quotedPrintable(mail.body)).utf8)
     }
 
+    /// Characters allowed unquoted in a display name (RFC 5322 atext plus space).
     private static let atext = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&'*+-/=?^_`{|}~ ")
 
     /// Plain when it is only atoms, a quoted string for other ASCII, encoded words for anything else.
+    /// - Parameter name: The sender display name.
+    /// - Returns: The header-safe display name.
     private static func displayName(_ name: String) -> String {
         if name.allSatisfy(atext.contains) { return name }
         if name.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) }) {
@@ -35,6 +46,8 @@ enum MailMessage {
     }
 
     /// RFC 2047 `=?UTF-8?B?…?=` for non-ASCII header text, split into words of at most 75 characters.
+    /// - Parameter text: Header text.
+    /// - Returns: The text unchanged when ASCII, otherwise the encoded words joined by folding whitespace.
     private static func encodedWords(_ text: String) -> String {
         guard text.unicodeScalars.contains(where: { !(0x20...0x7E).contains($0.value) }) else { return text }
         var words: [String] = []
@@ -50,6 +63,9 @@ enum MailMessage {
         return words.map { "=?UTF-8?B?\(Data($0.utf8).base64EncodedString())?=" }.joined(separator: "\r\n ")
     }
 
+    /// Formats a date for the `Date` header in UTC.
+    /// - Parameter date: The date.
+    /// - Returns: E.g. `Sat, 07 Nov 2026 08:00:00 +0000`.
     private static func rfc5322Date(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -59,11 +75,16 @@ enum MailMessage {
     }
 
     /// Quoted-printable (RFC 2045) with CRLF line ends and soft breaks keeping lines at 76 characters.
+    /// - Parameter text: The mail body.
+    /// - Returns: The encoded body.
     private static func quotedPrintable(_ text: String) -> String {
         let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         return lines.map(encodeLine).joined(separator: "\r\n")
     }
 
+    /// Quoted-printable encodes one line, escaping `=`, non-ASCII and trailing whitespace, with soft breaks.
+    /// - Parameter line: One line of the body without line end.
+    /// - Returns: The encoded line, possibly split with `=` CRLF soft breaks.
     private static func encodeLine(_ line: String) -> String {
         let bytes = Array(line.utf8)
         var tokens: [String] = []

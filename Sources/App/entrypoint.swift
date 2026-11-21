@@ -4,8 +4,15 @@ import NIOCore
 import NIOPosix
 import Vapor
 
+/// Process entry point: reads the configuration, builds the live TMDB provider and runs the Vapor application.
 @main
 enum Entrypoint {
+    /// Configures the application, runs the requested command (`serve` by default) and shuts down.
+    ///
+    /// A `ConfigError` (at startup or from `configure`) prints its German message and exits with status 1; a failed
+    /// command (`CommandFailure`, already logged by `execute()`) also exits with status 1.
+    /// - Throws: Errors from detecting the environment, bootstrapping logging or creating the application, and any
+    ///   other error from configuring or running the app (logged first).
     static func main() async throws {
         var env = try Environment.detect()
         try LoggingSystem.bootstrap(from: &env)

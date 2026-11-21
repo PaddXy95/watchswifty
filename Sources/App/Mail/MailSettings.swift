@@ -1,8 +1,11 @@
 import Foundation
 
+/// How the SMTP connection is secured.
 enum MailEncryption: String, Codable, CaseIterable, Sendable {
+    /// `starttls`: upgrade a plain connection; `ssl`: TLS from the start; `plain`: unencrypted.
     case starttls, ssl, plain
 
+    /// Label shown in the mail form (**keine** means none).
     var label: String {
         switch self {
         case .starttls: "STARTTLS"
@@ -11,6 +14,7 @@ enum MailEncryption: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// Standard port for the encryption (587, 465 or 25).
     var defaultPort: Int {
         switch self {
         case .starttls: 587
@@ -34,8 +38,12 @@ struct MailSettings: Codable, Sendable, Equatable {
     /// „Adresse von WatchSwifty“ (`https://host[:port]`, no trailing slash) – the only source for links in mails.
     var baseURL: String
 
+    /// The configured port, or the encryption's default port.
     var effectivePort: Int { port ?? encryption.defaultPort }
 
+    /// Password reset or invitation link for a token.
+    /// - Parameter token: The password token.
+    /// - Returns: `<baseURL>/reset-password?token=…`.
     func link(token: String) -> String {
         "\(baseURL)/reset-password?token=\(token)"
     }
@@ -44,12 +52,16 @@ struct MailSettings: Codable, Sendable, Equatable {
     var accountLink: String { "\(baseURL)/account" }
 }
 
+/// Whether mail settings are stored and readable.
 enum MailSettingsState: Equatable, Sendable {
+    /// No settings stored.
     case notConfigured
     /// Stored, but the server key cannot decrypt it (TOKEN_KEY changed).
     case unreadable
+    /// Stored and readable.
     case configured(MailSettings)
 
+    /// The settings when configured, else nil.
     var settings: MailSettings? {
         if case .configured(let settings) = self { return settings }
         return nil

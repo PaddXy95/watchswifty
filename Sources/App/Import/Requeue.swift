@@ -1,8 +1,14 @@
 import Fluent
 import Foundation
 
-/// After a title's TMDB data changed, its „nicht zugeordnet“ rows get another chance.
+/// After a title's TMDB data changed, its „Nicht zugeordnet“ (unmatched) rows get another chance.
 /// Returns how many rows went back to pending.
+///
+/// - Parameters:
+///   - titleID: The title whose data changed.
+///   - db: The database.
+/// - Returns: The number of rows set back to `pending`.
+/// - Throws: A database error.
 @discardableResult
 func requeueUnmatchedRows(titleID: UUID, on db: any Database) async throws -> Int {
     let rows = try await NetflixRow.query(on: db).filter(\.$status == RowStatus.unmatched.rawValue)

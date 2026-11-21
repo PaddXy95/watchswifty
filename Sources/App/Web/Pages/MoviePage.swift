@@ -1,14 +1,25 @@
 import Elementary
 import ElementaryHTMX2
 
+/// Movie detail page at `/movie/:tmdbID`.
+///
+/// The header holds poster, runtime and genres, overview, external links, rating, the „Später ansehen“ (watch later)
+/// toggle and the movie comment; below follow the streaming availability (when given) and `MovieWatchesSection`.
 struct MoviePage: HTML {
     let nav: NavContext
+    /// The cached movie.
     let title: Title
+    /// The user's viewings of the movie.
     let watches: [Watch]
+    /// The user's rating (1–10), nil when unrated.
     let rating: Int?
+    /// The user's comment on the movie.
     let comment: String?
+    /// Today (`YYYY-MM-DD`) for the date default of the watch form.
     let today: String
+    /// The movie is on the user's „Später ansehen“ list.
     var watchLater = false
+    /// Streaming availability block; nil leaves it out.
     var availability: AvailabilityView? = nil
 
     var body: some HTML {
@@ -42,9 +53,16 @@ struct MoviePage: HTML {
     }
 }
 
+/// The `#movie-watches` section: the user's viewings of a movie and the form to add one.
+///
+/// The watch form and the delete buttons target `#movie-watches`; marking the movie and deleting a viewing return this
+/// fragment. The submit label becomes „Erneut gesehen“ (watched again) once there is a viewing, and the last viewing's
+/// service is preselected.
 struct MovieWatchesSection: HTML {
+    /// TMDB ID of the movie (for the action URLs).
     let tmdbID: Int
     let watches: [Watch]
+    /// Today (`YYYY-MM-DD`) for the date default of the watch form.
     let today: String
 
     var body: some HTML {

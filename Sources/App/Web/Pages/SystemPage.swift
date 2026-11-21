@@ -9,6 +9,8 @@ struct UpdateState {
     var latestURL: String?
     var error: String?
 
+    /// Reads the update check from the stored settings.
+    /// - Parameter settings: The app settings row.
     init(_ settings: AppSettings) {
         enabled = settings.updateCheck
         checkedAt = settings.checkedAt
@@ -19,6 +21,8 @@ struct UpdateState {
 }
 
 /// `07.11.2026, 14:32` in the server's time zone.
+/// - Parameter date: The point in time.
+/// - Returns: Date and time in German format.
 func formatDateTime(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "de_DE")
@@ -31,20 +35,35 @@ func formatDateTime(_ date: Date) -> String {
 enum SystemBlock: String, Sendable {
     case updates, mail, notifications, oidc
 
+    /// Element ID of the block's `FoldableBlock`, e.g. `block-mail`.
     var id: String { "block-\(rawValue)" }
 }
 
+/// „System“ admin page at `/admin/system`: foldable blocks for „Version & Updates“, „E-Mail“, „Benachrichtigungen“
+/// (notifications) and OIDC sign-in.
+///
+/// The notifications and OIDC blocks only appear when their section is given; `openBlock` is shown open.
 struct SystemPage: HTML {
     let nav: NavContext
+    /// The running version.
     let current: AppVersion
+    /// Setting and result of the update check.
     let state: UpdateState
+    /// Success message of the last action.
     let notice: String?
+    /// Error message of the last action.
     var error: String? = nil
+    /// State of the stored SMTP settings.
     var mail: MailSettingsState = .notConfigured
+    /// Values shown in the mail form.
     var mailForm = MailFormValues(baseURL: "")
+    /// Prefilled test mail recipient: the address just used, else the admin's own address.
     var testRecipient: String? = nil
+    /// OIDC block content; nil leaves the block out.
     var oidc: OIDCSection? = nil
+    /// Notifications block content; nil leaves the block out.
     var notifications: NotificationsSection? = nil
+    /// Block of the last action (or `?open=`), shown open.
     var openBlock: SystemBlock? = nil
 
     var body: some HTML {
@@ -89,8 +108,13 @@ struct SystemPage: HTML {
     }
 }
 
+/// Result of the last update check: a newer release with update instructions, „neueste Version“ (up to date), an
+/// installation newer than the found release, or no comparison for a development build; „Noch nicht geprüft“ (not
+/// checked yet) before the first check.
 struct UpdateResult: HTML {
+    /// The running version.
     let current: AppVersion
+    /// Stored result of the update check.
     let state: UpdateState
 
     var body: some HTML {
@@ -150,10 +174,14 @@ struct MailFormValues {
     var caFile = ""
     var baseURL = ""
 
+    /// A blank form.
+    /// - Parameter baseURL: Suggested address of WatchSwifty for links in mails.
     init(baseURL: String) {
         self.baseURL = baseURL
     }
 
+    /// The stored settings (the password is left out).
+    /// - Parameter settings: The decrypted mail settings.
     init(_ settings: MailSettings) {
         host = settings.host
         port = settings.port.map(String.init) ?? ""
@@ -165,6 +193,8 @@ struct MailFormValues {
         baseURL = settings.baseURL
     }
 
+    /// The admin's input that was rejected, shown again.
+    /// - Parameter input: The submitted form (the password is left out).
     init(_ input: MailSettingsInput) {
         host = input.host
         port = input.port ?? ""
@@ -179,10 +209,14 @@ struct MailFormValues {
 
 /// System → E-Mail: SMTP settings, test mail, delete.
 struct MailSection: HTML {
+    /// State of the stored settings.
     let state: MailSettingsState
+    /// Values shown in the form.
     let values: MailFormValues
+    /// Prefilled test mail recipient: the address just used, else the admin's own address.
     let testRecipient: String?
 
+    /// A password is stored: the field's placeholder says leaving it empty keeps it.
     private var hasPassword: Bool { state.settings?.password != nil }
 
     var body: some HTML {
@@ -278,12 +312,17 @@ struct OIDCFormValues: Sendable {
     var issuer = ""
     var clientID = ""
     var baseURL = ""
+    /// A client secret is stored: the field's placeholder says leaving it empty keeps it.
     var hasSecret = false
 
+    /// A blank form.
+    /// - Parameter baseURL: Suggested address of WatchSwifty (base of the callback URL).
     init(baseURL: String) {
         self.baseURL = baseURL
     }
 
+    /// The stored settings (the secret is left out).
+    /// - Parameter settings: The decrypted OIDC settings.
     init(_ settings: OIDCSettings) {
         displayName = settings.displayName
         issuer = settings.issuer
@@ -292,6 +331,8 @@ struct OIDCFormValues: Sendable {
         hasSecret = true
     }
 
+    /// The admin's input that was rejected, shown again.
+    /// - Parameter input: The submitted form (the secret is left out).
     init(_ input: OIDCSettingsInput) {
         displayName = input.displayName ?? ""
         issuer = input.issuer
@@ -302,12 +343,18 @@ struct OIDCFormValues: Sendable {
 
 /// System → Anmeldung über OIDC (SSO): provider settings, connection test, password-login switch, delete.
 struct OIDCSection: HTML, Sendable {
+    /// State of the stored OIDC settings.
     let state: OIDCSettingsState
+    /// Values shown in the form.
     let values: OIDCFormValues
+    /// The password login is currently on.
     let passwordLogin: Bool
+    /// `PASSWORD_LOGIN=true` forces the password login on, whatever is stored.
     let passwordLoginForced: Bool
 
+    /// Display name of the provider, „SSO“ while none is stored.
     private var name: String { state.settings?.displayName ?? "SSO" }
+    /// Callback URL to register at the provider, built from the entered address; nil when that is not a valid base URL.
     private var redirectURL: String? {
         MailSettingsService.baseURL(values.baseURL).map { $0 + "/auth/oidc/callback" }
     }
@@ -408,12 +455,16 @@ struct OIDCSection: HTML, Sendable {
 
 /// System → Benachrichtigungen: time of the daily pass and the KNot webhook address.
 struct NotificationsSection: HTML, Sendable {
+    /// Stored daily-run time, last run and webhook address.
     let settings: NotificationSettings
+    /// Identifier of the server's time zone.
     let timeZone: String
+    /// When the next daily pass runs.
     let nextRun: Date
     /// Rejected input shown again (time, address).
     var entered: (time: String, url: String)? = nil
 
+    /// The server runs in UTC: shows the hint to set `TZ` in the container.
     private var isUTC: Bool { ["UTC", "GMT", "Etc/UTC", "Etc/GMT"].contains(timeZone) }
 
     var body: some HTML {

@@ -5,9 +5,11 @@ import Foundation
 /// The viewings of one episode or movie, newest first, each with „Löschen“ (asks first). The response replaces
 /// `target`.
 struct WatchList: HTML {
+    /// The viewings to list, already sorted newest first.
     let watches: [Watch]
     /// `DELETE \(deletePrefix)/<watch id>` deletes one viewing.
     let deletePrefix: String
+    /// htmx target (CSS selector) the delete response replaces, e.g. the season section.
     let target: String
 
     var body: some HTML {

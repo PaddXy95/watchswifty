@@ -5,11 +5,16 @@ import Foundation
 /// „Aus anderen Trackern importieren“: upload of the standard CSV and review of unclear titles.
 struct StandardImportPage: HTML {
     let nav: NavContext
+    /// All entries of the last upload.
     let entries: [ImportEntry]
+    /// Error of a failed upload.
     let error: String?
+    /// Result notice of an upload just processed.
     let notice: String?
 
+    /// Entries waiting for a decision (to review or not found at TMDB).
     private var open: [ImportEntry] { entries.filter { [.review, .notFound].contains($0.entryStatus) } }
+    /// Entries already imported, listed folded at the end.
     private var imported: [ImportEntry] { entries.filter { $0.entryStatus == .imported } }
 
     var body: some HTML {
@@ -62,9 +67,15 @@ struct StandardImportPage: HTML {
 
 /// Counts; polls while entries are still waiting for TMDB.
 struct ImportStatusBox: HTML {
+    /// All entries of the last upload.
     let entries: [ImportEntry]
 
+    /// Number of entries with a status.
+    /// - Parameter status: The status to count.
+    /// - Returns: The count.
     private func count(_ status: ImportEntryStatus) -> Int { entries.filter { $0.entryStatus == status }.count }
+    /// Error of the first pending entry that failed (e.g. TMDB unreachable); while set, polling stops and
+    /// „Erneut versuchen“ (retry) is offered.
     private var pendingError: String? { entries.first { $0.entryStatus == .pending && $0.error != nil }?.error }
 
     var body: some HTML {
@@ -85,9 +96,17 @@ struct ImportStatusBox: HTML {
     }
 }
 
+/// Card of one standard-import entry (`#import-<id>`): title, kind, number of viewings and rating, then by status a link
+/// to the imported title, a waiting note, or, for entries to review, TMDB candidates with a search field and
+/// „Überspringen“ (skip).
+///
+/// Accept, search and skip target the card (`closest .film-entry`) and replace it (outerHTML) with the updated card the
+/// server returns.
 struct ImportEntryCard: HTML {
+    /// The entry to show.
     let entry: ImportEntry
 
+    /// Base path of the entry's actions.
     private var path: String { "/import/standard/\(entry.id?.uuidString ?? "")" }
 
     var body: some HTML {

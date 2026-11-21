@@ -18,39 +18,60 @@ struct APIError: Error, Sendable, Equatable {
     static let noPassword = APIError(status: .conflict, code: "noPassword", message: "Dieses Konto hat kein Passwort.")
     static let payloadTooLarge = APIError(status: .payloadTooLarge, code: "payloadTooLarge", message: "Die Datei ist zu groß.")
 
+    /// 422 `mailNotConfigured`: no mail server is set up.
+    /// - Parameter message: The German message.
+    /// - Returns: The error.
     static func mailNotConfigured(_ message: String = MailError.notConfigured.message) -> APIError {
         APIError(status: .unprocessableEntity, code: "mailNotConfigured", message: message)
     }
 
     /// 503, never 502/504: proxies like Cloudflare replace those with their own page and hide the message.
+    /// - Parameter message: The German reason.
+    /// - Returns: The error (`mailFailed`).
     static func mailFailed(_ message: String) -> APIError {
         APIError(status: .serviceUnavailable, code: "mailFailed", message: message)
     }
 
+    /// 422 `notificationsNotConfigured`: no notification channel is set up.
+    /// - Parameter message: The German message.
+    /// - Returns: The error.
     static func notificationsNotConfigured(_ message: String = NotifyError.notConfigured.message) -> APIError {
         APIError(status: .unprocessableEntity, code: "notificationsNotConfigured", message: message)
     }
 
     /// 503 like `mailFailed`.
+    /// - Parameter message: The German reason.
+    /// - Returns: The error (`notifyFailed`).
     static func notifyFailed(_ message: String) -> APIError {
         APIError(status: .serviceUnavailable, code: "notifyFailed", message: message)
     }
 
     /// `PASSWORD_LOGIN=false`: passwords can be neither used nor set.
+    /// - Parameter message: The German message.
+    /// - Returns: The error (409 `passwordLoginDisabled`).
     static func passwordLoginDisabled(_ message: String = "Der Passwort-Login ist abgeschaltet.") -> APIError {
         APIError(status: .conflict, code: "passwordLoginDisabled", message: message)
     }
 
     /// The account's address comes from the OIDC provider (linked account without password).
+    /// - Parameter name: The provider's display name.
+    /// - Returns: The error (409 `emailFromProvider`).
     static func emailFromProvider(name: String) -> APIError {
         APIError(status: .conflict, code: "emailFromProvider", message: "Die Adresse kommt von \(name) – bitte dort ändern.")
     }
 
+    /// 422 `validation` with a German message for the user.
+    /// - Parameter message: The message.
+    /// - Returns: The error.
     static func validation(_ message: String) -> APIError {
         APIError(status: .unprocessableEntity, code: "validation", message: message)
     }
 
     /// Maps any error thrown while answering an API request; reuses the web UI's German messages.
+    /// - Parameters:
+    ///   - error: The thrown error.
+    ///   - path: The request path (passed to `HTMLErrorMiddleware.describe`).
+    /// - Returns: The matching API error.
     static func from(_ error: any Error, path: String = "") -> APIError {
         switch error {
         case let error as APIError:
@@ -97,6 +118,7 @@ struct APIError: Error, Sendable, Equatable {
     }
 
     /// JSON response for this error (401 also announces the bearer scheme).
+    /// - Returns: The response with status, JSON body and, for 401, `WWW-Authenticate: Bearer`.
     func response() -> Response {
         let response = Response(status: status)
         try? response.content.encode(["code": code, "message": message], as: .json)

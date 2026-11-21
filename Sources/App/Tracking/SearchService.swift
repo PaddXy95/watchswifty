@@ -22,11 +22,17 @@ struct SearchHit {
     }
 }
 
+/// Runs TMDB searches and adds the user's own progress to the hits.
 struct SearchService {
     let db: any Database
     let tmdb: any TMDBClient
 
     /// TMDB multi search (at least 2 characters after trimming, otherwise no results).
+    /// - Parameters:
+    ///   - userID: The user whose progress, ratings and „Später ansehen“ (watch later) list are added.
+    ///   - rawQuery: The query as typed.
+    /// - Returns: One hit per TMDB result, in TMDB's order.
+    /// - Throws: TMDB errors (e.g. no token) and database errors.
     func search(userID: UUID, query rawQuery: String) async throws -> [SearchHit] {
         let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard query.count >= 2 else { return [] }
@@ -53,6 +59,9 @@ struct SearchService {
             return hit
         }
 
+        /// Builds the hit for one TMDB result from the cached title, the user's watches and library entry.
+        /// - Parameter result: The TMDB result.
+        /// - Returns: The hit; without a cached title it carries no progress.
         func hit(for result: TMDBSearchResult) -> SearchHit {
             guard let title = cached.first(where: { $0.tmdbID == result.id && $0.titleKind == result.kind }), let id = title.id else {
                 return SearchHit(result: result, inLibrary: false, watchedEpisodes: nil, totalEpisodes: nil, movieWatched: false, rating: nil)

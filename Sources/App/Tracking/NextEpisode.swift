@@ -1,5 +1,6 @@
 import Foundation
 
+/// A lightweight, value-type snapshot of an episode, used by the progress calculations and view models.
 struct EpisodeInfo: Sendable, Equatable {
     let id: UUID
     let season: Int
@@ -10,6 +11,15 @@ struct EpisodeInfo: Sendable, Equatable {
     /// Minutes; nil or 0 = unknown.
     var runtime: Int?
 
+    /// Creates an episode snapshot from its parts.
+    /// - Parameters:
+    ///   - id: The episode's ID.
+    ///   - season: The season number (0 = specials).
+    ///   - number: The episode number within the season.
+    ///   - name: The episode name.
+    ///   - airDate: The air date (`YYYY-MM-DD`), or nil when unknown.
+    ///   - overview: The TMDB overview, if loaded.
+    ///   - runtime: The runtime in minutes, if known.
     init(id: UUID, season: Int, number: Int, name: String, airDate: String?, overview: String? = nil, runtime: Int? = nil) {
         self.id = id
         self.season = season
@@ -20,13 +30,19 @@ struct EpisodeInfo: Sendable, Equatable {
         self.runtime = runtime
     }
 
+    /// Creates a snapshot of a stored episode.
+    /// - Parameter episode: A saved episode (its ID must be set).
     init(_ episode: Episode) {
         self.init(id: episode.id!, season: episode.season, number: episode.number, name: episode.name, airDate: episode.airDate,
                   overview: episode.overview, runtime: episode.runtime)
     }
 
+    /// The episode code, e.g. `S01E05`.
     var code: String { String(format: "S%02dE%02d", season, number) }
 
+    /// Whether the episode has aired by `today`; episodes without an air date count as not aired.
+    /// - Parameter today: The current day (`YYYY-MM-DD`, see `AppConfig.today()`).
+    /// - Returns: True when the air date is on or before `today`.
     func isAired(today: String) -> Bool {
         guard let airDate else { return false }
         return airDate <= today
@@ -35,6 +51,11 @@ struct EpisodeInfo: Sendable, Equatable {
 
 /// The first aired, unwatched regular episode after the highest watched regular episode
 /// (specials and gaps before the highest watched episode are ignored). Nil = nothing watched or caught up.
+/// - Parameters:
+///   - episodes: All episodes of the series, in any order.
+///   - watched: IDs of the episodes the user has watched.
+///   - today: The current day (`YYYY-MM-DD`).
+/// - Returns: The next episode to watch, or nil.
 func nextEpisode(in episodes: [EpisodeInfo], watched: Set<UUID>, today: String) -> EpisodeInfo? {
     let regular = episodes.filter { $0.season >= 1 }.sorted { ($0.season, $0.number) < ($1.season, $1.number) }
     guard let highest = regular.lastIndex(where: { watched.contains($0.id) }) else { return nil }
@@ -42,6 +63,12 @@ func nextEpisode(in episodes: [EpisodeInfo], watched: Set<UUID>, today: String) 
 }
 
 /// Aired, unwatched regular episodes from `next` onwards (including `next`).
+/// - Parameters:
+///   - episodes: All episodes of the series, in any order.
+///   - next: The first episode to count, usually the result of ``nextEpisode(in:watched:today:)``.
+///   - watched: IDs of the episodes the user has watched.
+///   - today: The current day (`YYYY-MM-DD`).
+/// - Returns: The number of episodes still to watch.
 func remainingAiredCount(in episodes: [EpisodeInfo], from next: EpisodeInfo, watched: Set<UUID>, today: String) -> Int {
     episodes.filter { e in
         e.season >= 1 && (e.season, e.number) >= (next.season, next.number) && !watched.contains(e.id) && e.isAired(today: today)

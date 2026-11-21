@@ -11,12 +11,26 @@ struct LibraryService {
 
     /// `filter`: all | tv | movie | hidden; `sort`: recent | rating | name (unknown values → defaults); `genre`: only
     /// titles with that genre (titles whose genres are not loaded yet never match).
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - rawFilter: The filter name.
+    ///   - rawSort: The sort order name.
+    ///   - genre: Only titles with this genre, or nil for all.
+    /// - Returns: The filtered, sorted library items.
+    /// - Throws: Database errors.
     func items(userID: UUID, filter rawFilter: String, sort rawSort: String, genre: Genre? = nil) async throws -> [LibraryItem] {
         try await page(userID: userID, filter: rawFilter, sort: rawSort, genre: genre).items
     }
 
     /// The items plus the genres of all titles in the user's library (hidden ones included, by German label) – the
     /// choices of the filter – from one read of the library.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - rawFilter: all | tv | movie | hidden (unknown → all; all, tv and movie leave out hidden titles).
+    ///   - rawSort: recent | rating | name (unknown → recent).
+    ///   - genre: Only titles with this genre, or nil for all.
+    /// - Returns: The filtered, sorted items and the genre choices.
+    /// - Throws: Database errors.
     func page(userID: UUID, filter rawFilter: String, sort rawSort: String,
               genre: Genre? = nil) async throws -> (items: [LibraryItem], genres: [Genre]) {
         let filter = Self.filters.contains(rawFilter) ? rawFilter : "all"
@@ -43,6 +57,10 @@ struct LibraryService {
     }
 
     /// Every title the user watched, rated or hid, with the latest watch per title for „Zuletzt gesehen“.
+    /// - Parameter userID: The user.
+    /// - Returns: The library items (unfiltered, unsorted) and, per watched title, the day and creation time of its latest
+    ///   watch.
+    /// - Throws: Database errors.
     private func load(userID: UUID) async throws -> (items: [LibraryItem], recency: [UUID: (String, Date)]) {
         let watchList = try await WatchRow.all(userID: userID, on: db)
         let entries = try await UserTitle.query(on: db).filter(\.$user.$id == userID).all()

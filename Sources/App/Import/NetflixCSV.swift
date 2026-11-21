@@ -1,5 +1,6 @@
 import Foundation
 
+/// One usable line of a Netflix export.
 struct NetflixCSVRow: Sendable, Equatable {
     let title: String
     /// ISO day `yyyy-MM-dd`.
@@ -8,19 +9,31 @@ struct NetflixCSVRow: Sendable, Equatable {
     let fingerprint: String
 }
 
+/// Result of parsing a Netflix export.
 struct NetflixCSVResult: Sendable, Equatable {
     let rows: [NetflixCSVRow]
+    /// Lines with an empty title or one starting with `:`, which are skipped.
     let skippedBlank: Int
 }
 
+/// Why a Netflix upload was rejected; `germanMessage` gives the text shown to the user.
 enum NetflixCSVError: Error, Equatable {
+    /// The header is not `Title,Date`.
     case notNetflixHistory
+    /// A line has no date column or an unreadable date.
     case invalidDate(line: Int, value: String)
     /// The upload would store more rows than one user may keep (`ImportService.maxStoredRows`).
     case tooManyRows(limit: Int)
 }
 
 /// Parses Netflix's "Wiedergabeaktivität" export (`Title,Date`, dates `M/D/YY`).
+///
+/// Strips a BOM, accepts `;` as separator when the header uses it instead of `,`, skips empty lines and lines
+/// without a usable title, and fingerprints repeated (day, title) pairs by their occurrence.
+/// - Parameter text: The file content.
+/// - Returns: The parsed rows and the number of skipped lines.
+/// - Throws: `NetflixCSVError.notNetflixHistory` for a wrong header, `.invalidDate` for a line with a missing or
+///   unreadable date.
 func parseNetflixCSV(_ text: String) throws -> NetflixCSVResult {
     var input = text
     if input.hasPrefix("\u{FEFF}") { input.removeFirst() }
@@ -57,12 +70,17 @@ func parseNetflixCSV(_ text: String) throws -> NetflixCSVResult {
 
 /// Netflix's `M/D/YY` (also `M/D/YYYY`), plus what spreadsheet round-trips produce:
 /// German `D.M.YYYY` / `D.M.YY` and ISO `YYYY-MM-DD` → `yyyy-MM-dd`.
+///
+/// - Parameter raw: The date as written in the file; two-digit years are read as 20xx.
+/// - Returns: The ISO day, or nil when unreadable or not a real calendar day.
 func netflixDay(_ raw: String) -> String? {
+    /// The three non-empty, all-digit parts around `separator`, or nil.
     func numbers(_ separator: Character) -> [Substring]? {
         let parts = raw.split(separator: separator, omittingEmptySubsequences: false)
         guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }) else { return nil }
         return parts
     }
+    /// A two-digit (20xx) or four-digit year, or nil.
     func year(_ part: Substring) -> Int? {
         guard part.count == 2 || part.count == 4, let value = Int(part) else { return nil }
         return part.count == 2 ? 2000 + value : value
@@ -82,12 +100,19 @@ func netflixDay(_ raw: String) -> String? {
     return CalendarDay.isValid(iso) ? iso : nil
 }
 
+/// One record of a CSV file, with the 1-based line it starts on (for error messages).
 struct CSVRecord {
     let line: Int
     let fields: [String]
 }
 
 /// Minimal RFC 4180 splitter: quoted fields, `""` escapes, commas/newlines inside quotes, LF or CRLF.
+///
+/// Also accepts a lone CR as line break outside quotes; empty lines produce no record.
+/// - Parameters:
+///   - text: The CSV text.
+///   - delimiter: The field separator.
+/// - Returns: The records in file order.
 func splitCSVRecords(_ text: String, delimiter: Character) -> [CSVRecord] {
     var records: [CSVRecord] = []
     var fields: [String] = []

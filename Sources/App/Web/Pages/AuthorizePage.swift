@@ -2,6 +2,8 @@ import Elementary
 
 /// Confirmation before an app gets a device token for the signed-in account.
 struct AuthorizePage: HTML {
+    /// The app's PKCE authorization request; passed on unchanged as hidden fields to `POST /api/auth/authorize`, whose
+    /// `decision` is „Verbinden“ (`connect`) or „Abbrechen“ (`cancel`).
     let params: APIAuthorizeController.Params
 
     var body: some HTML {

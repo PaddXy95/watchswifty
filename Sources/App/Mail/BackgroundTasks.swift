@@ -3,8 +3,11 @@ import NIOConcurrencyHelpers
 
 /// Work the response does not wait for (the „Passwort vergessen“ and „Neues Gerät“ mails). Tests wait for it with `drain()`.
 final class BackgroundTasks: Sendable {
+    /// The tasks still running, keyed by a random ID; each removes itself when done.
     private let running = NIOLockedValueBox<[UUID: Task<Void, Never>]>([:])
 
+    /// Starts `operation` in a new unstructured task that the caller does not await.
+    /// - Parameter operation: The work to run.
     func run(_ operation: @escaping @Sendable () async -> Void) {
         let id = UUID()
         running.withLockedValue { tasks in

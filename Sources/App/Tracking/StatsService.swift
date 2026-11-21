@@ -15,11 +15,13 @@ struct PeriodStats: Equatable, Sendable {
     var isEmpty: Bool { movies == 0 && series == 0 && episodes == 0 }
 }
 
+/// Counts for one month (1 = January) of a year.
 struct MonthStats: Equatable, Sendable {
     let month: Int
     let stats: PeriodStats
 }
 
+/// Counts for one calendar year, with its months.
 struct YearStats: Equatable, Sendable {
     let year: Int
     let stats: PeriodStats
@@ -27,6 +29,7 @@ struct YearStats: Equatable, Sendable {
     let months: [MonthStats]
 }
 
+/// Distinct movies and series and their watch time for one rating (nil = unrated) in the selected range.
 struct RatingStats: Equatable, Sendable {
     let rating: Int?
     var movies = 0
@@ -91,6 +94,7 @@ struct GenreStat: Equatable, Sendable {
     var movies = 0
 }
 
+/// A series in „Längste Serien“ (longest series): episode viewings and their time in the period.
 struct TopSeries: Equatable, Sendable {
     let tmdbID: Int
     let name: String
@@ -100,6 +104,7 @@ struct TopSeries: Equatable, Sendable {
     let rating: Int?
 }
 
+/// Everything the „Statistik“ (statistics) page and `GET /v1/stats` show for one user.
 struct Stats: Sendable {
     /// Selected year, nil = all years.
     var year: Int? = nil
@@ -139,6 +144,7 @@ struct StatsService {
 
     static let listLimit = 5
 
+    /// One watch as the statistics count it: runtime (nil = unknown), calendar month and service.
     private struct Viewing {
         let titleID: UUID
         let episodeID: UUID?
@@ -149,6 +155,7 @@ struct StatsService {
         let service: StreamingService?
     }
 
+    /// Accumulates viewings into the counts of a ``PeriodStats``.
     private struct Tally {
         var movieIDs: Set<UUID> = []
         var seriesIDs: Set<UUID> = []
@@ -156,6 +163,8 @@ struct StatsService {
         var minutes = 0
         var unknown = 0
 
+        /// Counts one viewing: its title as a distinct movie or series, an episode viewing, and its minutes (or as unknown).
+        /// - Parameter viewing: The viewing to add.
         mutating func add(_ viewing: Viewing) {
             if viewing.isEpisode {
                 seriesIDs.insert(viewing.titleID)
@@ -166,6 +175,7 @@ struct StatsService {
             if let minutes = viewing.minutes { self.minutes += minutes } else { unknown += 1 }
         }
 
+        /// The accumulated counts.
         var stats: PeriodStats {
             PeriodStats(movies: movieIDs.count, series: seriesIDs.count, episodes: episodes, minutes: minutes, unknownRuntime: unknown)
         }
@@ -176,6 +186,14 @@ struct StatsService {
     /// `year` (nil = all years) selects the range for period, chart, services, ratings, genres and the top lists (longest
     /// series and movies, most watched movies and episodes); `mostCompletedSeries` and the yearly table (`years`,
     /// `undated`, `total`) always cover everything.
+    ///
+    /// Movie watches without a runtime and episode watches without their own or the series' runtime count as unknown;
+    /// watches of a series without an episode are skipped.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - rawYear: The selected year; values outside 1…9999 count as all years.
+    /// - Returns: The statistics.
+    /// - Throws: Database errors.
     func stats(userID: UUID, year rawYear: Int?) async throws -> Stats {
         // Calendar years only; anything else (e.g. Int.min) counts as "all years" and can never overflow in `year - 1`.
         let selectedYear = rawYear.flatMap { (1...9999).contains($0) ? $0 : nil }
@@ -321,6 +339,9 @@ struct StatsService {
     }
 
     /// The user's watches with their episodes' runtimes: one projection instead of thousands of Fluent models.
+    /// - Parameter userID: The user.
+    /// - Returns: One entry per watch, in no particular order.
+    /// - Throws: Database errors.
     private func statsWatches(userID: UUID) async throws -> [StatsWatch] {
         guard let sql = db as? any SQLDatabase else {
             let watches = try await WatchRow.all(userID: userID, on: db)
@@ -330,6 +351,7 @@ struct StatsService {
                            episodeRuntime: $0.episodeID.flatMap { runtimes[$0] ?? nil })
             }
         }
+        /// The raw SQL row: watch columns plus the joined episode runtime.
         struct Row: Decodable {
             let title_id: UUID
             let episode_id: UUID?
@@ -354,12 +376,16 @@ struct StatsService {
     }
 
     /// Code, name and runtime of the given episodes (for „Meistgesehene Folgen“ only the rewatched ones).
+    /// - Parameter ids: The episode IDs; an empty array returns no entries.
+    /// - Returns: The series ID and episode info keyed by episode ID (on SQL databases without air date or overview).
+    /// - Throws: Database errors.
     private func episodes(_ ids: [UUID]) async throws -> [UUID: (titleID: UUID, info: EpisodeInfo)] {
         guard !ids.isEmpty else { return [:] }
         guard let sql = db as? any SQLDatabase else {
             let episodes = try await Episode.query(on: db).filter(\.$id ~~ ids).all()
             return Dictionary(episodes.map { ($0.id!, ($0.$title.id, EpisodeInfo($0))) }, uniquingKeysWith: { a, _ in a })
         }
+        /// The raw SQL row, with column names as stored.
         struct Row: Decodable {
             let id: UUID
             let title_id: UUID
@@ -383,10 +409,17 @@ struct StatsService {
     /// air date ≤ today; specials, episodes without a date and rows the last refresh no longer returned – see
     /// `Episode.isCurrent` – do not count). Uses all watches, not only the period.
     /// Counted in SQL: one row per series instead of every episode of every watched series.
+    /// - Parameters:
+    ///   - userID: The user.
+    ///   - titleByID: The watched titles, for names and posters.
+    ///   - ratingByTitle: The user's ratings by title.
+    /// - Returns: Up to ``listLimit`` series watched completely at least once, most completions first.
+    /// - Throws: Database errors.
     private func completedSeries(userID: UUID, titleByID: [UUID: TitleRow],
                                  ratingByTitle: [UUID: Int?]) async throws -> [CompletedSeries] {
         var counts: [(titleID: UUID, completions: Int)] = []
         if let sql = db as? any SQLDatabase {
+            /// The raw SQL row: a series and its completion count.
             struct Row: Decodable {
                 let title_id: UUID
                 let completions: Int
@@ -454,6 +487,12 @@ struct StatsService {
     }
 
     /// Months of the selected year (up to `monthCount`) or one bar per year; undated viewings have no bar.
+    /// - Parameters:
+    ///   - viewings: The viewings in the selected range.
+    ///   - year: The selected year, or nil for one bar per year.
+    ///   - years: All years with dated viewings, ascending (used without a selected year).
+    ///   - monthCount: Number of month bars for a selected year (default 12).
+    /// - Returns: The bars, oldest first.
     private static func chart(_ viewings: [Viewing], year: Int?, years: [Int], monthCount: Int?) -> [ChartBar] {
         var bars: [ChartBar]
         if year != nil {
@@ -477,6 +516,8 @@ struct StatsService {
     }
 
     /// `2026-11-07` → (2026, 11); anything else → (nil, nil).
+    /// - Parameter date: A day (`YYYY-MM-DD`) or nil.
+    /// - Returns: The year and month, or (nil, nil).
     private static func yearMonth(_ date: String?) -> (Int?, Int?) {
         guard let date, date.count >= 7, let year = Int(date.prefix(4)),
               let month = Int(date.dropFirst(5).prefix(2)), (1...12).contains(month) else { return (nil, nil) }
@@ -485,6 +526,10 @@ struct StatsService {
 }
 
 /// Change against the previous year: „+18 %“, „−6 %“, „±0 %“; nil without a previous value.
+/// - Parameters:
+///   - current: The value of the selected year.
+///   - previous: The value of the year before.
+/// - Returns: The rounded percentage change, or nil when `previous` is 0 or less.
 func formatDelta(_ current: Int, _ previous: Int) -> String? {
     guard previous > 0 else { return nil }
     let percent = Int((Double(current - previous) / Double(previous) * 100).rounded())
@@ -493,6 +538,8 @@ func formatDelta(_ current: Int, _ previous: Int) -> String? {
 }
 
 /// `45 Min.`, `3 Std. 20 Min.` (under 10 h), `1.240 Std.`
+/// - Parameter minutes: The duration in minutes.
+/// - Returns: The German duration text.
 func formatDuration(minutes: Int) -> String {
     if minutes < 60 { return "\(minutes) Min." }
     let hours = minutes / 60, rest = minutes % 60
@@ -501,6 +548,8 @@ func formatDuration(minutes: Int) -> String {
 }
 
 /// German digit grouping without depending on the server locale: 1240 → `1.240`.
+/// - Parameter value: The number to format.
+/// - Returns: The digits with `.` between thousands.
 func groupedThousands(_ value: Int) -> String {
     let digits = Array(String(value))
     var result = ""

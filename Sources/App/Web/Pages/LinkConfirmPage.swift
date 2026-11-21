@@ -3,8 +3,11 @@ import Elementary
 /// Confirmation before a link token binds a provider account to a WatchSwifty account: names both sides, so nobody
 /// links their provider account to someone else's account by accident (security audit F17).
 struct LinkConfirmPage: HTML {
+    /// Display name of the provider.
     let ssoName: String
+    /// The WatchSwifty account the link token belongs to.
     let username: String
+    /// The provider identity from the completed OIDC flow.
     let identity: OIDCIdentity
 
     /// How the provider account is shown: name and e-mail (or the provider's user name), else its ID.

@@ -2,8 +2,13 @@ import Elementary
 import ElementaryHTMX2
 
 /// „Beobachten“ switch on the series page.
+///
+/// The button (`#follow-toggle`) posts the opposite state to `/tv/<id>/follow` and replaces itself with the response;
+/// `aria-pressed` reflects whether the series is followed.
 struct FollowToggle: HTML {
+    /// TMDB ID of the series.
     let tmdbID: Int
+    /// Whether the user follows the series; the button posts the opposite.
     let followed: Bool
 
     var body: some HTML {

@@ -4,6 +4,8 @@ import Vapor
 /// A command error with a German message for the operator; the entrypoint prints it and exits with code 1.
 struct CommandFailure: Error, Equatable, CustomStringConvertible {
     let description: String
+    /// Creates a failure with the message shown to the operator.
+    /// - Parameter description: The German message the entrypoint prints.
     init(_ description: String) { self.description = description }
 }
 
@@ -11,13 +13,21 @@ struct CommandFailure: Error, Equatable, CustomStringConvertible {
 /// (e.g. the only admin forgot theirs). The password is asked twice and hidden, so it never lands in the shell
 /// history or the `.env`.
 struct ResetPasswordCommand: AsyncCommand {
+    /// Command-line arguments: the username (`benutzer`).
     struct Signature: CommandSignature {
         @Argument(name: "benutzer", help: "Benutzername")
         var username: String
     }
 
+    /// German help text shown in the command list.
     var help: String { "Setzt das Passwort eines Benutzers neu (fragt es verdeckt ab)." }
 
+    /// Asks for the new password twice (hidden), stores its hash and invalidates every open password link of the user.
+    /// - Parameters:
+    ///   - context: The command context (application and console).
+    ///   - signature: The parsed arguments.
+    /// - Throws: `CommandFailure` when the user does not exist, the password is too short or the repetition differs;
+    ///   database and hashing errors otherwise.
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
         let username = User.normalize(signature.username)

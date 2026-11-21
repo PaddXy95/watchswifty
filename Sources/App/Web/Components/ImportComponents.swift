@@ -2,10 +2,19 @@ import Elementary
 import ElementaryHTMX2
 import Foundation
 
+/// Progress of the Netflix import's title matching on the import page (`#import-progress`).
+///
+/// While a run is going it polls `/import/progress?polling=1` every 2 s; it also reloads on the `importChanged` event,
+/// which decisions send via `HX-Trigger`. It shows the pending rows (while running), rows waiting for review and the
+/// last error, and offers „Erneut versuchen“ (retry) when no run is going but there was an error or rows are pending.
 struct ImportProgress: HTML {
+    /// Whether a matching run is going.
     let isRunning: Bool
+    /// Rows still to be matched (without those waiting for review).
     let pendingRows: Int
+    /// Rows whose mapping waits for the user's review.
     let waitingForReview: Int
+    /// The last matching error for this user, if any.
     let lastError: String?
     /// The page was polling and the run is over: offer a reload instead of forcing one.
     var finished = false
@@ -37,6 +46,9 @@ struct ImportProgress: HTML {
     }
 }
 
+/// German label of a mapping status, shown as the badge in the mapping list.
+/// - Parameter status: The mapping status.
+/// - Returns: E.g. „automatisch“ (automatic) or „zu prüfen“ (to review).
 func mappingStatusLabel(_ status: MappingStatus) -> String {
     switch status {
     case .auto: "automatisch"
@@ -48,10 +60,16 @@ func mappingStatusLabel(_ status: MappingStatus) -> String {
 }
 
 /// TMDB candidates for a mapping; clicking one accepts (review) or changes (mapping list) it.
+///
+/// Each ``CandidateRow`` posts to `/import/mappings/<id>/<action>`. Also the response of the own TMDB search.
 struct CandidateList: HTML {
+    /// ID of the mapping the candidates are for.
     let mappingID: UUID
+    /// TMDB search results to offer.
     let results: [TMDBSearchResult]
+    /// Decision endpoint: `accept` (review) or `change` (mapping list).
     let action: String   // "accept" | "change"
+    /// htmx target the decision response replaces, e.g. `closest .mapping-review`.
     let target: String
 
     var body: some HTML {
@@ -69,15 +87,23 @@ struct CandidateList: HTML {
 }
 
 /// One TMDB candidate: poster (click → large popover), name (year), TMDB link and „Übernehmen“.
+///
+/// The poster button opens a native popover (`popovertarget`); „Übernehmen“ (take over) posts to `acceptURL` and
+/// replaces `target` with the response.
 struct CandidateRow: HTML {
+    /// The TMDB search result.
     let result: TMDBSearchResult
     /// Unique on the page: the same candidate can appear in several lists (review, own search, film list).
     let popoverID: String
+    /// URL „Übernehmen“ posts to.
     let acceptURL: String
     /// `hx-vals` JSON sent with „Übernehmen“.
     let vals: String
+    /// htmx target (CSS selector) the response replaces.
     let target: String
 
+    /// A fresh id for the poster popover.
+    /// - Returns: `poster-<random UUID>`.
     static func newPopoverID() -> String { "poster-\(UUID().uuidString.lowercased())" }
 
     var body: some HTML {
@@ -104,9 +130,16 @@ struct CandidateRow: HTML {
     }
 }
 
+/// „Bei TMDB suchen“ (search TMDB) field for a mapping, with an empty results container below it.
+///
+/// Typing (debounced 300 ms) fetches `/import/mappings/<id>/search?mode=<mode>` and puts the ``CandidateList`` into
+/// `#<mode>-candidates-<mapping id>`.
 struct CandidateSearch: HTML {
+    /// ID of the mapping to search for.
     let mappingID: UUID
+    /// `accept` (review) or `change` (mapping list); passed to the search, it selects the results' endpoint.
     let mode: String
+    /// Not used in the markup: the server derives the candidates' target from `mode`.
     let target: String
 
     var body: some HTML {
@@ -119,21 +152,32 @@ struct CandidateSearch: HTML {
     }
 }
 
+/// View model of one mapping waiting for review, with its open Netflix rows.
 struct ReviewItem {
+    /// Maximum number of rows listed under „Zeilen anzeigen“ (show rows).
     static let rowLimit = 20
 
+    /// The mapping to review.
     let mapping: NetflixMapping
     /// Open rows of the mapping, newest first.
     let rows: [NetflixRow]
 
+    /// Creates a review item, sorting the rows newest first (same day: by raw title).
+    /// - Parameters:
+    ///   - mapping: The mapping to review.
+    ///   - rows: Its open rows, in any order.
     init(mapping: NetflixMapping, rows: [NetflixRow]) {
         self.mapping = mapping
         self.rows = rows.sorted { ($0.watchedOn, $1.rawTitle) > ($1.watchedOn, $0.rawTitle) }
     }
 
+    /// Number of open rows.
     var rowCount: Int { rows.count }
+    /// Earliest viewing day (`YYYY-MM-DD`); empty without rows.
     var firstDay: String { rows.last?.watchedOn ?? "" }
+    /// Latest viewing day (`YYYY-MM-DD`); empty without rows.
     var lastDay: String { rows.first?.watchedOn ?? "" }
+    /// The newest rows, at most ``rowLimit``.
     var shownRows: ArraySlice<NetflixRow> { rows.prefix(Self.rowLimit) }
 
     /// „gesehen am 06.11.2026“ or „gesehen 02.03.2025 – 06.11.2026“.
@@ -144,7 +188,10 @@ struct ReviewItem {
     }
 }
 
+/// Review card for one Netflix name (`#mapping-<id>`): row count and dates, the rows, TMDB candidates, an own search
+/// („Eigene Suche“) and „Ignorieren“ (ignore); every decision replaces the closest `.mapping-review`.
 struct MappingReviewItem: HTML {
+    /// The mapping and its open rows.
     let item: ReviewItem
 
     var body: some HTML {
@@ -179,13 +226,21 @@ struct MappingReviewItem: HTML {
     }
 }
 
+/// View model of a Netflix row that could not be matched to an episode or movie.
 struct UnmatchedItem {
+    /// The unmatched row.
     let row: NetflixRow
     /// The row's name is mapped to a series, so it can be assigned to one of its episodes.
     let canAssign: Bool
 }
 
+/// Card for one unmatched Netflix row (`#row-<id>`) with „Ignorieren“ (ignore) and, if possible, „Folge wählen“
+/// (choose episode).
+///
+/// „Folge wählen“ loads the ``AssignForm`` from `/import/rows/<id>/options` into its `.assign-slot`; ignoring or
+/// assigning replaces the closest `.unmatched-row`.
 struct UnmatchedRowItem: HTML {
+    /// The row and whether it can be assigned.
     let item: UnmatchedItem
 
     var body: some HTML {
@@ -206,8 +261,12 @@ struct UnmatchedRowItem: HTML {
     }
 }
 
+/// Entry of the mapping list (`#mapping-item-<id>`): Netflix name → title, status badge, „Ändern“ (change, with a TMDB
+/// search) and „Zurücksetzen“ (reset, after a confirmation); responses replace the closest `.mapping-item`.
 struct MappingListItem: HTML {
+    /// The mapping to show.
     let mapping: NetflixMapping
+    /// Name of the mapped title, or `nil` (shown as „–“).
     let titleName: String?
 
     var body: some HTML {
@@ -230,8 +289,12 @@ struct MappingListItem: HTML {
 }
 
 /// Episode picker for one unmatched row, fetched on demand.
+///
+/// Posts the chosen episode to `/import/rows/<id>/assign` and replaces the closest `.unmatched-row`.
 struct AssignForm: HTML {
+    /// ID of the Netflix row to assign.
     let rowID: UUID
+    /// Episodes of the mapped series, grouped by season in the select.
     let episodes: [Episode]
 
     var body: some HTML {

@@ -1,6 +1,11 @@
 import Fluent
 import Vapor
 
+/// Registers all routes: health and version, the App API and its docs page at `/api`, the public authentication
+/// controllers (app login, login, OIDC, password reset), and the feature controllers behind session authentication and
+/// `AuthRedirectMiddleware`.
+/// - Parameter app: The application.
+/// - Throws: Errors of `registerAPI(_:)`.
 func routes(_ app: Application) throws {
     app.get("healthz") { _ in "ok" }
     app.get("version") { _ in AppVersion.current }

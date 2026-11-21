@@ -1,9 +1,13 @@
 import Foundation
 
+/// Startup configuration error; its German description is printed before the process exits.
 enum ConfigError: Error, Equatable, CustomStringConvertible {
+    /// A required environment variable is not set (associated value: its name).
     case missing(String)
+    /// A setting is unusable (associated value: the German message shown as is).
     case invalid(String)
 
+    /// The German message for the console.
     var description: String {
         switch self {
         case .missing(let name): "Fehlende Umgebungsvariable: \(name)"
@@ -12,6 +16,7 @@ enum ConfigError: Error, Equatable, CustomStringConvertible {
     }
 }
 
+/// Server configuration, read from the environment at startup (`entrypoint.swift`) or built for tests (`testing`).
 struct AppConfig: Sendable {
     var tmdbLanguage: String
     var databasePath: String
@@ -42,7 +47,15 @@ struct AppConfig: Sendable {
     /// Variables that are set but no longer read (logged at startup).
     var environmentHints: [String] = []
 
+    /// Builds the configuration from environment variables, with defaults for everything optional.
+    ///
+    /// Of `PASSWORD_LOGIN` only the value `true` has an effect; other values and the retired `OIDC_*` variables are
+    /// collected in `environmentHints` (SSO is set up under System).
+    /// - Parameter env: The process environment.
+    /// - Returns: The configuration.
+    /// - Throws: Declared for `ConfigError`; no current variable makes it fail.
     static func fromEnvironment(_ env: [String: String]) throws -> AppConfig {
+        /// The trimmed value of a variable; nil when unset or blank.
         func value(_ key: String) -> String? {
             guard let raw = env[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
             return raw
@@ -74,6 +87,8 @@ struct AppConfig: Sendable {
         return config
     }
 
+    /// Configuration for tests: in-memory SQLite, bcrypt cost 4, no login delay, background jobs off and today pinned
+    /// to `2026-11-07`.
     static var testing: AppConfig {
         var config = AppConfig(
             tmdbLanguage: "de-DE",

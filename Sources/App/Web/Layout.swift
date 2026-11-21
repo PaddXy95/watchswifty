@@ -1,6 +1,7 @@
 import Elementary
 import ElementaryHTMX2
 
+/// The pages that can be active in the navigation; `SiteNav` highlights the menu entry of the current one.
 enum NavItem: Sendable, Equatable {
     case continueWatching, history, library, watchLater, stats, search, importing, account, admin, system
 
@@ -15,26 +16,45 @@ enum NavItem: Sendable, Equatable {
     }
 }
 
+/// What the page shell needs to know about the signed-in user and the current page (built per request by `req.nav(_:)`).
 struct NavContext: Sendable {
+    /// Shown next to „Abmelden“ (log out).
     let username: String
+    /// Adds the „Admin“ menu entry.
     let isAdmin: Bool
+    /// The page being rendered; its `menuEntry` is highlighted.
     let active: NavItem
     /// Newer release found by the update check (only set for admins).
     var updateVersion: String? = nil
 }
 
+/// The HTML document shell of every web page: head, loading bar, optional navigation, `main` and footer.
+///
+/// `main` starts with the empty `#flash` region (`aria-live="polite"`) into which error and flash messages are swapped.
+/// Every htmx request shows the `#page-loader` bar. Without navigation (sign-in and other pages for anonymous visitors,
+/// error pages) the body gets the class `auth` (centered layout) and the footer shows no version.
 struct PageLayout<Content: HTML>: HTMLDocument {
+    /// Page-specific part of the `<title>`; „ · WatchSwifty“ is appended.
     let pageTitle: String
+    /// Navigation context; nil renders the page without header and menu.
     let nav: NavContext?
+    /// The page content, placed in `main` below `#flash`.
     let content: Content
 
+    /// Creates the shell around a page's content.
+    /// - Parameters:
+    ///   - title: Page-specific part of the document title.
+    ///   - nav: Navigation context, or nil for a page without navigation.
+    ///   - content: The page content.
     init(title: String, nav: NavContext?, @ContentBuilder content: () -> Content) {
         self.pageTitle = title
         self.nav = nav
         self.content = content()
     }
 
+    /// Document title: the page title plus „ · WatchSwifty“.
     var title: String { "\(pageTitle) · WatchSwifty" }
+    /// The UI is German.
     var lang: String { "de" }
     /// The login page (no navigation) is laid out centered.
     var bodyAttributes: [HTMLAttribute<HTMLTag.body>] {
@@ -42,6 +62,8 @@ struct PageLayout<Content: HTML>: HTMLDocument {
         (nav == nil ? [.class("auth")] : []) + [.custom(name: "hx-indicator", value: "#page-loader")]
     }
 
+    /// Viewport, htmx config (error responses are swapped too, a 204 is not), theme color, app icons, the web manifest, and
+    /// the stylesheet and htmx script with their content fingerprints (`AssetVersion`).
     var head: some HTML {
         meta(.name(.viewport), .content("width=device-width, initial-scale=1"))
         // Error responses are swapped too: they carry German messages (usually retargeted to #flash).
@@ -69,9 +91,15 @@ struct PageLayout<Content: HTML>: HTMLDocument {
     }
 }
 
+/// The site header: brand link, a CSS-only burger toggle for phones, the main menu and the logout form.
+///
+/// Brand and menu links are boosted (`hx-boost`), so navigating shows the loading bar; the entry of the current page
+/// gets `class="active"` and `aria-current="page"`.
 struct SiteNav: HTML {
+    /// User and current page.
     let context: NavContext
 
+    /// Menu entries as (item, German label, path); „Admin“ (linking to `/admin/system`) only for admins.
     private var items: [(NavItem, String, String)] {
         var items: [(NavItem, String, String)] = [
             (.continueWatching, "Weiterschauen", "/"),

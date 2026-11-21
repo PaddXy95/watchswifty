@@ -4,6 +4,12 @@ import Vapor
 import WatchSwiftyAPI
 
 extension APIHandler {
+    /// Handles `GET /api/v1/history`: one page of the user's watch history from `HistoryService`.
+    ///
+    /// `page` is clamped to `1...HistoryService.maxPage`, `perPage` to `1...200` (default 50).
+    /// - Parameter input: The generated operation input (query `page`, `perPage`).
+    /// - Returns: `.ok` with the page's items and the total count.
+    /// - Throws: `APIError.unauthorized` / `APIError.tokenExpired` without a valid bearer token, database errors.
     func getHistory(_ input: Operations.getHistory.Input) async throws -> Operations.getHistory.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
@@ -13,6 +19,15 @@ extension APIHandler {
         return .ok(.init(body: .json(.init(items: result.entries.map(Self.historyItem), total: result.total, page: page, perPage: perPage))))
     }
 
+    /// Handles `PUT /api/v1/watches/{id}`: changes day and service of one of the user's watches via
+    /// `HistoryService.edit`.
+    ///
+    /// A missing or empty `day` leaves the watch undated; a missing service clears it.
+    /// - Parameter input: The generated operation input (path `id`, optional `WatchEdit` body).
+    /// - Returns: `.ok` with the updated history item.
+    /// - Throws: `APIError.unauthorized` / `APIError.tokenExpired` without a valid bearer token, `APIError.notFound`
+    ///   for a malformed ID, `TrackingError.notFound` for an unknown or another user's watch, `TrackingError` date
+    ///   errors for an invalid day.
     func updateWatch(_ input: Operations.updateWatch.Input) async throws -> Operations.updateWatch.Output {
         let user = try APIContext.requireUser()
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
@@ -23,6 +38,11 @@ extension APIHandler {
         return .ok(.init(body: .json(Self.historyItem(watch))))
     }
 
+    /// Handles `DELETE /api/v1/watches/{id}`: deletes one of the user's watches via `WatchService.deleteWatch`.
+    /// - Parameter input: The generated operation input (path `id`).
+    /// - Returns: `.noContent`.
+    /// - Throws: `APIError.unauthorized` / `APIError.tokenExpired` without a valid bearer token, `APIError.notFound`
+    ///   for a malformed ID, `TrackingError.notFound` for an unknown or another user's watch.
     func deleteWatch(_ input: Operations.deleteWatch.Input) async throws -> Operations.deleteWatch.Output {
         let user = try APIContext.requireUser()
         guard let id = UUID(uuidString: input.path.id) else { throw APIError.notFound }
@@ -30,6 +50,9 @@ extension APIHandler {
         return .noContent(.init())
     }
 
+    /// Maps a watch (title and episode loaded) to the `HistoryItem` schema.
+    /// - Parameter watch: The watch.
+    /// - Returns: The schema value.
     static func historyItem(_ watch: Watch) -> Components.Schemas.HistoryItem {
         let title = watch.$title.value
         return .init(id: watch.id?.uuidString ?? "", kind: title?.titleKind == .movie ? .movie : .tv, tmdbId: title?.tmdbID ?? 0,

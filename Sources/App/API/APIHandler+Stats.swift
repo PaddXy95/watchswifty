@@ -4,14 +4,21 @@ import Vapor
 import WatchSwiftyAPI
 
 extension APIHandler {
+    /// Handles `GET /api/v1/stats`: the user's statistics from `StatsService` (periods, charts, services, top lists,
+    /// genres, years, ratings).
+    /// - Parameter input: The generated operation input (optional query `year`).
+    /// - Returns: `.ok` with the statistics.
+    /// - Throws: `APIError.unauthorized` / `APIError.tokenExpired` without a valid bearer token, database errors.
     func getStats(_ input: Operations.getStats.Input) async throws -> Operations.getStats.Output {
         let user = try APIContext.requireUser()
         let request = try APIContext.request()
         let stats = try await StatsService(db: request.db, today: request.watches.today())
             .stats(userID: user.requireID(), year: input.query.year)
+        /// Maps a movie statistic to the API schema.
         func movie(_ m: MovieStat) -> Components.Schemas.MovieStat {
             .init(tmdbId: m.tmdbID, name: m.name, posterPath: m.posterPath, watches: m.watches, minutes: m.minutes, rating: m.rating)
         }
+        /// Maps the totals of a period to the API schema.
         func period(_ p: PeriodStats) -> Components.Schemas.Period {
             .init(movies: p.movies, series: p.series, episodes: p.episodes, minutes: p.minutes, unknownRuntime: p.unknownRuntime)
         }

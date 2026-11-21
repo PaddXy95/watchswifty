@@ -7,10 +7,23 @@ import Vapor
 struct OriginCheckMiddleware: AsyncMiddleware {
     let allowedOrigins: Set<String>
 
+    /// Creates the middleware.
+    /// - Parameter allowedOrigins: Additional accepted origins (`PUBLIC_ORIGIN`), normalized with `normalizeOrigin(_:)`.
     init(allowedOrigins: [String] = []) {
         self.allowedOrigins = Set(allowedOrigins.map(Self.normalizeOrigin))
     }
 
+    /// Rejects state-changing web requests whose origin does not belong to WatchSwifty.
+    ///
+    /// GET, HEAD and App API (`/api/v1`) requests pass unchecked. An `Origin` header must match a configured origin,
+    /// the canonical origin of the OIDC setup or the host the request reached; without one, only htmx requests are
+    /// accepted.
+    /// - Parameters:
+    ///   - request: The incoming request.
+    ///   - next: The rest of the responder chain.
+    /// - Returns: The downstream response.
+    /// - Throws: `Abort(.forbidden)` with a German reason when the origin is foreign or missing; otherwise whatever the
+    ///   downstream responder throws.
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
         // The App API authenticates with bearer tokens only (no cookies), so cross-site requests cannot act as a user.
         guard request.method != .GET, request.method != .HEAD, !request.isAPIRequest else {
@@ -30,6 +43,10 @@ struct OriginCheckMiddleware: AsyncMiddleware {
 
     /// True when `origin` names the host the browser talked to (Host / X-Forwarded-Host [+ X-Forwarded-Port]);
     /// the scheme only decides the default port, so TLS-terminating proxies match too.
+    /// - Parameters:
+    ///   - origin: The origin to compare, e.g. the `Origin` header.
+    ///   - request: The request whose host headers are compared.
+    /// - Returns: `true` when host and effective port match; `false` for unparsable values.
     static func requestMatches(origin: String, _ request: Request) -> Bool {
         guard let url = URL(string: origin), let scheme = url.scheme?.lowercased(), let originHost = url.host?.lowercased() else {
             return false
@@ -51,12 +68,20 @@ struct OriginCheckMiddleware: AsyncMiddleware {
         return originAuthority == requestAuthority
     }
 
+    /// Joins host and port, leaving out the scheme's default port.
+    /// - Parameters:
+    ///   - host: The lowercased host name.
+    ///   - port: The explicit port, if any.
+    ///   - defaultPort: The scheme's default port (80 or 443).
+    /// - Returns: `host` or `host:port`.
     private static func authority(host: String, port: Int?, defaultPort: Int) -> String {
         guard let port, port != defaultPort else { return host }
         return "\(host):\(port)"
     }
 
     /// `scheme://host[:port]`, lowercased, without trailing slash.
+    /// - Parameter origin: An origin as sent by a browser or configured.
+    /// - Returns: The value trimmed, lowercased and without trailing slashes.
     static func normalizeOrigin(_ origin: String) -> String {
         var value = origin.trimmingCharacters(in: .whitespaces).lowercased()
         while value.hasSuffix("/") { value.removeLast() }

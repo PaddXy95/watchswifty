@@ -2,10 +2,20 @@ import Elementary
 import Foundation
 import ElementaryHTMX2
 
+/// One table row of the „Verlauf“ (history) page: date, title (and episode), service, origin, with „Bearbeiten“ (edit)
+/// and „Löschen“ (delete).
+///
+/// The row id is `watch-<watch id>`. The inline edit form (posts to `/watches/<id>`) and the delete button (after a
+/// confirmation) replace the closest `<tr>` with the response. Cells carry `data-label`, which the narrow layout shows
+/// as captions.
 struct HistoryRow: HTML {
+    /// The viewing shown in this row.
     let watch: Watch
+    /// The watched title.
     let title: Title
+    /// The watched episode, or `nil` for a movie.
     let episode: Episode?
+    /// Today (`YYYY-MM-DD`): maximum of the date input and its value for undated viewings.
     let today: String
 
     var body: some HTML {
@@ -41,9 +51,15 @@ struct HistoryRow: HTML {
     }
 }
 
+/// One page of history rows, followed by a „Mehr laden“ (load more) row when there is a next page.
+///
+/// The button fetches `/history?page=<n>` and replaces its own row (`#more-row`), so the next page is appended.
 struct HistoryRows: HTML {
+    /// (watch, title, episode) triples in display order.
     let rows: [(Watch, Title, Episode?)]
+    /// Number of the next page, or `nil` on the last page.
     let nextPage: Int?
+    /// Today (`YYYY-MM-DD`), passed to every ``HistoryRow``.
     let today: String
 
     var body: some HTML {

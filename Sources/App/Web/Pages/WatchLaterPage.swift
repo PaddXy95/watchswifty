@@ -5,9 +5,12 @@ import Foundation
 /// „Später ansehen“ (spec §3.2).
 struct WatchLaterListPage: HTML {
     let navContext: NavContext
+    /// The list split into titles at the user's services and all others, with region and fetch date.
     let page: WatchLaterPage
+    /// Active kind filter: `all`, `tv` or `movie`.
     let filter: String
 
+    /// Kind filters as (query value, German label).
     private let filters = [("all", "Alle"), ("tv", "Serien"), ("movie", "Filme")]
 
     var body: some HTML {
@@ -55,10 +58,18 @@ struct WatchLaterListPage: HTML {
     }
 }
 
+/// Card of one „Später ansehen“ (watch later) title: poster, name, kind badge, „neu seit“ (new since) date, and either
+/// the provider chips of the user's services or a status line.
+///
+/// „Entfernen“ (remove) posts to `/watch-later/:kind/:tmdbID/remove` and swaps the card (`closest .card`) with the empty
+/// response, so it disappears.
 struct WatchLaterCard: HTML {
+    /// The title with its offers grouped by the user's services.
     let item: WatchLaterItem
+    /// The title is available at one of the user's services: shows provider chips instead of the status line.
     let mine: Bool
 
+    /// Path of the title's detail page.
     private var href: String { "/\(item.title.kind)/\(item.title.tmdbID)" }
 
     /// Status for titles not at the user's services.
@@ -72,6 +83,9 @@ struct WatchLaterCard: HTML {
         return "Derzeit nirgends verfügbar"
     }
 
+    /// Provider names of the offers without duplicates, in order.
+    /// - Parameter offers: The offers to name.
+    /// - Returns: The names, comma-separated.
     private static func names(_ offers: [Offer]) -> String {
         var names: [String] = []
         for offer in offers where !names.contains(offer.name) { names.append(offer.name) }
@@ -103,6 +117,9 @@ struct WatchLaterCard: HTML {
         }
     }
 
+    /// Formats a date as `dd.MM.` (German, e.g. „07.11.“).
+    /// - Parameter date: The date to format.
+    /// - Returns: Day and month.
     private static func dayMonth(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "de_DE")

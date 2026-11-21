@@ -1,5 +1,7 @@
 import Elementary
 
+/// Footer of every page (`Layout`): app version (linked to its release), an update hint for admins, credits and the
+/// TMDB attribution required by TMDB's API terms.
 struct SiteFooter: HTML {
     /// Shown to admins when the update check found a newer release.
     var updateVersion: String? = nil

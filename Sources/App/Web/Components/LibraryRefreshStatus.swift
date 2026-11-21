@@ -4,7 +4,10 @@ import Foundation
 
 /// Konto → TMDB-Token: reload all titles from TMDB. While a run is going the fragment asks every 2 s for the
 /// progress (like the Netflix import); otherwise it shows the last result and the button.
+///
+/// The fragment is `#library-refresh`; polling and the start form both replace it (outer HTML).
 struct LibraryRefreshStatus: HTML {
+    /// Progress and result of the current or last refresh run.
     let state: LibraryRefreshState
     /// A start that was refused (e.g. no token).
     var error: String? = nil

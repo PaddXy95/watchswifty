@@ -20,11 +20,16 @@ struct OIDCConfig: Sendable, Equatable {
     }
 
     /// True when `stored` is this issuer, ignoring a trailing slash on either side.
+    /// - Parameter stored: The issuer stored on an account, if any.
+    /// - Returns: `true` when both issuers match; `false` for `nil`.
     func matchesIssuer(_ stored: String?) -> Bool {
         guard let stored else { return false }
         return Self.trimmed(stored) == Self.trimmed(issuer)
     }
 
+    /// Removes trailing slashes from an issuer.
+    /// - Parameter issuer: The issuer.
+    /// - Returns: The issuer without trailing slashes.
     static func trimmed(_ issuer: String) -> String {
         var value = issuer
         while value.hasSuffix("/") { value.removeLast() }
