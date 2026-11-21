@@ -10,6 +10,13 @@ import WatchSwiftyClient
         #expect(item.service?.isKnown == false)
     }
 
+    @Test func unknownOfferKindDecodes() throws {
+        let json = #"{"providerId":8,"name":"Netflix","kind":"cinema","mine":true}"#
+        let offer = try JSONDecoder().decode(Components.Schemas.ProviderOffer.self, from: Data(json.utf8))
+        #expect(offer.kind.rawValue == "cinema")
+        #expect(offer.kind.isKnown == false)
+    }
+
     @Test func unknownOriginDecodes() throws {
         let json = #"{"id":"0F2B4D63-8E57-4E0A-9C5B-3B1E2D4F5A6B","kind":"tv","tmdbId":1,"title":"X","origin":"trakt"}"#
         let item = try JSONDecoder().decode(Components.Schemas.HistoryItem.self, from: Data(json.utf8))
@@ -48,6 +55,7 @@ import WatchSwiftyClient
         #expect(ImportStatusValue.known.map(\.rawValue) == ["pending", "imported", "review", "not_found", "skipped"])
         #expect(DeviceKindValue.known.map(\.rawValue) == ["device", "manual"])
         #expect(ServiceValue.primeVideo.isKnown)
+        #expect(OfferKindValue.known.map(\.rawValue) == ["flatrate", "free", "ads", "rent", "buy"])
         #expect(GenreValue.known.map(\.rawValue) == ["action", "adventure", "animation", "comedy", "crime", "documentary", "drama",
                                                       "family", "fantasy", "history", "horror", "music", "mystery", "romance",
                                                       "science_fiction", "tv_movie", "thriller", "war", "western", "kids", "news",

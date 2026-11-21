@@ -14,7 +14,7 @@ extension APIHandler {
         let request = try APIContext.request()
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
         let channel = NotifyChannel(rawValue: body.channel.rawValue) ?? .mail
-        try await request.notificationPrefs.save(user: user, announced: body.announced, soon: body.soon, today: body.today, titleAvailable: nil, channel: channel,
+        try await request.notificationPrefs.save(user: user, announced: body.announced, soon: body.soon, today: body.today, titleAvailable: body.titleAvailable, channel: channel,
                                                  available: try await request.notifications.availableChannels(for: user))
         return .ok(.init(body: .json(try await Self.notificationPrefs(user, request: request))))
     }
@@ -58,7 +58,8 @@ extension APIHandler {
         let active = available.contains(user.preferredChannel) ? user.preferredChannel : available.first
         let settings = try await request.notificationSettings.settings()
         let keyState = user.webhookKeyState(request.application.tokenCipher)
-        return .init(announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
+        return .init(titleAvailable: user.notifyAvailable == true,
+                     announced: user.notifyAnnounced == true, soon: user.notifySoon == true, today: user.notifyToday == true,
                      channel: schema(user.preferredChannel), activeChannel: active.map(schema),
                      availableChannels: available.map(schema), webhookConfigured: settings.webhookURL != nil,
                      hasWebhookKey: keyState != .none, dailyRunTime: settings.dailyRunTime)

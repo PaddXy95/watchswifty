@@ -138,6 +138,7 @@ extension APIHandler {
             overview: title.overview.flatMap { $0.isEmpty ? nil : $0 }, status: title.tmdbStatus,
             runtime: title.runtime.flatMap { $0 > 0 ? $0 : nil }, genres: genres(title), links: links(title),
             rating: model.rating, comment: model.comment, hidden: model.hidden, followed: model.followed,
+            watchLater: try await request.watchLater.contains(userID: user.requireID(), titleID: title.requireID()),
             lastService: model.defaultService.flatMap { Components.Schemas.Service(rawValue: $0.rawValue) },
             next: next.map { .init(episodeId: $0.id.uuidString, season: $0.season, number: $0.number, name: $0.name, airDate: $0.airDate) },
             seasons: model.seasons.map { season in

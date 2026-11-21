@@ -13,3 +13,4 @@ typeOverrides:
     DeviceKind: DeviceKindValue
     NotifyChannel: NotifyChannelValue
     Genre: GenreValue
+    OfferKind: OfferKindValue

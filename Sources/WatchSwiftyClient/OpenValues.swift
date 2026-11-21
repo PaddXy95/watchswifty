@@ -130,3 +130,16 @@ public struct GenreValue: OpenStringValue {
                                        .scienceFiction, .tvMovie, .thriller, .war, .western, .kids, .news,
                                        .reality, .soap, .talk, .politics]
 }
+
+/// Schema `OfferKind`: how a title is offered at a streaming service (watch later availability).
+public struct OfferKindValue: OpenStringValue {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    public static let flatrate = Self(rawValue: "flatrate")
+    public static let free = Self(rawValue: "free")
+    public static let ads = Self(rawValue: "ads")
+    public static let rent = Self(rawValue: "rent")
+    public static let buy = Self(rawValue: "buy")
+    public static let known: [Self] = [.flatrate, .free, .ads, .rent, .buy]
+}
