@@ -160,6 +160,22 @@ struct StandardImportTests {
         }
     }
 
+    @Test func importRespectsWatchLaterDay() async throws {
+        let tmdb = Self.fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            let old = try await entries(app, user, [Self.draft(.movie, "Dune", watches: [Self.watch("2019-03-01")])])[0]
+            let dune = try await CatalogService(db: app.db, tmdb: tmdb).title(kind: .movie, tmdbID: 438631)
+            try await WatchLaterEntry(userID: user.requireID(), titleID: dune.requireID(), addedAt: .now, addedOn: "2024-01-01")
+                .save(on: app.db)
+            try await importer(app, tmdb).record(old, tmdbID: 438631)
+            #expect(try await WatchLaterEntry.query(on: app.db).count() == 1)
+            let recent = try await entries(app, user, [Self.draft(.movie, "Dune", watches: [Self.watch("2024-02-01")])])[0]
+            try await importer(app, tmdb).record(recent, tmdbID: 438631)
+            #expect(try await WatchLaterEntry.query(on: app.db).count() == 0)
+        }
+    }
+
     @Test func specialsMatch() async throws {
         let tmdb = Self.fake()
         try await withTestApp(tmdb: tmdb) { app in

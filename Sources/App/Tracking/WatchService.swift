@@ -25,6 +25,7 @@ struct WatchService {
         }
         let watch = Watch(userID: userID, titleID: episode.$title.id, episodeID: episodeID, watchedOn: watchedOn, service: service, origin: .manual)
         try await watch.save(on: db)
+        try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: episode.$title.id, day: watchedOn, origin: .manual)
         return watch
     }
 
@@ -73,6 +74,7 @@ struct WatchService {
         }
         let watch = Watch(userID: userID, titleID: titleID, episodeID: nil, watchedOn: watchedOn, service: service, origin: .manual)
         try await watch.save(on: db)
+        try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: watchedOn, origin: .manual)
         return watch
     }
 
@@ -103,6 +105,7 @@ struct WatchService {
         }
         let watch = Watch(userID: userID, titleID: titleID, episodeID: episodeID, watchedOn: day, service: .netflix, origin: .import)
         try await watch.save(on: db)
+        try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: day, origin: .import)
         return watch
     }
 
@@ -281,6 +284,9 @@ struct WatchService {
             try await Watch(userID: userID, titleID: titleID, episodeID: episode.requireID(), watchedOn: nil,
                             service: service, origin: .manual).save(on: db)
         }
+        if !toMark.isEmpty {
+            try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: nil, origin: .manual)
+        }
         return toMark.count
     }
 
@@ -303,6 +309,7 @@ struct WatchService {
             try await Watch(userID: userID, titleID: titleID, episodeID: episode.requireID(), watchedOn: nil,
                             service: service, origin: .manual).save(on: db)
         }
+        try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: nil, origin: .manual)
         return behind.count
     }
 }
