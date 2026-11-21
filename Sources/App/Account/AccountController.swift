@@ -7,7 +7,7 @@ struct AccountController {
     struct DeviceInput: Content { var name: String }
     struct EmailInput: Content { var email: String; var currentPassword: String }
     struct LinkInput: Content { var currentPassword: String? }
-    struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var channel: String? }
+    struct NotificationPrefsInput: Content { var announced: String?; var soon: String?; var today: String?; var available: String?; var channel: String? }
     struct WebhookKeyInput: Content { var key: String }
 
     func register(on protected: any RoutesBuilder) {
@@ -37,6 +37,7 @@ struct AccountController {
         let channel = input.channel.flatMap(NotifyChannel.init(rawValue:)) ?? user.preferredChannel
         do {
             try await req.notificationPrefs.save(user: user, announced: on(input.announced), soon: on(input.soon), today: on(input.today),
+                                                 titleAvailable: on(input.available),
                                                  channel: channel, available: try await req.notifications.availableChannels(for: user))
         } catch let error as APIError {
             return try await page(req, open: .notifications, status: error.status, error: error.message)

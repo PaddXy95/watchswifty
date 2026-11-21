@@ -14,7 +14,7 @@ extension APIHandler {
         let request = try APIContext.request()
         guard case let .json(body) = input.body else { throw APIError.validation("Ungültige Anfrage.") }
         let channel = NotifyChannel(rawValue: body.channel.rawValue) ?? .mail
-        try await request.notificationPrefs.save(user: user, announced: body.announced, soon: body.soon, today: body.today, channel: channel,
+        try await request.notificationPrefs.save(user: user, announced: body.announced, soon: body.soon, today: body.today, titleAvailable: nil, channel: channel,
                                                  available: try await request.notifications.availableChannels(for: user))
         return .ok(.init(body: .json(try await Self.notificationPrefs(user, request: request))))
     }
