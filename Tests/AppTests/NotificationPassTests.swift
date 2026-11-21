@@ -148,4 +148,47 @@ struct NotificationPassTests {
             #expect(stored.lastRunAt == nil)
         }
     }
+
+    /// pat (mail) with only the availability switch on; „Dune“ on the list just appeared at Netflix.
+    func seedAvailable(_ app: Application) async throws -> User {
+        let pat = try await notifyUser(app, "pat", email: "pat@x.de")
+        pat.notifyAvailable = true
+        try await pat.save(on: app.db)
+        try await UserStreamingService(userID: pat.requireID(), providerID: 8).save(on: app.db)
+        let dune = try await seedMovie(app, tmdbID: 693134, name: "Dune")
+        dune.year = 2024
+        try await dune.save(on: app.db)
+        try await WatchLaterEntry(userID: pat.requireID(), titleID: dune.requireID(), addedAt: F.t2, addedOn: F.today, baselined: true)
+            .save(on: app.db)
+        let tmdb = FakeTMDBClient()
+        tmdb.setWatchProviders(kind: .movie, id: 693134, TMDBWatchProviders(offers: ["DE": [offer(8, "Netflix", .flatrate)]]))
+        try await AvailabilityService(db: app.db).refresh(dune, tmdb: tmdb, now: F.t2)
+        try await AvailabilityNoticeService(db: app.db).reconcile(titleID: dune.requireID(), now: F.t2)
+        return pat
+    }
+
+    @Test func availabilityOnlyUserGetsDigest() async throws {
+        let mail = FakeMailSender()
+        try await withTestApp(mail: mail) { app in
+            try await configureMail(app)
+            _ = try await seedAvailable(app)
+            let result = await run(app)
+            #expect(result.sent == 1)
+            #expect(mail.sent.first?.header("Subject") == "WatchSwifty: 1 Titel jetzt verfügbar")
+            #expect(mail.sent.first?.body.contains("„Dune“ (2024, Film) – Netflix") == true)
+            #expect(try await AvailabilityNotice.query(on: app.db).first()?.noticeState == .sent)
+            #expect(await run(app).sent == 0)
+        }
+    }
+
+    @Test func availabilitySendFailureKeepsPending() async throws {
+        let mail = FakeMailSender()
+        mail.failure = MailError(message: "kaputt")
+        try await withTestApp(mail: mail) { app in
+            try await configureMail(app)
+            _ = try await seedAvailable(app)
+            #expect(await run(app).failed == 1)
+            #expect(try await AvailabilityNotice.query(on: app.db).first()?.noticeState == .pending)
+        }
+    }
 }

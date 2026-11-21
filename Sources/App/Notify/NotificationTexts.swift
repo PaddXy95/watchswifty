@@ -37,12 +37,14 @@ enum NotificationTexts {
 
     /// The daily digest: per series (by name) the sections „Heute“, „In den nächsten Tagen“, „Neu angekündigt“; each
     /// episode once, in the section of its `headline`.
-    static func digest(username: String, items: [DueNotice], today: String, baseURL: String?) -> NotificationMessage {
+    static func digest(username: String, items: [DueNotice], available: [AvailabilityDue] = [], today: String,
+                       baseURL: String?) -> NotificationMessage {
         let count = { (kind: NoticeKind) in items.filter { $0.headline == kind }.count }
         let parts = [
             count(.today) > 0 ? "\(count(.today)) \(count(.today) == 1 ? "Folge" : "Folgen") heute" : nil,
             count(.soon) > 0 ? "\(count(.soon)) \(count(.soon) == 1 ? "Folge" : "Folgen") in den nächsten Tagen" : nil,
             count(.announced) > 0 ? "\(count(.announced)) neu angekündigt" : nil,
+            available.isEmpty ? nil : "\(available.count) Titel jetzt verfügbar",
         ].compactMap { $0 }
         let series = Dictionary(grouping: items, by: \.seriesTMDBID).values.sorted { a, b in
             let order = a[0].seriesName.localizedCaseInsensitiveCompare(b[0].seriesName)
@@ -59,15 +61,31 @@ enum NotificationTexts {
             if let baseURL { lines.append("  \(baseURL)/tv/\(episodes[0].seriesTMDBID)") }
             return lines.joined(separator: "\n")
         }
+        var sections: [String] = []
+        if !blocks.isEmpty { sections.append(blocks.joined(separator: "\n\n")) }
+        if !available.isEmpty {
+            var lines = ["Jetzt bei deinen Diensten:"]
+            for title in available {
+                let what = [title.year.map(String.init), title.kind == .movie ? "Film" : "Serie"].compactMap { $0 }.joined(separator: ", ")
+                lines.append("  „\(oneLine(title.name))“ (\(what)) – " + title.providers.map(oneLine).joined(separator: ", "))
+                if let baseURL { lines.append("  \(baseURL)/\(title.kind.rawValue)/\(title.tmdbID)") }
+            }
+            sections.append(lines.joined(separator: "\n"))
+        }
+        let intro = items.isEmpty ? "es gibt Neues zu deiner Liste „Später ansehen“:" : "es gibt Neues zu deinen beobachteten Serien:"
+        let notes = [
+            items.isEmpty ? nil : "Die Termine sind die von TMDB – bei US-Serien oft einen Tag vor der Verfügbarkeit hier.",
+            available.isEmpty ? nil : "Verfügbarkeit: JustWatch",
+            "Abschalten unter „Konto → Benachrichtigungen“.",
+        ].compactMap { $0 }
         let body = """
             Hallo \(username),
 
-            es gibt Neues zu deinen beobachteten Serien:
+            \(intro)
 
-            \(blocks.joined(separator: "\n\n"))
+            \(sections.joined(separator: "\n\n"))
 
-            Die Termine sind die von TMDB – bei US-Serien oft einen Tag vor der Verfügbarkeit hier.
-            Abschalten unter „Konto → Benachrichtigungen“.
+            \(notes.joined(separator: "\n"))
 
             Viele Grüße
             WatchSwifty
