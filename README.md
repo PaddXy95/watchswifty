@@ -17,6 +17,7 @@ container, one SQLite file, data from TMDB. The web UI is in German; apps such a
 
 - **Continue watching:** one card per series with the next episode (series of the last 3 months)
 - **Netflix import:** upload your viewing history as CSV, titles are matched to TMDB automatically
+- **Import from other trackers** (Letterboxd, IMDb, Trakt, TV Time, Simkl, …) in a simple standard CSV format
 - **Tracking by hand:** search series and movies, mark episodes as watched (with date and streaming service), rate
   them 1–10, private comments on series, seasons and movies
 - **History and library** with synopsis, genres (library filter) and links to TMDB, IMDb, Rotten Tomatoes and SeriesGraph

@@ -17,7 +17,7 @@ beyond that is refused. Titles longer than 500 characters are cut.
 ## Other trackers (standard CSV)
 
 History from another tracker (Letterboxd, IMDb, Trakt, TV Time, Simkl, …) or a list of your own can be imported
-under **Import → Aus anderen Trackern importieren** (import from other trackers) as a CSV in the WatchSwifty standard
+under **Konto → Import → Aus anderen Trackern importieren** (account → import → import from other trackers) as a CSV in the WatchSwifty standard
 format. The page offers an [example file](../Public/import/watchswifty-import-example.csv) to download.
 
 ```

@@ -2,6 +2,56 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.7.0] – 2026-11-21
+
+### Added
+- **Später ansehen** (watch later): a list of series and movies you want to watch. Add titles with **+ Später** in
+  the search or with „Später ansehen“ on a series or movie page. The page splits the list into **Bei deinen Diensten**
+  (at your services) and **Noch nicht bei deinen Diensten** (not at your services yet), with where the rest can be
+  watched („Im Abo bei …“, „Nur leihen oder kaufen“, „Derzeit nirgends verfügbar“). A title leaves the list as soon as
+  you record a watch; imported watches only count when they are dated on or after the day you added the title.
+- **Streamingdienste** (streaming services) under **Konto** (account): choose your country (default Germany) and the
+  services you subscribe to, with their logos.
+- **Verfügbarkeit** (availability) on every series and movie page: where the title streams in your country, split
+  into „In deinen Abos“ (your subscriptions, marked with ✓), „Weitere Abos“ (other subscriptions) and „Gratis / mit
+  Werbung“ (free / with ads), with „Leihen oder kaufen“ (rent or buy) folded. The block loads after the page when its
+  data is missing or older than 7 days. The data comes from JustWatch through TMDB (no extra account or key needed)
+  and is credited to JustWatch.
+- **Notification for watch later titles:** under **Konto → Benachrichtigungen** you can get a message when a title on
+  your list becomes available at one of your services in a subscription or for free. Each title and service is
+  reported once, in the daily digest by mail or webhook; titles that already ran there when you added them, chose the
+  service, changed the country or switched the notification on are not reported. Renting or buying never triggers a
+  message.
+- **Standard import from other trackers:** under **Konto → Import → Aus anderen Trackern importieren** (import from
+  other trackers) a CSV in the WatchSwifty standard format (movies, episodes and series with TMDB or IMDb id, date,
+  service, rating and comment) can be imported, for example from Letterboxd, IMDb, Trakt, TV Time or Simkl. Titles with
+  an id are taken directly, others are matched by title and year; unclear ones can be picked, searched again or
+  skipped. An example file is offered on the page, see [Import](docs/import.md).
+- **App API:** `GET /v1/watch-later`, `PUT /v1/{tv,movies}/{tmdbID}/watch-later`,
+  `GET /v1/{tv,movies}/{tmdbID}/availability`, `GET`/`PUT /v1/me/streaming-services`, `GET /v1/streaming-providers`,
+  `GET /v1/streaming-regions`, and `/v1/imports/standard` (upload, status, accept, search, skip, retry). New fields:
+  `watchLater` on `SeriesDetail`, `MovieDetail` and `SearchHit`, and `titleAvailable` on the notification settings
+  (optional when saving, so older apps keep the stored value). The Swift client gets the open type `OfferKindValue`.
+
+### Changed
+- **Smaller menu:** „Weiterschauen · Später ansehen · Bibliothek · Statistik · Suche · Konto · Admin“. Pages that
+  belong together have tabs at the top: **Bibliothek** has „Titel“ and „Verlauf“ (history), **Konto** has
+  „Einstellungen“ (settings) and „Import“, and the new entry **Admin** has „System“ and „Benutzer“ (users). The
+  addresses of the pages stay the same; hints now say „unter Admin → System“.
+- **The film list import is replaced by the standard import.** The film list page and its API `/v1/imports/films` are
+  removed (**breaking** for apps that used it); entries still waiting there are dropped, viewings already created stay.
+  A film list can be imported again in the standard format: one `movie` row per viewing with `title`, `year`,
+  `watched_on`, `service`, `rating` (1–10) and `comment` (see [Import](docs/import.md)).
+- The daily run also checks the availability of all titles on watch later lists (one TMDB request per title, no matter
+  how many users list it) before it sends notifications.
+
+### Security
+- Users without their own TMDB token cannot open other users' cached titles through the new import or watch later
+  routes either: accepting an import entry, adding a title to the list and the availability block follow the same rule
+  as the title pages (only titles the user already uses).
+- The standard import is hardened like the 0.6.0 parsers: overlong titles are cut, implausible years dropped, ratings
+  clamped before converting, and one upload is capped at 20,000 titles.
+
 ## [0.6.0] – 2026-11-14
 
 ### Fixed
