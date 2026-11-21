@@ -56,6 +56,21 @@ struct LiveTMDBClient: TMDBClient {
         return try Self.decoding { try Self.decodeFind(data) }
     }
 
+    func watchProviders(kind: TitleKind, id: Int) async throws -> TMDBWatchProviders {
+        let data = try await get("\(kind.rawValue)/\(id)/watch/providers", [:])
+        return try Self.decoding { try Self.decodeWatchProviders(data) }
+    }
+
+    func providers(kind: TitleKind, region: String) async throws -> [TMDBProviderInfo] {
+        let data = try await get("watch/providers/\(kind.rawValue)", ["watch_region": region])
+        return try Self.decoding { try Self.decodeProviderList(data) }
+    }
+
+    func providerRegions() async throws -> [TMDBRegion] {
+        let data = try await get("watch/providers/regions", [:])
+        return try Self.decoding { try Self.decodeRegions(data) }
+    }
+
     // MARK: HTTP
 
     private func get(_ path: String, _ query: [String: String]) async throws -> Data {
@@ -208,5 +223,45 @@ struct LiveTMDBClient: TMDBClient {
         return TMDBMovie(id: m.id, name: m.title, originalName: m.original_title, year: year(m.release_date), posterPath: m.poster_path,
                          overview: blankToNil(m.overview), imdbID: blankToNil(m.imdb_id), runtime: positive(m.runtime),
                          genreIDs: (m.genres ?? []).map(\.id))
+    }
+
+    private struct ProviderRef: Decodable {
+        let provider_id: Int; let provider_name: String; let logo_path: String?; let display_priority: Int?
+    }
+
+    static func decodeWatchProviders(_ data: Data) throws -> TMDBWatchProviders {
+        struct Region: Decodable {
+            let link: String?
+            let flatrate: [ProviderRef]?; let free: [ProviderRef]?; let ads: [ProviderRef]?
+            let rent: [ProviderRef]?; let buy: [ProviderRef]?
+        }
+        struct Response: Decodable { let results: [String: Region]? }
+        var result = TMDBWatchProviders()
+        for (code, region) in try JSONDecoder().decode(Response.self, from: data).results ?? [:] {
+            if let link = region.link { result.links[code] = link }
+            let groups: [(OfferKind, [ProviderRef]?)] = [(.flatrate, region.flatrate), (.free, region.free), (.ads, region.ads),
+                                                         (.rent, region.rent), (.buy, region.buy)]
+            result.offers[code] = groups.flatMap { kind, refs in
+                (refs ?? []).map { TMDBOffer(providerID: $0.provider_id, name: $0.provider_name, logoPath: $0.logo_path,
+                                             displayPriority: $0.display_priority ?? Int.max, kind: kind) }
+            }
+        }
+        return result
+    }
+
+    static func decodeProviderList(_ data: Data) throws -> [TMDBProviderInfo] {
+        struct Response: Decodable { let results: [ProviderRef]? }
+        return (try JSONDecoder().decode(Response.self, from: data).results ?? []).map {
+            TMDBProviderInfo(providerID: $0.provider_id, name: $0.provider_name, logoPath: $0.logo_path,
+                             displayPriority: $0.display_priority ?? Int.max)
+        }
+    }
+
+    static func decodeRegions(_ data: Data) throws -> [TMDBRegion] {
+        struct Region: Decodable { let iso_3166_1: String; let english_name: String?; let native_name: String? }
+        struct Response: Decodable { let results: [Region]? }
+        return (try JSONDecoder().decode(Response.self, from: data).results ?? []).map {
+            TMDBRegion(code: $0.iso_3166_1, name: $0.native_name ?? $0.english_name ?? $0.iso_3166_1)
+        }
     }
 }

@@ -11,6 +11,9 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
         var moviesByID: [Int: TMDBMovie] = [:]
         var imdbIDs: [Int: String] = [:]
         var finds: [String: TMDBFindResult] = [:]
+        var watchProviders: [String: TMDBWatchProviders] = [:]  // "tv:1"
+        var providerLists: [String: [TMDBProviderInfo]] = [:]   // "movie:DE"
+        var regions: [TMDBRegion] = []
         var callFailures: [String: TMDBError] = [:]
         var callHooks: [String: @Sendable () async throws -> Void] = [:]
         var failure: TMDBError?
@@ -87,6 +90,33 @@ final class FakeTMDBClient: TMDBClient, @unchecked Sendable {
     func find(imdbID: String) async throws -> TMDBFindResult {
         try await record("find:\(imdbID)")
         return state.withLockedValue { $0.finds[imdbID] } ?? TMDBFindResult()
+    }
+
+    func setWatchProviders(kind: TitleKind, id: Int, _ providers: TMDBWatchProviders) {
+        state.withLockedValue { $0.watchProviders["\(kind.rawValue):\(id)"] = providers }
+    }
+
+    func setProviders(kind: TitleKind, region: String, _ providers: [TMDBProviderInfo]) {
+        state.withLockedValue { $0.providerLists["\(kind.rawValue):\(region)"] = providers }
+    }
+
+    func setRegions(_ regions: [TMDBRegion]) {
+        state.withLockedValue { $0.regions = regions }
+    }
+
+    func watchProviders(kind: TitleKind, id: Int) async throws -> TMDBWatchProviders {
+        try await record("watch_providers:\(kind.rawValue):\(id)")
+        return state.withLockedValue { $0.watchProviders["\(kind.rawValue):\(id)"] } ?? TMDBWatchProviders()
+    }
+
+    func providers(kind: TitleKind, region: String) async throws -> [TMDBProviderInfo] {
+        try await record("providers:\(kind.rawValue):\(region)")
+        return state.withLockedValue { $0.providerLists["\(kind.rawValue):\(region)"] } ?? []
+    }
+
+    func providerRegions() async throws -> [TMDBRegion] {
+        try await record("regions")
+        return state.withLockedValue { $0.regions }
     }
 
     func addMovie(_ movie: TMDBMovie) {
