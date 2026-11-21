@@ -89,6 +89,10 @@ func configure(_ app: Application, config: AppConfig, tmdbProvider: TMDBProvider
     app.migrations.add(CreateWebSession())
     app.migrations.add(CreateImportEntry())
     app.migrations.add(DropFilmListEntries())
+    app.migrations.add(CreateWatchLater())
+    app.migrations.add(CreateTitleAvailability())
+    app.migrations.add(CreateStreamingServices())
+    app.migrations.add(CreateAvailabilityNotice())
 
     try routes(app)
     try await app.autoMigrate()
