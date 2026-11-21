@@ -108,8 +108,13 @@ extension APIHandler {
         let titleID = try title.requireID()
         if try await request.availability.needsRefresh(titleID: titleID, region: user.region) {
             if request.tmdbToken != nil {
-                try await request.availability.refresh(title, tmdb: request.tmdb)
-                try await AvailabilityNoticeService(db: request.db).reconcile(titleID: titleID)
+                do {
+                    try await request.availability.refresh(title, tmdb: request.tmdb)
+                    try await AvailabilityNoticeService(db: request.db).reconcile(titleID: titleID)
+                } catch let error as TMDBError {
+                    // Like the web block: an older stored state is better than an error.
+                    guard try await request.availability.snapshot(titleID: titleID, region: user.region) != nil else { throw error }
+                }
             } else if try await request.availability.snapshot(titleID: titleID, region: user.region) == nil {
                 throw TMDBError.missingToken
             }

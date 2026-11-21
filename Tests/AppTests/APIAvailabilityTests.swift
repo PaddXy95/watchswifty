@@ -178,4 +178,19 @@ struct APIAvailabilityTests {
             }
         }
     }
+
+    @Test func staleStateSurvivesTMDBFailure() async throws {
+        let tmdb = fake()
+        try await withTestApp(tmdb: tmdb) { app in
+            let (_, token) = try await setup(app)
+            let movie = try await seedMovie(app, tmdbID: 603)
+            try await AvailabilityService(db: app.db).refresh(movie, tmdb: tmdb, now: Date().addingTimeInterval(-10 * 86_400))
+            tmdb.fail("watch_providers:movie:603", with: .rateLimited)
+            try await call(app, .GET, "/api/v1/movies/603/availability", token) { res in
+                #expect(res.status == .ok)
+                let decoded = try res.content.decode(AvailabilityBody.self)
+                #expect(decoded.offers.count == 2)
+            }
+        }
+    }
 }

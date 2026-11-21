@@ -67,4 +67,17 @@ struct AvailabilityPassTests {
             #expect(await pass(app, now: start.addingTimeInterval(31 * Self.day)) == AvailabilityPassResult(expired: 1))
         }
     }
+
+    @Test func passContinuesAfterNonTMDBError() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.setWatchProviders(kind: .movie, id: 604, TMDBWatchProviders(offers: ["DE": [offer(8, "Netflix", .flatrate)]]))
+        tmdb.onCall("watch_providers:movie:603") { throw FakeTMDBClient.Boom() }
+        try await withTestApp(tmdb: tmdb) { app in
+            let pat = try await createUser(app, "pat", tmdbToken: try app.tokenCipher.seal("t1"))
+            try await list(app, pat, try await seedMovie(app, tmdbID: 603))
+            try await list(app, pat, try await seedMovie(app, tmdbID: 604))
+            let result = await pass(app, now: start)
+            #expect(result.refreshed == 1 && result.failed == 1)
+        }
+    }
 }

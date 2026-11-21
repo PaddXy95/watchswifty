@@ -309,7 +309,9 @@ struct WatchService {
             try await Watch(userID: userID, titleID: titleID, episodeID: episode.requireID(), watchedOn: nil,
                             service: service, origin: .manual).save(on: db)
         }
-        try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: nil, origin: .manual)
+        if !behind.isEmpty {
+            try await WatchLaterService(db: db).removeAfterWatch(userID: userID, titleID: titleID, day: nil, origin: .manual)
+        }
         return behind.count
     }
 }

@@ -28,7 +28,11 @@ struct NotificationPrefsService {
         let switchedOn = titleAvailable == true && user.notifyAvailable != true
         if let titleAvailable { user.notifyAvailable = titleAvailable }
         try await user.save(on: db)
-        if switchedOn { try await AvailabilityNoticeService(db: db).rebaseline(userID: user.requireID()) }
+        if switchedOn {
+            let notices = AvailabilityNoticeService(db: db)
+            try await notices.rebaseline(userID: user.requireID())
+            try await notices.dropPending(userID: user.requireID())
+        }
     }
 
     /// Sets (or with an empty value removes) the key. No password since the 2026-11-13 feedback round: the user accepts

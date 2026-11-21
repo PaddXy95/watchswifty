@@ -21,11 +21,18 @@ struct AvailabilityNoticeService {
     /// the user's services as `.baseline` (entry not yet baselined) or as new (`.pending` / `.skipped`), and forgets
     /// offers that are gone, so a return is reported again.
     func reconcile(titleID: UUID, now: Date = .now) async throws {
-        let entries = try await WatchLaterEntry.query(on: db).filter(\.$title.$id == titleID).all()
-        guard !entries.isEmpty else { return }
+        try await reconcile(entries: try await WatchLaterEntry.query(on: db).filter(\.$title.$id == titleID).all(), titleID: titleID, now: now)
+    }
+
+    /// `reconcile` for entries loaded earlier: each one is read again, so an entry removed or re-baselined meanwhile (by
+    /// the user while a fetch was running) is not written with stale state. Concurrent runs may insert the same notice;
+    /// the second insert is ignored.
+    func reconcile(entries loaded: [WatchLaterEntry], titleID: UUID, now: Date = .now) async throws {
+        guard !loaded.isEmpty else { return }
         let availability = AvailabilityService(db: db)
-        for entry in entries {
-            guard let user = try await User.find(entry.$user.id, on: db),
+        for loadedEntry in loaded {
+            guard let entryID = loadedEntry.id, let entry = try await WatchLaterEntry.find(entryID, on: db),
+                  let user = try await User.find(entry.$user.id, on: db),
                   let snapshot = try await availability.snapshot(titleID: titleID, region: user.region) else { continue }
             let userID = try user.requireID()
             let services = try await serviceIDs(userID: userID)
@@ -37,8 +44,10 @@ struct AvailabilityNoticeService {
             let knownIDs = Set(known.map(\.providerID))
             let state: NoticeState = !entry.baselined ? .baseline : (user.notifyAvailable == true ? .pending : .skipped)
             for providerID in matching.subtracting(knownIDs).sorted() {
-                try await AvailabilityNotice(userID: userID, titleID: titleID, providerID: providerID, noticedAt: now, state: state)
-                    .create(on: db)
+                try await ignoringDuplicate {
+                    try await AvailabilityNotice(userID: userID, titleID: titleID, providerID: providerID, noticedAt: now, state: state)
+                        .create(on: db)
+                }
             }
             if !entry.baselined {
                 entry.baselined = true
@@ -51,6 +60,12 @@ struct AvailabilityNoticeService {
     /// switch changed).
     func rebaseline(userID: UUID) async throws {
         try await WatchLaterEntry.query(on: db).filter(\.$user.$id == userID).set(\.$baselined, to: false).update()
+    }
+
+    /// Switching the notification on: offers still waiting from before (no channel, failed send) are not reported.
+    func dropPending(userID: UUID) async throws {
+        try await AvailabilityNotice.query(on: db).filter(\.$user.$id == userID).filter(\.$state == NoticeState.pending.rawValue)
+            .set(\.$state, to: NoticeState.skipped.rawValue).update()
     }
 
     /// Pending offers of titles still on the list whose offer still exists, one item per title, by name.
@@ -102,5 +117,14 @@ struct AvailabilityNoticeService {
     /// The user's services (TMDB provider ids).
     func serviceIDs(userID: UUID) async throws -> Set<Int> {
         Set(try await UserStreamingService.query(on: db).filter(\.$user.$id == userID).all().map(\.providerID))
+    }
+}
+
+/// Runs `insert`, ignoring a unique-constraint failure (a concurrent request inserted the same row first).
+func ignoringDuplicate(_ insert: () async throws -> Void) async throws {
+    do {
+        try await insert()
+    } catch let error as any DatabaseError where error.isConstraintFailure {
+        return
     }
 }

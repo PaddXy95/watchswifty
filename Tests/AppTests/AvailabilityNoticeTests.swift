@@ -168,4 +168,46 @@ struct AvailabilityNoticeTests {
             #expect(try await AvailabilityNoticeService(db: app.db).due(userID: other.requireID()).isEmpty)
         }
     }
+
+    @Test func pendingBeforeSwitchingOnIsNotSent() async throws {
+        let tmdb = FakeTMDBClient()
+        try await withTestApp(tmdb: tmdb) { app in
+            let s = try await setup(app, tmdb)
+            try await offers(app, s, [offer(8, "Netflix", .flatrate)])       // pending (e.g. no channel yet)
+            let prefs = NotificationPrefsService(db: app.db, cipher: app.tokenCipher)
+            try await prefs.save(user: s.user, announced: false, soon: false, today: false, titleAvailable: false, channel: .mail, available: [])
+            try await prefs.save(user: s.user, announced: false, soon: false, today: false, titleAvailable: true, channel: .mail, available: [])
+            try await AvailabilityNoticeService(db: app.db).reconcile(titleID: s.title.requireID(), now: start)
+            #expect(try await AvailabilityNoticeService(db: app.db).due(userID: s.user.requireID()).isEmpty)
+        }
+    }
+
+    @Test func concurrentReconcilesDoNotFail() async throws {
+        let tmdb = FakeTMDBClient()
+        try await withTestApp(tmdb: tmdb) { app in
+            let s = try await setup(app, tmdb)
+            s.tmdb.setWatchProviders(kind: .movie, id: 603, TMDBWatchProviders(offers: ["DE": [offer(8, "Netflix", .flatrate)]]))
+            try await AvailabilityService(db: app.db).refresh(s.title, tmdb: s.tmdb, now: start)
+            let titleID = try s.title.requireID()
+            let db = app.db
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0..<4 { group.addTask { try await AvailabilityNoticeService(db: db).reconcile(titleID: titleID) } }
+                try await group.waitForAll()
+            }
+            #expect(try await states(app) == [8: .pending])
+        }
+    }
+
+    @Test func removedEntryGetsNoNotices() async throws {
+        let tmdb = FakeTMDBClient()
+        try await withTestApp(tmdb: tmdb) { app in
+            let s = try await setup(app, tmdb)
+            s.tmdb.setWatchProviders(kind: .movie, id: 603, TMDBWatchProviders(offers: ["DE": [offer(8, "Netflix", .flatrate)]]))
+            try await AvailabilityService(db: app.db).refresh(s.title, tmdb: s.tmdb, now: start)
+            let entries = try await WatchLaterEntry.query(on: app.db).all()     // loaded before the removal
+            try await WatchLaterService(db: app.db).remove(userID: s.user.requireID(), titleID: s.title.requireID())
+            try await AvailabilityNoticeService(db: app.db).reconcile(entries: entries, titleID: s.title.requireID(), now: start)
+            #expect(try await states(app).isEmpty)
+        }
+    }
 }

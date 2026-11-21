@@ -37,6 +37,10 @@ struct StreamingProviderChoices: HTML, Sendable {
             if providers.isEmpty {
                 p(.class("muted")) { "Für dieses Land kennt TMDB keine Streamingdienste." }
             }
+            // Chosen services this country's list does not show stay chosen (spec §2).
+            for id in selected.subtracting(providers.map(\.providerID)).sorted() {
+                input(.type(.hidden), .name("providers[]"), .value("\(id)"))
+            }
             for provider in providers {
                 label(.class("provider-choice")) {
                     input(.type(.checkbox), .name("providers[]"), .value("\(provider.providerID)"))

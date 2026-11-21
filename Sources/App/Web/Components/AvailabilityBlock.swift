@@ -36,7 +36,7 @@ struct JustWatchLink: HTML, Sendable {
     let region: String
 
     var body: some HTML {
-        a(.href("https://www.justwatch.com/\(region.lowercased())"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) {
+        a(.href("https://www.justwatch.com/\(region == "GB" ? "uk" : region.lowercased())"), .target(.blank), .custom(name: "rel", value: "noopener noreferrer")) {
             "JustWatch"
         }
     }
@@ -122,7 +122,7 @@ struct AvailabilityBlock: HTML, Sendable {
         if groups.mine.isEmpty && groups.otherSubscriptions.isEmpty {
             p(.class("muted")) {
                 "Derzeit bei keinem Abo-Dienst verfügbar."
-                if view.onList {
+                if view.onList && groups.atServices(view.services).isEmpty {
                     " Steht der Titel auf „Später ansehen“, bekommst du eine Nachricht, sobald er bei einem deiner Dienste im Abo läuft."
                 }
             }

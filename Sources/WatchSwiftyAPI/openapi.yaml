@@ -3275,11 +3275,11 @@ components:
       enum: [mail, webhook]
     NotificationPrefs:
       type: object
-      required: [announced, soon, today, titleAvailable, channel, availableChannels, webhookConfigured, hasWebhookKey, dailyRunTime]
+      required: [announced, soon, today, channel, availableChannels, webhookConfigured, hasWebhookKey, dailyRunTime]
       properties:
         titleAvailable:
           type: boolean
-          description: Notify when a title on the watch later list becomes available at one of the user's services.
+          description: Notify when a title on the watch later list becomes available at one of the user's services (always sent; optional so apps also work with older servers).
         announced:
           type: boolean
           description: Notify as soon as a new episode of a followed series is known.

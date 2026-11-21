@@ -167,4 +167,32 @@ struct WatchLaterServiceTests {
             #expect(try await service(app).page(user: user, filter: "tv", now: start).atMyServices.map(\.title.name) == ["B"])
         }
     }
+
+    @Test func concurrentAddsKeepOneEntry() async throws {
+        let tmdb = FakeTMDBClient()
+        try await withTestApp(tmdb: tmdb) { app in
+            let user = try await createUser(app, "pat")
+            let movie = try await seedMovie(app, tmdbID: 603)
+            let db = app.db, logger = app.logger, userID = try user.requireID()
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0..<4 {
+                    group.addTask { try await WatchLaterService(db: db).add(userID: userID, title: movie, tmdb: tmdb, today: "2026-11-07", logger: logger) }
+                }
+                try await group.waitForAll()
+            }
+            #expect(try await entries(app).count == 1)
+        }
+    }
+
+    @Test func rewatchRoundWithNothingMarkedKeepsEntry() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let series = try await seedSeries(app, tmdbID: 9, seasons: [1: 1], unaired: ["1x1"])
+            try await listed(app, user, series)
+            let marked = try await WatchService(db: app.db, today: { "2026-11-07" })
+                .markSeries(userID: user.requireID(), titleID: series.requireID(), service: nil, rewatch: true)
+            #expect(marked == 0)
+            #expect(try await entries(app).count == 1)
+        }
+    }
 }

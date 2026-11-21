@@ -10,6 +10,12 @@ import WatchSwiftyClient
         #expect(item.service?.isKnown == false)
     }
 
+    @Test func notificationPrefsFromOlderServerDecode() throws {
+        let json = #"{"announced":true,"soon":false,"today":false,"channel":"mail","availableChannels":["mail"],"webhookConfigured":false,"hasWebhookKey":false,"dailyRunTime":"07:00"}"#
+        let prefs = try JSONDecoder().decode(Components.Schemas.NotificationPrefs.self, from: Data(json.utf8))
+        #expect(prefs.titleAvailable == nil)
+    }
+
     @Test func unknownOfferKindDecodes() throws {
         let json = #"{"providerId":8,"name":"Netflix","kind":"cinema","mine":true}"#
         let offer = try JSONDecoder().decode(Components.Schemas.ProviderOffer.self, from: Data(json.utf8))

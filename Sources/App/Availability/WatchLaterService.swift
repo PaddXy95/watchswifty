@@ -45,7 +45,9 @@ struct WatchLaterService {
     func add(userID: UUID, title: Title, tmdb: any TMDBClient, today: String, now: Date = .now, logger: Logger) async throws {
         let titleID = try title.requireID()
         guard try await !contains(userID: userID, titleID: titleID) else { return }
-        try await WatchLaterEntry(userID: userID, titleID: titleID, addedAt: now, addedOn: today).create(on: db)
+        try await ignoringDuplicate {   // a double click may race this request
+            try await WatchLaterEntry(userID: userID, titleID: titleID, addedAt: now, addedOn: today).create(on: db)
+        }
         do {
             try await AvailabilityService(db: db).refresh(title, tmdb: tmdb, now: now)
             try await AvailabilityNoticeService(db: db).reconcile(titleID: titleID, now: now)

@@ -235,9 +235,10 @@ struct LiveTMDBClient: TMDBClient {
             let flatrate: [ProviderRef]?; let free: [ProviderRef]?; let ads: [ProviderRef]?
             let rent: [ProviderRef]?; let buy: [ProviderRef]?
         }
-        struct Response: Decodable { let results: [String: Region]? }
+        struct Response: Decodable { let results: [String: Region] }
         var result = TMDBWatchProviders()
-        for (code, region) in try JSONDecoder().decode(Response.self, from: data).results ?? [:] {
+        // A body without `results` is not „no offers anywhere“: it would wipe the stored offers and re-notify them later.
+        for (code, region) in try JSONDecoder().decode(Response.self, from: data).results {
             if let link = region.link { result.links[code] = link }
             let groups: [(OfferKind, [ProviderRef]?)] = [(.flatrate, region.flatrate), (.free, region.free), (.ads, region.ads),
                                                          (.rent, region.rent), (.buy, region.buy)]

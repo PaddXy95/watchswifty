@@ -56,6 +56,8 @@ struct StreamingSettingsService {
                 } catch let error as TMDBError {
                     logger.info("Verfügbarkeit für „\(title.name)“ nicht abgefragt: \(error)")
                     if error == .missingToken || error == .unauthorized { return }
+                } catch {
+                    logger.warning("Verfügbarkeit für „\(title.name)“ nicht abgefragt: \(String(describing: type(of: error)))")
                 }
             }
         } catch {

@@ -1,4 +1,5 @@
 @testable import App
+import Elementary
 import Fluent
 import Foundation
 import Testing
@@ -111,5 +112,12 @@ struct AccountStreamingTests {
             })
             #expect(try await User.find(pat.requireID(), on: app.db)?.notifyAvailable == true)
         }
+    }
+
+    @Test func choicesKeepSelectedServicesMissingFromTheList() {
+        let html = StreamingProviderChoices(providers: [TMDBProviderInfo(providerID: 8, name: "Netflix", logoPath: nil, displayPriority: 1)],
+                                            selected: [8, 337]).render()
+        #expect(html.contains(#"<input type="hidden" name="providers[]" value="337">"#))
+        #expect(!html.contains(#"<input type="hidden" name="providers[]" value="8">"#))
     }
 }

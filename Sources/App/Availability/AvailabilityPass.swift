@@ -29,7 +29,7 @@ func refreshWatchLaterAvailability(db: any Database, provider: TMDBProvider, cip
                 else { continue }
                 try await notices.reconcile(titleID: titleID, now: now)
                 result.refreshed += 1
-            } catch let error as TMDBError {
+            } catch {
                 logger.warning("Verfügbarkeit für \(title.name) nicht abgefragt: \(error)")
                 result.failed += 1
             }

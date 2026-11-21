@@ -1,4 +1,5 @@
 @testable import App
+import Elementary
 import Fluent
 import Foundation
 import Testing
@@ -150,5 +151,25 @@ struct AvailabilityPageTests {
             #expect(body.contains(#"hx-post="/movie/603/watch-later""#))
             #expect(body.contains(#"hx-get="/movie/603/availability""#))
         }
+    }
+
+    @Test func freeAtOwnServiceHasNoFalsePromise() async throws {
+        let tmdb = FakeTMDBClient()
+        tmdb.setWatchProviders(kind: .tv, id: 9, TMDBWatchProviders(offers: ["DE": [offer(8, "Netflix", .ads)]]))
+        try await withTestApp(tmdb: tmdb) { app in
+            let (pat, headers) = try await pat(app)
+            let series = try await seedSeries(app, tmdbID: 9, seasons: [1: 2])
+            try await WatchLaterEntry(userID: pat.requireID(), titleID: series.requireID(), addedAt: .now, addedOn: "2026-11-07")
+                .save(on: app.db)
+            let body = try await get(app, "/tv/9/availability", headers.adding(.htmx))
+            #expect(body.contains("Gratis / mit Werbung"))
+            #expect(!body.contains("bekommst du eine Nachricht"))
+        }
+    }
+
+    @Test func justWatchLinkUsesItsCountryPath() {
+        let html = JustWatchLink(region: "GB").render()
+        #expect(html.contains("https://www.justwatch.com/uk"))
+        #expect(JustWatchLink(region: "DE").render().contains("https://www.justwatch.com/de"))
     }
 }
