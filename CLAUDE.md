@@ -139,6 +139,9 @@ Spec `2026-11-11-notifications-design.md`.
   failures), `FakeMailSender`, `FakeWebhookSender`, `FakeReleaseFetcher`.
 - `Tests/AppTests/Fixtures/netflix-sample.csv` holds representative rows; never commit a real user's export.
 - `ReleaseScriptTests` run `scripts/*.sh` in throwaway git repos.
+- `UpgradeTests` migrate databases written by released versions (`Fixtures/upgrade/<tag>.sqlite`, generated with
+  `scripts/upgrade-fixtures/generate.sh <tag>` from that release's code). Never edit a released migration; fix data
+  with a new one.
 
 ## Git workflow
 

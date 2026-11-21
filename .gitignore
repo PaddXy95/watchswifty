@@ -13,3 +13,6 @@ token.key
 # Local tool folders (Claude Code preview config, agent working notes)
 .claude/
 .superpowers/
+
+# Upgrade test fixtures: databases written by released versions
+!Tests/AppTests/Fixtures/upgrade/*.sqlite
