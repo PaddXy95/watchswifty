@@ -2,6 +2,21 @@
 
 All notable changes to WatchSwifty. Versions follow [SemVer](https://semver.org).
 
+## [0.7.1] – 2026-11-27
+
+### Added
+- **Compatibility policy:** [Releases](docs/releases.md#compatibility) lists what stays stable from 1.0.0 on: updates
+  from any earlier release, environment variables, the volume, image tags, CLI commands, and which changes `/api/v1`
+  may and may not get.
+
+### Changed
+- **Weiterschauen** (continue watching) **when you watch a series again:** a series you have watched completely comes
+  back with a card as soon as you watch episodes of it again („Erneut gesehen“, watched again), like a series watched
+  for the first time: after watching S01E01 again the card shows S01E02. Its button records a new viewing of the next
+  episode, and the card leaves the shelf once the new round is complete. The next episode on the series page and in
+  the App API (`next` on `SeriesDetail`) follows the same rule. Watching single episodes again while a series is not
+  finished yet does not move the card back.
+
 ## [0.7.0] – 2026-11-21
 
 ### Added
