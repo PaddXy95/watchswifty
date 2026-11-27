@@ -228,10 +228,13 @@ extension APIHandler {
     /// - Throws: Database errors.
     static func seriesDetail(_ request: Request, user: User, title: Title) async throws -> Components.Schemas.SeriesDetail {
         let model = try await request.seriesDetails.detail(userID: user.requireID(), title: title)
-        // Same rule as „Weiterschauen“: the first aired, unwatched regular episode after the highest watched one.
+        // Same rule as „Weiterschauen“: the first aired, unwatched regular episode after the highest one watched in the
+        // current round.
         let rows = model.seasons.flatMap(\.episodes)
-        let next = App.nextEpisode(in: rows.map(\.info), watched: Set(rows.filter(\.watched).map(\.info.id)),
-                               today: request.watches.today())
+        let today = request.watches.today()
+        let counts = Dictionary(uniqueKeysWithValues: rows.map { ($0.info.id, $0.watches.count) })
+        let round = currentRound(in: rows.map(\.info), watchCounts: counts, today: today)
+        let next = App.nextEpisode(in: rows.map(\.info), watched: round, today: today)
         return .init(
             tmdbId: title.tmdbID, name: title.name, year: title.year, posterPath: title.posterPath,
             overview: title.overview.flatMap { $0.isEmpty ? nil : $0 }, status: title.tmdbStatus,
