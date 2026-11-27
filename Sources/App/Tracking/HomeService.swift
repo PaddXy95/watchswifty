@@ -49,8 +49,10 @@ struct HomeService {
         let titleID = try title.requireID()
         guard let card = try await service.card(userID: userID, titleID: titleID, today: today) else { return nil }
         if expectedEpisodeID == nil || expectedEpisodeID == card.next.id {
+            // `rewatch`: in a new round the next episode was watched before and still needs a watch of its own.
             _ = try await watches.markEpisode(userID: userID, episodeID: card.next.id, day: today,
-                                              service: try await watches.lastService(userID: userID, titleID: titleID))
+                                              service: try await watches.lastService(userID: userID, titleID: titleID),
+                                              rewatch: true)
         }
         return try await service.card(userID: userID, titleID: titleID, today: today)
     }

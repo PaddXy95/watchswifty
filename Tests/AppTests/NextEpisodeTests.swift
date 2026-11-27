@@ -62,4 +62,24 @@ struct NextEpisodeTests {
         #expect(next.name == "4x15")
         #expect(remainingAiredCount(in: eps, from: next, watched: watched, today: Self.today) == 9)
     }
+    @Test func currentRoundIsEverythingWatchedInFirstRound() {
+        let eps = make([1: 3])
+        let counts = Dictionary(uniqueKeysWithValues: ids(eps, ["1x1", "1x2"]).map { ($0, 1) })
+        #expect(currentRound(in: eps, watchCounts: counts, today: Self.today) == ids(eps, ["1x1", "1x2"]))
+    }
+
+    @Test func currentRoundAfterRestart() {
+        let eps = make([0: 1, 1: 3], unaired: ["1x3"])
+        var counts = Dictionary(uniqueKeysWithValues: eps.map { ($0.id, 1) })
+        counts[ids(eps, ["1x1"]).first!] = 2
+        #expect(currentRound(in: eps, watchCounts: counts, today: Self.today) == ids(eps, ["1x1"]))
+        #expect(nextEpisode(in: eps, watched: currentRound(in: eps, watchCounts: counts, today: Self.today),
+                            today: Self.today)?.name == "1x2")
+    }
+
+    @Test func currentRoundEmptyWhenRoundsComplete() {
+        let eps = make([1: 2])
+        let counts = Dictionary(uniqueKeysWithValues: eps.map { ($0.id, 2) })
+        #expect(currentRound(in: eps, watchCounts: counts, today: Self.today).isEmpty)
+    }
 }
