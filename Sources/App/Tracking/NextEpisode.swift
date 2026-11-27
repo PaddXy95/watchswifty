@@ -49,6 +49,21 @@ struct EpisodeInfo: Sendable, Equatable {
     }
 }
 
+/// The episodes watched in the current round: those watched more often than the aired regular episode watched least.
+///
+/// While an aired regular episode is still unwatched that is every watched episode (the first round). Once all of them
+/// are watched, watching some again („Erneut gesehen“) starts a new round, and only those count, so the series is
+/// continued like one watched for the first time. Empty when every round is complete.
+/// - Parameters:
+///   - episodes: All episodes of the series, in any order.
+///   - watchCounts: The number of the user's watches per episode ID; missing = unwatched.
+///   - today: The current day (`YYYY-MM-DD`).
+/// - Returns: IDs of the episodes watched in the current round, to pass as `watched` to ``nextEpisode(in:watched:today:)``.
+func currentRound(in episodes: [EpisodeInfo], watchCounts: [UUID: Int], today: String) -> Set<UUID> {
+    let completed = episodes.filter { $0.season >= 1 && $0.isAired(today: today) }.map { watchCounts[$0.id] ?? 0 }.min() ?? 0
+    return Set(watchCounts.filter { $0.value > completed }.keys)
+}
+
 /// The first aired, unwatched regular episode after the highest watched regular episode
 /// (specials and gaps before the highest watched episode are ignored). Nil = nothing watched or caught up.
 /// - Parameters:

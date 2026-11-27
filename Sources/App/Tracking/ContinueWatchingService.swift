@@ -39,6 +39,7 @@ struct ContinueWatchingService {
     }
 
     /// All cards: series that are not hidden and have an aired, unwatched regular episode after the highest watched one.
+    /// A finished series watched again from the start counts like a new one (see `currentRound(in:watchCounts:today:)`).
     ///
     /// Series with dated watches come first (newest day first), then series with only undated watches (newest recorded
     /// first).
@@ -116,10 +117,11 @@ struct ContinueWatchingService {
         }.map(\.card)
     }
 
-    /// Per series with something left to watch: the first aired regular episode after the highest watched regular
-    /// episode (`nextEpisode(in:watched:today:)`) and how many aired ones there are from there on
-    /// (`remainingAiredCount(in:from:watched:today:)`). Everything after the highest watched episode is unwatched, so SQL
-    /// counts them and returns one row per series instead of every episode of every watched series.
+    /// Per series with something left to watch: the first aired regular episode after the highest regular episode watched
+    /// in the current round (`currentRound(in:watchCounts:today:)`, `nextEpisode(in:watched:today:)`) and how many aired
+    /// ones there are from there on (`remainingAiredCount(in:from:watched:today:)`). Everything after that episode is
+    /// unwatched in this round, so SQL counts them and returns one row per series instead of every episode of every
+    /// watched series.
     /// - Parameters:
     ///   - userID: The user.
     ///   - onlyTitle: Limits the result to this series, or nil for all.
@@ -130,8 +132,9 @@ struct ContinueWatchingService {
                                  today: String) async throws -> [UUID: (next: EpisodeInfo, remaining: Int)] {
         guard let sql = db as? any SQLDatabase else {
             let watches = try await WatchRow.all(userID: userID, episodesOnly: true, titleIDs: onlyTitle.map { [$0] }, on: db)
-            let watched = Set(watches.compactMap(\.episodeID))
+            let counts = Dictionary(watches.compactMap(\.episodeID).map { ($0, 1) }, uniquingKeysWith: +)
             return try await Episode.infos(ofTitles: Array(Set(watches.map(\.titleID))), on: db).compactMapValues { episodes in
+                let watched = currentRound(in: episodes, watchCounts: counts, today: today)
                 guard let next = nextEpisode(in: episodes, watched: watched, today: today) else { return nil }
                 return (next, remainingAiredCount(in: episodes, from: next, watched: watched, today: today))
             }
@@ -155,18 +158,53 @@ struct ContinueWatchingService {
                 SQLBinaryExpression(SQLColumn("season_number", table: table), .multiply, SQLLiteral.numeric("1000000")),
                 .add, SQLColumn("episode_number", table: table)))
         }
-        // Per series: the position of the highest watched regular episode.
-        let highest = SQLSubquery.select { query in
+        // Per episode the user watched: how often.
+        let counts = SQLSubquery.select { query in
             query
-                .column(SQLColumn("title_id", table: "we"), as: "title_id")
-                .column(SQLFunction("MAX", args: position("we")), as: "pos")
+                .column(SQLColumn("episode_id", table: "w"), as: "episode_id")
+                .column(SQLFunction("COUNT", args: SQLLiteral.all), as: "cnt")
                 .from(SQLAlias(SQLIdentifier(Watch.schema), as: SQLIdentifier("w")))
-                .join(SQLAlias(SQLIdentifier(Episode.schema), as: SQLIdentifier("we")), method: SQLJoinMethod.inner,
-                      on: SQLColumn("id", table: "we"), .equal, SQLColumn("episode_id", table: "w"))
                 .where(SQLColumn("user_id", table: "w"), .equal, SQLBind(userID))
-                .where(SQLColumn("season_number", table: "we"), .greaterThanOrEqual, SQLBind(1))
+                .where(SQLColumn("episode_id", table: "w"), .isNot, SQLLiteral.null)
             if let onlyTitle { query.where(SQLColumn("title_id", table: "w"), .equal, SQLBind(onlyTitle)) }
-            return query.groupBy(SQLColumn("title_id", table: "we"))
+            return query.groupBy(SQLColumn("episode_id", table: "w"))
+        }
+        // Per watched series: the completed rounds, i.e. the watch count of the aired regular episode watched least
+        // (`currentRound(in:watchCounts:today:)`); 0 while one is unwatched.
+        let completed = SQLSubquery.select { query in
+            let watchedTitles = SQLSubquery.select { sub in
+                sub.column(SQLColumn("title_id")).from(Watch.schema)
+                    .where(SQLColumn("user_id"), .equal, SQLBind(userID))
+                    .where(SQLColumn("episode_id"), .isNot, SQLLiteral.null)
+                if let onlyTitle { sub.where(SQLColumn("title_id"), .equal, SQLBind(onlyTitle)) }
+                return sub
+            }
+            return query
+                .column(SQLColumn("title_id", table: "ce"), as: "title_id")
+                .column(SQLFunction("MIN", args: SQLFunction.coalesce(SQLColumn("cnt", table: "cc"), SQLLiteral.numeric("0"))),
+                        as: "done")
+                .from(SQLAlias(SQLIdentifier(Episode.schema), as: SQLIdentifier("ce")))
+                .join(SQLAlias(counts, as: "cc"), method: SQLJoinMethod.left,
+                      on: SQLColumn("episode_id", table: "cc"), .equal, SQLColumn("id", table: "ce"))
+                .where(SQLColumn("title_id", table: "ce"), .in, watchedTitles)
+                .where(SQLColumn("season_number", table: "ce"), .greaterThanOrEqual, SQLBind(1))
+                .where(SQLColumn("air_date", table: "ce"), .isNot, SQLLiteral.null)
+                .where(SQLColumn("air_date", table: "ce"), .lessThanOrEqual, SQLBind(today))
+                .groupBy(SQLColumn("title_id", table: "ce"))
+        }
+        // Per series: the position of the highest regular episode watched in the current round.
+        let highest = SQLSubquery.select { $0
+            .column(SQLColumn("title_id", table: "we"), as: "title_id")
+            .column(SQLFunction("MAX", args: position("we")), as: "pos")
+            .from(SQLAlias(counts, as: "c"))
+            .join(SQLAlias(SQLIdentifier(Episode.schema), as: SQLIdentifier("we")), method: SQLJoinMethod.inner,
+                  on: SQLColumn("id", table: "we"), .equal, SQLColumn("episode_id", table: "c"))
+            .join(SQLAlias(completed, as: "r"), method: SQLJoinMethod.left,
+                  on: SQLColumn("title_id", table: "r"), .equal, SQLColumn("title_id", table: "we"))
+            .where(SQLColumn("season_number", table: "we"), .greaterThanOrEqual, SQLBind(1))
+            .where(SQLColumn("cnt", table: "c"), .greaterThan,
+                   SQLFunction.coalesce(SQLColumn("done", table: "r"), SQLLiteral.numeric("0")))
+            .groupBy(SQLColumn("title_id", table: "we"))
         }
         // Per series: how many aired episodes come after it, and the position of the first.
         let pending = SQLSubquery.select { $0

@@ -159,4 +159,62 @@ struct ContinueWatchingTests {
             #expect(try await service.card(userID: user.requireID(), titleID: show.requireID(), today: Self.today) == nil)
         }
     }
+    /// Watching a finished series again from the start puts it back on the shelf, like a series never watched.
+    @Test func restartedSeriesShowsNextEpisodeOfNewRound() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3, 2: 2])
+            _ = try await ws(app).markSeries(userID: userID, titleID: show.requireID(), service: nil)
+            #expect(try await cards(app, user).isEmpty)
+
+            _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, show, 1, 1).requireID(), day: "2026-11-06",
+                                              service: nil, rewatch: true)
+            let card = try #require(try await cards(app, user).first)
+            #expect(card.next.season == 1 && card.next.number == 2 && card.remaining == 4)
+        }
+    }
+
+    /// „Weiterschauen“ on a card of a new round adds a watch although the episode was watched before.
+    @Test func markNextAdvancesThroughNewRound() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3])
+            _ = try await ws(app).markSeries(userID: userID, titleID: show.requireID(), service: nil)
+            _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, show, 1, 1).requireID(), day: nil,
+                                              service: nil, rewatch: true)
+            let home = HomeService(db: app.db, watches: ws(app))
+            let next = try await home.markNext(userID: userID, title: show, expectedEpisodeID: nil, today: Self.today)
+            #expect(next?.next.number == 3)
+            #expect(try await home.markNext(userID: userID, title: show, expectedEpisodeID: nil, today: Self.today) == nil)
+            #expect(try await Watch.query(on: app.db).count() == 6)
+        }
+    }
+
+    /// A finished second round leaves the shelf again.
+    @Test func completedRewatchExcluded() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3])
+            _ = try await ws(app).markSeries(userID: userID, titleID: show.requireID(), service: nil)
+            _ = try await ws(app).markSeries(userID: userID, titleID: show.requireID(), service: nil, rewatch: true)
+            #expect(try await cards(app, user).isEmpty)
+        }
+    }
+
+    /// Rewatching one episode during the first round does not move the card back.
+    @Test func rewatchDuringFirstRoundKeepsProgress() async throws {
+        try await withTestApp { app in
+            let user = try await createUser(app, "pat")
+            let userID = try user.requireID()
+            let show = try await seedSeries(app, tmdbID: 1, seasons: [1: 3, 2: 2])
+            _ = try await ws(app).markSeason(userID: userID, titleID: show.requireID(), season: 1, service: nil)
+            _ = try await ws(app).markEpisode(userID: userID, episodeID: episode(app, show, 1, 1).requireID(), day: nil,
+                                              service: nil, rewatch: true)
+            let card = try #require(try await cards(app, user).first)
+            #expect(card.next.season == 2 && card.next.number == 1 && card.remaining == 2)
+        }
+    }
 }

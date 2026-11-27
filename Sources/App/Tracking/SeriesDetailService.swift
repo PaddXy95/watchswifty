@@ -96,7 +96,8 @@ struct SeriesDetailService {
             list.sorted { ($0.watchedOn ?? "", $0.createdAt ?? .distantPast) > ($1.watchedOn ?? "", $1.createdAt ?? .distantPast) }
         }
         let infos = episodes.map(EpisodeInfo.init)
-        let openSeason = open ?? nextEpisode(in: infos, watched: Set(byEpisode.keys), today: today)?.season
+        let round = currentRound(in: infos, watchCounts: byEpisode.mapValues(\.count), today: today)
+        let openSeason = open ?? nextEpisode(in: infos, watched: round, today: today)?.season
             ?? (watchList.isEmpty ? infos.first(where: { $0.season >= 1 })?.season : nil)
         let grouped = Dictionary(grouping: episodes, by: \.season)
         let comments = try await watches.seasonComments(userID: userID, titleID: title.requireID())
